@@ -1,0 +1,4 @@
+This directory contains common calibration records common to the entire 
+pipeline, such as flag bit definitions in flagdefs.txt, the az/el pixel 
+offsets in offsets.txt, etc.
+
