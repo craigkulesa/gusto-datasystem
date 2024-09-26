@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <unistd.h>
 #include <curl/curl.h>
+#include <sys/param.h>
 #include "corrspec.h"
 #include "influx.h"
 
-#define MAXLENGTH 16
+#define MAXLENGTH 5
 #define DEBUG 0
 
 influxStruct *influxReturn=NULL;
@@ -14,13 +14,13 @@ int numNames=0;
 
 void extract_all_keyword_values(const char *source, const char *keyword) {
     const char *found = source;
-    char result[63];
+    char result[64];
     int result_size = sizeof(result);
     int i=0;
-    char ID[63]="";
+    char ID[64]="";
 
     // Loop until no more keywords are found
-    while ((found = strstr(found, keyword)) != NULL) {
+    while ((found = strstr(found, keyword)) != NULL && i<MAXLENGTH) {
         // Move the pointer to the position after the keyword
         found += strlen(keyword);
 
@@ -140,7 +140,7 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     while (token != NULL ){
 
 	memset(ID, '\0', sizeof(ID));
-        strncpy(ID, token+1, strlen(token)-2);
+        strncpy(ID, token+1, MIN(strlen(token)-2, sizeof(ID)-1));
 
         if(!strcmp(ID, "time"))
             time_indx = pos;
@@ -148,7 +148,7 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
         if(!strcmp(ID, "scanID"))
             scan_indx = pos;
 
-        if(!strcmp(ID, "TARGET"))
+        if(!strcmp(ID, "volt"))
             text_indx = pos;
 
         token = strtok(NULL, ",");
@@ -170,15 +170,13 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     // load names into allocated space for names
     extract_all_keyword_values(contents, "name\":");
 
-    // Set all struct values to 0, just in case we don't get any returns from influxDB
-    //memset(&influxReturn, 0, sizeof(influxReturn));
     for (int i=0; i<influxReturn->length; i++){
 	    influxReturn->value[i] = 0.;
     }
 
-
     // Parse the InfluxDB return string 
     int data_indx=0;
+    //    printf("%s\n", contents);
     for(int i=0; i<nmeas; i++){
         extract_substring(contents, start_str2, end_char, i+1, result);
 
@@ -188,7 +186,7 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
 
 	        if(pos == time_indx){
 	                memset(ID, '\0', sizeof(ID));
-		        strncpy(ID, token+1, strlen(token)-2);
+		        strncpy(ID, token+1, MIN(strlen(token)-2, sizeof(ID)-1));
 			strcpy(influxReturn->time, ID);
                         if(DEBUG)
 			  printf("time string = %s\n", ID);
@@ -196,23 +194,15 @@ size_t write_callback(char *contents, size_t size, size_t nmemb, void *userp) {
     
 	        else if(pos == scan_indx){
 	                memset(ID, '\0', sizeof(ID));
-		        strncpy(ID, token+1, strlen(token)-2);
+		        strncpy(ID, token+1, MIN(strlen(token)-2, sizeof(ID)-1));
 		        influxReturn->scanID = atoi(ID);
                         if(DEBUG)
 			  printf("scanID string = %s\n", ID);
 	        }
 
 	        else if(pos == text_indx){
-	                memset(ID, '\0', sizeof(ID));
-		        strncpy(ID, token+1, strlen(token)-2);
-			strcpy(influxReturn->text, ID);
-                        if(DEBUG)
-			  printf("text string = %s\n", ID);
-	        }
-
-	        else{
 	                memset(data, '\0', sizeof(data));
-		        strncpy(data, token, sizeof(data)-1);
+		        strncpy(data, token, MIN(strlen(token), sizeof(data)-1));
 		        influxReturn->value[data_indx] = atof(data);
                         if(DEBUG)
 			  printf("data string %d = %s\n", data_indx, data);
@@ -254,10 +244,9 @@ influxStruct* influxWorker(CURL *curl, char *query)
 
         // Make the HTTP POST request
         curl_easy_perform(curl);
+	curl_easy_cleanup(curl);
     }
-
    // Cleanup Influx DB
-   curl_easy_cleanup(curl);
    curl_global_cleanup();
 
    return influxReturn;      //return the struct
@@ -274,7 +263,6 @@ CURL *init_influx()
 
     // Create a CURL handle
     curl = curl_easy_init();
-
     return curl;
 }
 

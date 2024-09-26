@@ -1,9 +1,6 @@
 #include "corrspec.h"
 #include "callback.h"
 
-#define handle_error(msg) \
-	do { perror(msg); exit(EXIT_FAILURE); } while (0)
-
 extern struct coeffs c;
 
 // load up the QC coefficients from file and store as struct coeffs c
@@ -20,24 +17,11 @@ int readQCfile()
 
 struct Spectrum spec[4];
 
-static void handler(int sig, siginfo_t *si, void *unused)
-{
-   printf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
-   printf("Gracefully exiting\n");
-   sleep(3);
-}
-
 int main(int argc, char **argv) {
 
    // Set up SIGSEGV handler
    FILE *fp;
    char fileName[128];
-   struct sigaction sa;
-   sa.sa_flags = SA_SIGINFO;
-   sigemptyset(&sa.sa_mask);
-   sa.sa_sigaction = handler;
-   if (sigaction(SIGSEGV, &sa, NULL) == -1)
-	   handle_error("sigaction");
 
    c.len = readQCfile();
 

@@ -1,5 +1,6 @@
-#define _XOPEN_SOURCE
+#define _XOPEN_SOURCE 500
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <it/math.h>
 #include <fftw3.h>
