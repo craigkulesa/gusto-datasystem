@@ -7,6 +7,7 @@
 #define REF 0.025
 
 struct coeffs c;
+float dacV[4][4]; // DEV and then 0=VIhi, 1=VQhi, 2=VIlo, 3=VQlo
 
 // perform the polynomial fit to the QC correction
 // using the coefficients loaded from coeffs.txt at runtime
@@ -26,6 +27,32 @@ float polyfit(double x, double y)
   return (float)z;
 }
 
+// Single SELECT for CORRELATOR DACS from nearest previous Correlator Cal
+int getDACVfromInflux(int band, char *scanIDregex) {
+   int DEV, UNIT, CALID;
+   CURL *curl;
+   char *query = malloc(BUFSIZ);
+
+   for(DEV=0; DEV<4; DEV++) {
+      if(band==1)
+         UNIT=6;
+      else
+         UNIT=4;
+      curl = init_influx();
+      sprintf(query, "&q=SELECT * FROM /^ACS%d_DEV%d_*/ WHERE \"scanID\"=~/^%s/ ORDER BY time DESC LIMIT 5", UNIT-1, DEV+1, scanIDregex);
+      influxReturn = influxWorker(curl, query);
+      //      Order is reverse alphabetical from InfluxDB SELECT
+      dacV[DEV][0] = influxReturn->value[3]; //VIhi  
+      dacV[DEV][1] = influxReturn->value[1]; //VQhi
+      dacV[DEV][2] = influxReturn->value[2]; //VIlo
+      dacV[DEV][3] = influxReturn->value[0]; //VQlo
+      CALID = influxReturn->scanID;
+      // Free Influx struct from ACS_DEV_VDAC
+      freeinfluxStruct(influxReturn);
+   }
+   free(query);
+   return(CALID);
+}
 
 void get_proctime(char *proctime) {
    char command[BUFSIZ];
@@ -89,13 +116,13 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
             fits_write_key(fptr, TSTRING, "TELESCOP",  "GUSTO",   "", &status);
             fits_write_key(fptr, TSTRING, "LINE",      &line,     "", &status);
-            fits_write_key(fptr, TFLOAT,  "LINEFREQ",  &linefreq, "", &status);
+            fits_write_key(fptr, TFLOAT,  "LINEFREQ",  "1900.0", "", &status);
             fits_write_key(fptr, TINT,    "BAND",      &band,     "GUSTO band #",     &status);
             fits_write_key(fptr, TINT,    "NPIX",      &npix,     "N spec pixels",    &status);
-            fits_write_key(fptr, TSTRING, "DLEVEL",    "0.7",      "data level",      &status);
+            fits_write_key(fptr, TSTRING, "DLEVEL",    "0.5",      "data level",      &status);
             get_proctime(proctime);
             fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time", &status);
-            fits_write_key(fptr, TINT,    "SER_FLAG",  "0",       "SERIES FLAG",     &status);
+            fits_write_key(fptr, TINT,    "SEQFLAG",  "0",       "SEQUENCE FLAG",     &status);
 
 
             // Define the column parameters
@@ -276,7 +303,7 @@ char nthdigit(int x, int n)
 
 // Callback function to process the file
 void callback(char *filein){
-   char *fullpath= malloc(80*sizeof(char));
+   char *fullpath= malloc(128*sizeof(char));
    strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
 
    char *datafile;	// datafile is filename with no path - used in fits header
@@ -286,9 +313,6 @@ void callback(char *filein){
    } else {
 	   datafile = fullpath;
    }
-   // InfluxDB easy_curl objects
-   CURL *curl;
-   char *query = malloc(BUFSIZ);
 
    //timing
    struct timeval begin, end;
@@ -303,33 +327,20 @@ void callback(char *filein){
 
    // correlator variables from datafile
    uint64_t UNIXTIME=0;
-   int NINT=0;
-   int UNIT;
-   int DEV;
-   int NBYTES;
-   float FRAC=0;
-   int MIXER;
-
-   float FS_FREQ; // Full scale frequency, B1==5000MHz || B2==5000MHz
-   float dacV[4][4]; // DEV and then 0=VIhi, 1=VQhi, 2=VIlo, 3=VQlo
-   float VIhi,  VQhi,  VIlo,  VQlo;
+   int NINT=0, UNIT, DEV, NBYTES, MIXER;
+   float FRAC=0, FS_FREQ; // Full scale frequency, B1==5000MHz || B2==5000MHz
+   float VIhi = 0.0, VQhi = 0.0, VIlo = 0.0, VQlo = 0.0;
 
    // For normalized float correlator lags from Quant Corr
-   float *Rn;
-   float *Rn2;
+   float *Rn, *Rn2;
 
    // file open notification
    printf("opened file: %s\n", filein);
    fp = fopen(filein, "r");
 
    // tokenize scanID from filename
-   char *token;
-   int position = 0;
-   int band    = -1;
-   char *prefix=malloc(8*sizeof(char));;
-   int scanID  = -1;
-   int subScan = -1;
-
+   char *token, *prefix=malloc(8*sizeof(char));
+   int position = 0, band = -1, scanID = -1, subScan = -1;
    int CALID   = -1;	// scanID of previous correlator calibration
    bool error  = FALSE;	// status of error which may end processing early
 
@@ -404,24 +415,7 @@ void callback(char *filein){
      printf("File has %.1f spectra\n", (float)sz/bps);
 
    int32_t header[22];
-   // Single SELECT for CORRELATOR DACS from current or nearest previous Correlator Cal
-   for(DEV=0; DEV<4; DEV++) {
-     if(band==1)
-         UNIT=6;
-     else
-         UNIT=4;
-      curl = init_influx();
-      sprintf(query, "&q=SELECT * FROM /^ACS%d_DEV%d_*/ WHERE \"scanID\"=~/^%s/ ORDER BY time DESC LIMIT 10", UNIT-1, DEV+1, scanIDregex);
-      influxReturn = influxWorker(curl, query);
-      dacV[DEV][0] = influxReturn->value[3]; //VIhi  Order is reverse alphabetical from InfluxDB SELECT
-      dacV[DEV][1] = influxReturn->value[1]; //VQhi
-      dacV[DEV][2] = influxReturn->value[2]; //VIlo
-      dacV[DEV][3] = influxReturn->value[0]; //VQlo
-      CALID = influxReturn->scanID;
 
-      // Free Influx struct from ACS_DEV_VDAC
-      freeinfluxStruct(influxReturn);
-   }
    corr.corrtime=0;
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
 
@@ -480,32 +474,33 @@ void callback(char *filein){
 	 error = TRUE;
          break;
       }
+      // go to influx now that we are more sure the data are OK
+      if(j == 0) { // but only do it once
+	CALID = getDACVfromInflux(band, scanIDregex);
+	// just copy from vector into floats
+	VIhi = dacV[DEV-1][0];
+	VQhi = dacV[DEV-1][1];
+	VIlo = dacV[DEV-1][2];
+	VQlo = dacV[DEV-1][3];
 
-      // don't trust myself to rewrite the below, just copy from vector into floats
-      VIhi = dacV[DEV-1][0];
-      VQhi = dacV[DEV-1][1];
-      VIlo = dacV[DEV-1][2];
-      VQlo = dacV[DEV-1][3];
-
-      // this section unfuck-ifys special cases when ICE was off by one
-      if (VQlo==0.){
-         VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
-         VQhi = dacV[DEV-1][0];
-         VIlo = dacV[DEV-1][1];
-         VQlo = dacV[DEV-1][2];
-      }
+	// this section unfuck-ifys special cases when ICE was off by one
+	if (VQlo==0.){
+	  VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
+	  VQhi = dacV[DEV-1][0];
+	  VIlo = dacV[DEV-1][1];
+	  VQlo = dacV[DEV-1][2];
+	}
       
-      if (VIhi==0.){ //Still no values?  bail and don't make spectra
-         printf("######################## ERROR ###########################\n");
-         printf("#                  Error, no DAC values!                 #\n");
-         printf("#                        Exiting!                        #\n");
-         printf("######################## ERROR ###########################\n");
-         break;
+	if (VIhi==0.){ //Still no values?  bail and don't make spectra
+	  printf("######################## ERROR ###########################\n");
+	  printf("#                  Error, no DAC values!                 #\n");
+	  printf("#                        Exiting!                        #\n");
+	  printf("######################## ERROR ###########################\n");
+	  break;
+	}
+	if (DEBUG)
+	  printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
       }
-
-      if (DEBUG)
-         printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
-      
       if (NBYTES==8256)
          N = 512;
       else if (NBYTES==6208)
@@ -630,9 +625,11 @@ void callback(char *filein){
          array[i] = sqrt(P_I*P_Q) * sqrt(pow(spec[specA].out[i][0],2)+pow(spec[specA].out[i][1],2));
       }
 
-      // Let's try out CFITSIO!
       char fitsfile[32];
-      sprintf(fitsfile, "ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
+      if(UNIT == 4) // band 2
+	 sprintf(fitsfile, "./build/B2/ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
+      else if (UNIT == 6) // band 1
+	 sprintf(fitsfile, "./build/B1/ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
       if (DEBUG)
          printf("%s\n", fitsfile);
       append_to_fits_table(fitsfile, fits_header, array); 
@@ -683,7 +680,6 @@ void callback(char *filein){
    fflush(stdout);
 
    free(prefix);
-   free(query);
    free(fullpath);
 }
 

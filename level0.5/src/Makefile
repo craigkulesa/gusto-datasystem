@@ -1,19 +1,19 @@
 KERNEL := $(shell uname -s)
 
-CFLAGS := -O2 -g -Wall #-fsanitize=address
+CFLAGS := -O2 -Wall #-fsanitize=address
 
-ifeq ($(KERNEL), Linux)
+ifeq ($(KERNEL), $(filter $(KERNEL), Linux NetBSD FreeBSD))
       CXX := gcc
       INCLUDES := -I/usr/local/include -I/usr/pkg/include 
-      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/usr/pkg/lib -L/usr/local/lib -lm -lfftw3 -lcurl -lcfitsio -lc
+      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/usr/pkg/lib -L/usr/local/lib -lm -lfftw3 -lcurl -lcfitsio
 
 else ifeq ($(KERNEL), Darwin)
       CXX := clang
       INCLUDES := -I/usr/local/include -I/opt/pkg/include 
-      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/opt/pkg/lib -lm -lfftw3 -lcfitsio -lcurl -lc
+      LIBS := -Wl,-rpath,/usr/local/lib -lit -L/opt/pkg/lib -lm -lfftw3 -lcfitsio -lcurl
 
 else
-      $(error unknown kernel)
+      $(error unknown OS)
 
 endif
 
