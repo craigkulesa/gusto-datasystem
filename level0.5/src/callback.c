@@ -475,32 +475,33 @@ void callback(char *filein){
          break;
       }
       // go to influx now that we are more sure the data are OK
-      if(j == 0) { // but only do it once
+      if(j == 0)  // but only do it once
 	CALID = getDACVfromInflux(band, scanIDregex);
+      
 	// just copy from vector into floats
-	VIhi = dacV[DEV-1][0];
-	VQhi = dacV[DEV-1][1];
-	VIlo = dacV[DEV-1][2];
-	VQlo = dacV[DEV-1][3];
+      VIhi = dacV[DEV-1][0];
+      VQhi = dacV[DEV-1][1];
+      VIlo = dacV[DEV-1][2];
+      VQlo = dacV[DEV-1][3];
 
 	// this section unfuck-ifys special cases when ICE was off by one
-	if (VQlo==0.){
-	  VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
-	  VQhi = dacV[DEV-1][0];
-	  VIlo = dacV[DEV-1][1];
-	  VQlo = dacV[DEV-1][2];
-	}
-      
-	if (VIhi==0.){ //Still no values?  bail and don't make spectra
-	  printf("######################## ERROR ###########################\n");
-	  printf("#                  Error, no DAC values!                 #\n");
-	  printf("#                        Exiting!                        #\n");
-	  printf("######################## ERROR ###########################\n");
-	  break;
-	}
-	if (DEBUG)
-	  printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+      if (VQlo==0.){
+	VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
+	VQhi = dacV[DEV-1][0];
+	VIlo = dacV[DEV-1][1];
+	VQlo = dacV[DEV-1][2];
       }
+      
+      if (VIhi==0.){ //Still no values?  bail and don't make spectra
+	printf("######################## ERROR ###########################\n");
+	printf("#                  Error, no DAC values!                 #\n");
+	printf("#                        Exiting!                        #\n");
+	printf("######################## ERROR ###########################\n");
+	break;
+      }
+      if (DEBUG)
+	printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
+      
       if (NBYTES==8256)
          N = 512;
       else if (NBYTES==6208)
