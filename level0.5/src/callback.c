@@ -5,8 +5,11 @@
 #define PI 3.14159
 #define DEBUG 0
 #define REF 0.025
+#define CIIFREQ 1900.537
+#define NIIFREQ 1461.131
 
 struct coeffs c;
+int CALID = -1, lastBand = 0, lastScanID = 0;
 float dacV[4][4]; // DEV and then 0=VIhi, 1=VQhi, 2=VIlo, 3=VQlo
 
 // perform the polynomial fit to the QC correction
@@ -16,7 +19,7 @@ float polyfit(double x, double y)
   double z = 0.0;
   int idx;
   // These limits ensure that the returned vals are ceiling'd to 1.0 or floored to -1.0
-  // even if the polyfit diverges outside of the fit region.  For safety, derived from omnisys dll.
+  // even if the polyfit diverges outside of the fit region.  For safety; derived from omnisys dll.
   float yMax[50]={0.00,0.02,0.03,0.04,0.06,0.07,0.08,0.09,0.11,0.12,0.14,0.15,0.17,0.19,0.20,0.22,0.24,0.26,0.28,0.30,0.32,0.34,0.37,0.39,0.41,0.43,0.45,0.47,0.49,0.51,0.53,0.55,0.57,0.59,0.60,0.62,0.64,0.65,0.66,0.68,0.69,0.70,0.71,0.72,0.73,0.73,0.74,0.74,0.75,0.75};
   for(idx = 0; idx < c.len+1; idx++)
       z += c.a[idx] * pow(x, (double)c.i[idx]) * pow(y, (double)c.j[idx]);
@@ -29,7 +32,7 @@ float polyfit(double x, double y)
 
 // Single SELECT for CORRELATOR DACS from nearest previous Correlator Cal
 int getDACVfromInflux(int band, char *scanIDregex) {
-   int DEV, UNIT, CALID;
+   int DEV, UNIT;
    CURL *curl;
    char *query = malloc(BUFSIZ);
 
@@ -76,13 +79,10 @@ void get_proctime(char *proctime) {
 void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array) {
     fitsfile *fptr;  // FITS file pointer
     int status = 0;  // CFITSIO status value MUST be initialized to zero!
-    int array_length;
+    int array_length, band, npix, seqflag = 0;
     long nrows;
-    char extname[] = "DATA_TABLE";
-    char proctime[256];
-    char line[4];
+    char extname[] = "DATA_TABLE", proctime[256], line[4];
     float linefreq;
-    int band, npix;
     
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
     if (fits_open_file(&fptr, filename, READWRITE, &status)) {
@@ -105,24 +105,26 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 	       strcpy(line, "NII");
 	       band = 1;
 	       npix = 512;
+	       linefreq = NIIFREQ;
             }
             if (fits_header->unit == 4){ //ACS3 B2
 	       strcpy(line, "CII");
 	       band = 2;
 	       npix = 1024;
+	       linefreq = CIIFREQ;
             }
 
 	    // Create some Primary header keyword value pairs and fill them from the current fits_header struct
             fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
-            fits_write_key(fptr, TSTRING, "TELESCOP",  "GUSTO",   "", &status);
-            fits_write_key(fptr, TSTRING, "LINE",      &line,     "", &status);
-            fits_write_key(fptr, TFLOAT,  "LINEFREQ",  "1900.0", "", &status);
+            fits_write_key(fptr, TSTRING, "TELESCOP",  "GUSTO",   "Observatory Name", &status);
+            fits_write_key(fptr, TSTRING, "LINE",      &line,     "Line Name", &status);
+            fits_write_key(fptr, TFLOAT,  "LINEFREQ",  &linefreq, "Line freq in GHz", &status);
             fits_write_key(fptr, TINT,    "BAND",      &band,     "GUSTO band #",     &status);
             fits_write_key(fptr, TINT,    "NPIX",      &npix,     "N spec pixels",    &status);
             fits_write_key(fptr, TSTRING, "DLEVEL",    "0.5",      "data level",      &status);
             get_proctime(proctime);
-            fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time", &status);
-            fits_write_key(fptr, TINT,    "SEQFLAG",  "0",       "SEQUENCE FLAG",     &status);
+            fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time",  &status);
+            fits_write_key(fptr, TINT,    "SEQFLAG",   &seqflag,       "SEQUENCE FLAG",    &status);
 
 
             // Define the column parameters
@@ -271,36 +273,6 @@ void printDateTimeFromEpoch(time_t ts)
    printf("UTC Date and Time: %s\n", buffer);
 }
 
-
-long get_seconds(const char *timestamp)
-{
-   struct tm t;
-
-   memset(&t, 0, sizeof(struct tm));
-   strptime(timestamp, "%Y-%m-%dT%H:%M:%S", &t);
-   time_t seconds = mktime(&t) - 25200;  //TODO: fix this hardcoded offset to UTC
-
-   return (long) seconds;
-}
-
-
-int numPlaces (int n)
-{
-   if (n < 0)  return numPlaces ((n == INT_MIN) ? INT_MAX: -n);
-   if (n < 10) return 1;
-   return 1 + numPlaces (n / 10);
-}
-
-
-char nthdigit(int x, int n)
-{
-   while (n--) {
-      x /= 10;
-   }
-   return (x % 10) + '0';
-}
-
-
 // Callback function to process the file
 void callback(char *filein){
    char *fullpath= malloc(128*sizeof(char));
@@ -341,7 +313,6 @@ void callback(char *filein){
    // tokenize scanID from filename
    char *token, *prefix=malloc(8*sizeof(char));
    int position = 0, band = -1, scanID = -1, subScan = -1;
-   int CALID   = -1;	// scanID of previous correlator calibration
    bool error  = FALSE;	// status of error which may end processing early
 
    // Find file type from filename
@@ -433,9 +404,9 @@ void callback(char *filein){
        UNIXTIME = (((uint64_t)value2 << 32) | value1 ) / 1000.; //unixtime is to msec, store as 1sec int
        FRAC     = (((uint64_t)value2 << 32) | value1 ) % 1000 ; //fractional part is 1msec
      }
-     else{
+     else
        fread(&value, 4, 1, fp);
-     }
+     
      header[i] = (value);
    }
 
@@ -475,9 +446,13 @@ void callback(char *filein){
          break;
       }
       // go to influx now that we are more sure the data are OK
-      if(j == 0)  // but only do it once
+      if(j == 0 && (band != lastBand || scanID != lastScanID)) {  // but only do it once per band or scanID
+	if(DEBUG)
+	  printf("ScanID or band changed, doing Influxdb lookup\n");
 	CALID = getDACVfromInflux(band, scanIDregex);
-      
+	lastScanID = scanID;  // we now have data for this scanID 
+	lastBand = band;      // and band
+      }
 	// just copy from vector into floats
       VIhi = dacV[DEV-1][0];
       VQhi = dacV[DEV-1][1];
@@ -666,12 +641,10 @@ void callback(char *filein){
       printf("NINT is %d\n", NINT);
       printf("nlags=%d\n", N);
       printf("etaQ\t%.3f\n", 1/sqrt(P_I*P_Q));
-      // current scanID, and scanID used for cal
       printf("The cal    is from scanID: %d\n", CALID);
       printf("The data   is from scanID: %d\n", scanID);
    }
 
-   //timing
    gettimeofday(&end, 0);
    int seconds = end.tv_sec - begin.tv_sec;
    int microseconds = end.tv_usec - begin.tv_usec;

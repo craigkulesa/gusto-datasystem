@@ -26,5 +26,5 @@ corrspec: corrspec.c corrspec.h callback.c callback.h influx.c influx.h
 all: corrspec
 
 clean:
-	rm -f corrspec *.o *~ *.log x?? 
+	rm -f corrspec *.o *~ *.log ../x?? 
 
