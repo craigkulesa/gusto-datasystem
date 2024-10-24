@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 import shutil
+import configparser
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import numpy as np
@@ -22,11 +23,11 @@ def doStuff(scan):
     CHANNEL_FLAG = data['CHANNEL_FLAG']
 
     if 'HISTORY' not in header:
-        print("No history entries found in the header .. continuing")
+        print(scan, " No bad channels flag in header .. flagging bad channels")
     else:
         history_list = header['HISTORY']
         if f'known bad {line} channels flagged' in history_list:
-            print('flagging already done .. stopping')
+            print(scan, " Flagging already done .. stopping")
             exit
 
     # Known spikes
@@ -64,10 +65,24 @@ def doStuff(scan):
     hdu.flush()
 
 
-directory = "/home/young/Projects/GUSTO/level0.8/ACS3"
+# ConfigParser Object
+config = configparser.ConfigParser()
+
+# Read config file for Data Paths
+config.read('config.ini')
+paths=[]
+paths.append(config.get('Paths', 'B1_path'))
+paths.append(config.get('Paths', 'B2_path'))
+
 partial = sys.argv[1]
-search_files = sorted(glob.glob(f"{directory}/{partial}.fits"))
+search_files=[]
+for path in paths:
+   search_files+=sorted(glob.glob(f"{path}/{partial}.fits"))
+
 for file in (search_files):
     doStuff(file)
+
+
+
 
 
