@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gustoL09P"
+version = "0.1.0"
+description = "GUSTO Level 09 Pipeline package"
+authors = [{name="vtcloud"}]
+license = {file = "LICENSE"}
+readme = "README.rst"
+requires-python = ">=3.9"
+dependencies = ["dynamic"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["./requirements.txt"]}
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ['*']
+#namespaces = false
+
+[tool.setuptools.package-data]
+"*" = ["*.dat", "*.txt"]
+
+[project.optional-dependencies]
+rest = ["docutils>=0.3", "pack ==1.1, ==1.3"]
+
+[project.scripts]
+execGL09P = "gustoL09P.execGUSTOL09P:execGL09P"
+
+[project.urls]
+"Homepage" = "https://github.com/vtcloud/gustoL09P"
+"Bug Tracker" = "https://github.com/vtcloud/gustoL09P/issues"

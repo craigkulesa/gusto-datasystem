@@ -1,0 +1,58 @@
+# GUSTO Level 0.9 Pipeline Configuration File
+[DEFAULT]
+# The home directory can be either ${ghome} or be provided
+# with an explicit path.
+# home = ${ghome}/GUSTO/DATA/Pipeline
+ghome = /rdat/Projects/GUSTO/Data/Pipeline
+dhome = /rdat/Projects/GUSTO/Data
+
+
+[GUSTO_Directories]
+# The directories should be relative to the home directory.
+# when executing, a date+time stamp is added to the work directory
+# within the python function
+workDir = ${ghome}/work
+L08DataDir = ${dhome}/L08Data
+L09DataDir = ${dhome}/L09Data
+L10DataDir = ${dhome}/L09Data
+logDir = ${ghome}/work/logs
+tmpDir = ${ghome}/work/tmp
+
+
+[GUSTO_Processing]
+number_of_cpus = 4
+# list of processing parameters for individual pipelines
+l09save2fits = True
+l09set_channel_flags = True
+# select lines for processing
+# lines = ['CII']
+lines = NII, CII
+debug = False
+
+
+[GUSTO_Parameters]
+# with full path!
+GParameterFile = ~/git/src/gustoL09/Data/GUSTO_Baseline_Data_draft3.xlsx
+
+
+[CII_Parameters]
+# line rest frequency
+cii_freq = 1900.5369
+cii_freq_err = 0.0013
+cii_freq_unit = GHz
+cii_catalog = CDMS
+# fiducial velocity pixel for alignment
+cii_vfid = 0.0
+cii_pix = 1024
+
+
+[NII_Parameters]
+# line rest frequency
+nii_freq = 1461.13141
+nii_freq_err = 0.142
+nii_freq_unit = GHz
+nii_catalog = SLAIM
+# fiducial velocity pixel for alignment
+nii_vfid = 0.0
+nii_pix = 512
+
