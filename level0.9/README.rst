@@ -27,6 +27,21 @@ Current use is reading in the Level 0.8 data and creating a Level 0.9 data produ
 
 - execGL09P
 
+The program uses a parameter setup file including information about where it can find
+the data files and where to put them. The assumed data tree is like:
+
+| <data root directory>
+| ├── <level 0.7>
+| ├── <level 0.8>
+| ├── <level 0.9>         
+| ├── <level 0.95>
+| └── <level 1.0>
+
+// | ├── processes          
+// | │   ├── area.py
+// | │   └── bboxinout.py
+ 
+
 ## Contributing
 
 Interested in contributing? Check out the contributing guidelines. Please note that 
@@ -34,7 +49,7 @@ this project is released with a Code of Conduct. By contributing to this project
 
 ## License
 
-`vtcloud_template_package` was created by vtcloud. It is licensed under the terms of the CC0 v1.0 Universal license.
+`gustoL09P` was created by vtcloud. It is licensed under the terms of the CC0 v1.0 Universal license.
 
 ## Credits
 
