@@ -36,10 +36,6 @@ the data files and where to put them. The assumed data tree is like:
 | ├── <level 0.9>         
 | ├── <level 0.95>
 | └── <level 1.0>
-
-// | ├── processes          
-// | │   ├── area.py
-// | │   └── bboxinout.py
  
 
 ## Contributing
