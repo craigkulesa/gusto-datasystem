@@ -19,6 +19,14 @@ from astropy.table import Table
 from pybaselines import Baseline
 
 
+# 10/29/2024
+# little script to look at Volker's L1 data
+# does a disciplined least squares baseline fit
+# makes an integrated intensity map.
+# ra,dec and l,b coordinates 
+# makes integrated intensity map instead of cubes
+# NOT WORKING YET, porting over from May 2024 codebase
+
 
 ################################################################################
 def doStuff(self):
@@ -74,8 +82,6 @@ def regrid(l, b, T, beam):
    # Calculate number of grid points
    N_l = int(np.ceil((l_max - l_min) / beam))
    N_b = int(np.ceil((b_max - b_min) / beam))
-   print(N_ra)
-   print(N_dec)
 
    # Create meshgrid
    l_grid, b_grid = np.meshgrid(np.linspace(l_min, l_max, N_l),np.linspace(b_min, b_max, N_b))
@@ -109,19 +115,11 @@ paths=[]
 paths.append(config.get('Paths', 'B1_path'))
 paths.append(config.get('Paths', 'B2_path'))
 
-#partial = sys.argv[1]
-#search_files=[]
-#for path in paths:
-#   search_files+=sorted(glob.glob(f"{path}/{partial}.fits"))
-
-
 search_files=[]
 search_files =get_filenames(paths[1], 'acs3-scans.txt')
-search_files+=get_filenames(paths[0], 'acs5-scans.txt')
 
-# Debug
-#print("\n".join(search_files))
-
+# only B2
+#search_files+=get_filenames(paths[0], 'acs5-scans.txt')
 
 # Initialize empty lists to accumulate data
 ra_list = []
@@ -139,9 +137,10 @@ for file in search_files:
     else:
         (ra, dec, Ta) = result
 
-        ra_list.append(ra)
-        dec_list.append(dec)
-        Ta_list.append(Ta)
+        for i in range(0,len(ra)):
+            ra_list.append(ra[i])
+            dec_list.append(dec[i])
+            Ta_list.append(Ta[i])
 
 # Convert lists to numpy arrays
 ra  = np.array(ra_list)
@@ -183,8 +182,8 @@ hdr['VELOCITY']= 0
 ra_grid, dec_grid, T_img= regrid(ra, dec, Ta, 0.02)
 
 # Write the data cube and header to a FITS file
-#hdu = fits.PrimaryHDU(data=T_img, header=hdr)
-#hdu.writeto('my_data_image.fits', overwrite=True)
+hdu = fits.PrimaryHDU(data=T_img, header=hdr)
+hdu.writeto('my_data_image.fits', overwrite=True)
 
 
 
