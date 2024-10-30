@@ -7,25 +7,27 @@ import random
 import numpy as np
 import configparser
 from scipy import interpolate
+import matplotlib.pyplot as plt
+
 
 from pathlib import Path
-
 from astropy import units as u
 
 from astropy.io import fits
 from astropy.io.fits import Header
 from astropy.table import Table
+from astropy import units as u
+from astropy.coordinates import SkyCoord
+from astropy.coordinates import Galactic
 
 from pybaselines import Baseline
 
-
-# 10/29/2024
-# little script to look at Volker's L1 data
-# does a disciplined least squares baseline fit
-# makes an integrated intensity map.
-# ra,dec and l,b coordinates 
-# makes integrated intensity map instead of cubes
+# 10/29/2024 Makes L2 maps
+# Little script to look at Volker's L0.9 data 
 # NOT WORKING YET, porting over from May 2024 codebase
+# Does a disciplined least squares baseline fit to make L1
+# Makes an integrated intensity map.
+# ra,dec and l,b coordinates mish-mashed, working it...
 
 
 ################################################################################
@@ -45,9 +47,11 @@ def doStuff(self):
    n_OTF  = len(data)
    x = np.arange(1024)
 
+   # Reference Coordinate System
    crval2 = header['CRVAL2']   # reference RA pixel
    crval3 = header['CRVAL3']   # reference DEC pixel
 
+   # Delta Coordinate
    cdelt2 = hdu[1].data['CDELT2']   # array of RA offsets
    cdelt3 = hdu[1].data['CDELT3']   # array of DEC offsets
 
@@ -66,8 +70,10 @@ def doStuff(self):
       base2 = baseline_fitter.aspls(spec_new, 1e5)
       y_flat = spec_new - base2[0]
       ii[i] = sum(y_flat)
-      l[i] = crval2 + cdelt2[i]
-      b[i] = crval3 + cdelt3[i]
+      c_ra_dec = SkyCoord(ra=(crval2+cdelt2[i])*u.degree, dec=(crval3+cdelt3[i])*u.degree, frame='icrs')
+      c_l_b = c_ra_dec.transform_to(Galactic)
+      l[i] = c_l_b.l.value
+      b[i] = c_l_b.b.value
 
    # Return the (l,b) position and integrated intensity
    data = (l, b, ii)
@@ -75,7 +81,7 @@ def doStuff(self):
 
 
 def regrid(l, b, T, beam):
-   # Calculate the range of ra and dec values
+   # Calculate the range of glon and glat values
    l_min, l_max = np.min(l), np.max(l)
    b_min, b_max = np.min(b), np.max(b)
 
@@ -122,12 +128,12 @@ search_files =get_filenames(paths[1], 'acs3-scans.txt')
 #search_files+=get_filenames(paths[0], 'acs5-scans.txt')
 
 # Initialize empty lists to accumulate data
-ra_list = []
-dec_list = []
+glon_list = []
+glat_list = []
 Ta_list = []
 
 for file in search_files:
-    # get ra, dec, and calibrated spectra from each OTF file
+    # get glon, glat, and calibrated spectra from each OTF file
     print("trying OTF file: ", file)
 
     result = doStuff(file)
@@ -135,16 +141,17 @@ for file in search_files:
     if result is None:
         print("nothing returned")
     else:
-        (ra, dec, Ta) = result
+        (glon, glat, Ta) = result
 
-        for i in range(0,len(ra)):
-            ra_list.append(ra[i])
-            dec_list.append(dec[i])
-            Ta_list.append(Ta[i])
+        for i in range(0,len(glon)):
+            if glat[i]<2 and glat[i]>-2:
+                glon_list.append(glon[i])
+                glat_list.append(glat[i])
+                Ta_list.append(Ta[i])
 
 # Convert lists to numpy arrays
-ra  = np.array(ra_list)
-dec = np.array(dec_list)
+glon = np.array(glon_list)
+glat = np.array(glat_list)
 Ta  = np.array(Ta_list)
 
 
@@ -155,31 +162,27 @@ hdr['DATAMIN'] = min(Ta)
 hdr['DATAMAX'] = max(Ta)
 hdr['BUNIT']   = 'K (Ta*)     '
 
-hdr['CTYPE1']  = 'RA          '
-hdr['CRVAL1']  = min(ra)
+hdr['CTYPE1']  = 'GLON        '
+hdr['CRVAL1']  = min(glon)
 hdr['CDELT1']  = 0.016              # 1 arcmin beam
 hdr['CRPIX1']  = 0                  # reference pixel array index
 hdr['CROTA1']  = 0
 hdr['CUNIT1']  = 'deg         '
 
-hdr['CTYPE2']  = 'DEC         '
-hdr['CRVAL2']  = min(dec)
+hdr['CTYPE2']  = 'GLAT        '
+hdr['CRVAL2']  = min(glat)
 hdr['CDELT2']  = 0.016              # 1 arcmin beam
 hdr['CRPIX2']  = 0                  # reference pixel array index
 hdr['CROTA2']  = 0
 hdr['CUNIT2']  = 'deg         '
 
 hdr['OBJECT']  = 'NGC6334     '
-hdr['RADESYS'] = 'FK5         '
-hdr['RA']      = min(ra)            # Fiducial is arbitrarily (ra,dec) min
-hdr['DEC']     = min(dec)
+hdr['GLON']    = min(glon)            # Fiducial is arbitrarily (glat,glon) min
+hdr['GLAT']    = min(glat)
 hdr['EQUINOX'] = 2000
-hdr['LINE']    = 'C+          '
-hdr['RESTFREQ']= 1900.5369          # GHz
-hdr['VELOCITY']= 0
 
 # Do the regridding
-ra_grid, dec_grid, T_img= regrid(ra, dec, Ta, 0.02)
+ra_grid, dec_grid, T_img= regrid(glon, glat, Ta, 0.02)
 
 # Write the data cube and header to a FITS file
 hdu = fits.PrimaryHDU(data=T_img, header=hdr)
