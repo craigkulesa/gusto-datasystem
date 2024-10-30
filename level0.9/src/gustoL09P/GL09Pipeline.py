@@ -315,7 +315,7 @@ def processL08(params, verbose=False):
         pixel_cut = 300
         band = 1
         add = 'B1'
-        Tsky = 45  # Kelvin
+        Tsky = 33.5  # Kelvin
         rfreq = 1461.131406
 
 
