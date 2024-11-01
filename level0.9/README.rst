@@ -29,6 +29,10 @@ Current use is reading in the Level 0.8 data and creating a Level 0.9 data produ
 
 - execGL09P
 
+For limiting the number of files processed, use (change the scan numbers appropriately):
+
+- execGL09P -r 9000 9600
+
 The program uses a parameter setup file including information about where it can find
 the data files and where to put them. The assumed data tree is like:
 
