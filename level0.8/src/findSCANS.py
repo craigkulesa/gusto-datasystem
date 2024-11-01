@@ -38,7 +38,7 @@ size = 0.1*u.degree
 gc = SkyCoord(l=351.0*u.degree, b=0.0*u.degree, frame='galactic')
 # image size 
 l_img = 6.0*u.degree
-b_img = 4.0*u.degree
+b_img = 2.0*u.degree
 
 
 start_l  = gc.l.deg - l_img.value/2
@@ -60,13 +60,12 @@ for l in l_indx:
         numj += 1
         # find all points in udpPointing where we pointed at ra, dec
         gci = SkyCoord(l=l*u.degree, b=b*u.degree, frame='galactic')
-        c = gc.transform_to(FK5)
+        c = gci.transform_to(FK5)
         myquery = f'SELECT * FROM "udpPointing" WHERE RA<{(c.ra.value +size.to(u.deg).value)}  AND \
                                                       RA>{(c.ra.value -size.to(u.deg).value)}  AND \
-                                                      DEC<{(c.dec.value+size.to(u.deg).value)} AND \
-                                                      DEC>{(c.dec.value-size.to(u.deg).value)}' 
+                                                      DEC>{(c.dec.value+size.to(u.deg).value)} AND \
+                                                      DEC<{(c.dec.value-size.to(u.deg).value)}' 
         points = client.query(myquery).get_points()
-        print(points)
 
         # For loop over all of these pointings
         # POINTS contains a (time, scanID) for each pointing at (ra,dec)
