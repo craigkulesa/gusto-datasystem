@@ -5,8 +5,10 @@ GUSTO L09P pipeline
 
 ## Installation
 
+Change to the root directory of level0.9 (.../gusto-datasystem/level0.9) and run:
+
 .. code-block:: python
-``$ pip install -e gustoL09P --use-feature=in-tree-build``
+``$ pip install -e .``
 
 The "-e" switch means that edits to the code in the local repository 
 are used when executing the pipeline 
