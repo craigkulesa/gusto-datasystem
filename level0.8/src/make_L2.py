@@ -164,14 +164,14 @@ hdr['BUNIT']   = 'K (Ta*)     '
 
 hdr['CTYPE1']  = 'GLON        '
 hdr['CRVAL1']  = min(glon)
-hdr['CDELT1']  = 0.016              # 1 arcmin beam
+hdr['CDELT1']  = 0.004              # 1 arcmin beam
 hdr['CRPIX1']  = 0                  # reference pixel array index
 hdr['CROTA1']  = 0
 hdr['CUNIT1']  = 'deg         '
 
 hdr['CTYPE2']  = 'GLAT        '
 hdr['CRVAL2']  = min(glat)
-hdr['CDELT2']  = 0.016              # 1 arcmin beam
+hdr['CDELT2']  = 0.004              # 1 arcmin beam
 hdr['CRPIX2']  = 0                  # reference pixel array index
 hdr['CROTA2']  = 0
 hdr['CUNIT2']  = 'deg         '
@@ -180,9 +180,11 @@ hdr['OBJECT']  = 'NGC6334     '
 hdr['GLON']    = min(glon)            # Fiducial is arbitrarily (glat,glon) min
 hdr['GLAT']    = min(glat)
 hdr['EQUINOX'] = 2000
+hdr['LONPOLE'] = 180
+hdr['LATPOLE'] = min(glat)
 
 # Do the regridding
-ra_grid, dec_grid, T_img= regrid(glon, glat, Ta, 0.02)
+glon_grid, glat_grid, T_img= regrid(glon, glat, Ta, 0.004)
 
 # Write the data cube and header to a FITS file
 hdu = fits.PrimaryHDU(data=T_img, header=hdr)
