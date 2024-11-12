@@ -21,6 +21,8 @@ import sys
 import numpy as np
 from os.path import expanduser, expandvars
 #from joblib import Parallel, delayed, cpu_count
+import logging
+log = logging.getLogger(__name__)
 
 
 def getRange(icpar, dtype='float', endpoint=True):

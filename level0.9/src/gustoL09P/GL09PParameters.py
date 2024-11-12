@@ -31,6 +31,8 @@ import datetime
 import warnings
 import pkg_resources
 warnings.filterwarnings('ignore')
+import logging
+log = logging.getLogger(__name__)
 
 
 fheader, tail = os.path.split(inspect.stack()[0][1])

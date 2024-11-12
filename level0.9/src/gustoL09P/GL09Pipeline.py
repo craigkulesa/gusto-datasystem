@@ -4,8 +4,8 @@ This is the GUSTO L09 Pipeline.
 """
 
 __date__ = '9/19/2024'
-__updated__ = '20240916'
-__version__ = '0.1'
+__updated__ = '20241031'
+__version__ = '0.2'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
 from joblib import Parallel, delayed
@@ -42,6 +42,7 @@ from .GL09PProcessControl import GL09PProcessControl
 from .GL09PDataIO import loadL08Data
 from .GL095Pipeline import GL095Pipeline
 from .GL09PUtils import *
+from .GL09PLogger
 
 
 spectralLines = ['CII', 'NII', 'OI']
@@ -54,8 +55,6 @@ par_file0 = pkg_resources.resource_filename('gustoL09P', 'Data/GUSTO_BaselineDat
 tpipe = 'GUSTO L1 Pipeline'
 
 runtime = time.strftime('%Y%m%d%H%M%S')
-logfile = 'gusto_pipeline_%s.log'%(time.strftime("%c"))
-logging.basicConfig(filename=logfile, filemode='w', format='%(asctime)s - %(message)s', level=logging.INFO)
 
 def runGL09P(verbose=False):
     r"""Function running the GUSTO Level 2 pipeline.
@@ -104,6 +103,9 @@ def runGL09P(verbose=False):
     parser.add_argument('--scanRange', '-r', nargs=2, type=int,
                         default=[2000, 30000],
                         help='Range of scans to be processed by pipeline.')
+    parser.add_argument('--loglevel', '-l', type=str,
+                        default=INFO,
+                        help='setting the log level of the {tpipe}')
     parser.add_argument('--verbose', '-v', type=bool,
                         default=False,
                         help='enables verbosity of the {tpipe}')
@@ -138,10 +140,26 @@ def runGL09P(verbose=False):
     cfi = gL09P.getConfigInfo(verbose=verbose)
     if verbose:
         print('\nProcessing settings:')
-        pprint(cfi)
+        #pprint(cfi)
         
+    
+    # initialize logging:
+    logDir = cfi['gdirs']['logDir']
+    numeric_level = getattr(logging, arg.loglevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s\nValid options are: DEBUG, INFO, WARNING, ERROR, CRITICAL.' % loglevel)
+    logfile = os.path.join(logDir,'gusto_pipeline_%s.log'%(time.strftime("%Y%m%d%H%M%S")))
+    logger = init_logger(loglevel=numeric_level, logfile=None, loggername='GL09PLogger')
+    
+    logger.info('Started logging.')
+    logger.info('Pipeline configuration file: %s'%(args.configFile))
+    logger.info('Pipeline configuration:')
+    logger.info(cfi)
+
+    
     if args.debug:
         cfi['gprocs']['debug'] = arg.debug
+        
 
     #########################################################
     # determine the pipeline parts to be executed
@@ -181,6 +199,8 @@ def runGL09P(verbose=False):
         print('Execution time: %.2fh  %.2fm   %.2fs'%((ent-stt)/3600.,(ent-stt)/60.,ent-stt))
         print('Execution time: %s'%(time.strftime("%Hh %Mm %Ss",time.gmtime(ent-stt))))
         print('Processed %i files.'%(n_pf))
+        print()
+        print('The logfile is: %s', logfile)
         print()
     
     if '0.95' in exlevels:
@@ -237,7 +257,6 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     
     # get lines for processing
     lines = cfi['gprocs']['lines'].replace('[','').replace(']','').replace(' ','').split(',')
-    print(type(lines))
     print('Lines: ', lines[0])
     lines= ['CII', 'NII']
     
@@ -249,12 +268,18 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         inDir = cfi['gdirs']['L08DataDir']
         outDir = cfi['gdirs']['L09DataDir']
         if line=='CII':
-            filter = 'ACS3*/*.fits'
+            filter = '*.fits'
         else:
-            filter = 'ACS5*/*.fits'
+            filter = '*.fits'
+        print('outDir: ', outDir)
+        print('filter: ', os.path.join(inDir,filter))
+        print()
         
-        sdirs = sorted(glob.glob(filter, root_dir=inDir))
-        dsc = [int(sdir.split('/')[1].split('_')[1].split('.')[0]) for sdir in sdirs]
+        # sdirs = sorted(glob.glob(os.path.join(inDir,filter), root_dir=inDir))
+        #print(glob.glob(os.path.join(inDir,filter)))
+        sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
+        print('single result: ', sdirs[0], os.path.split(sdirs[0]))
+        dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
         
         sdirs.sort(key=lambda sdirs: dsc)
         
@@ -268,7 +293,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         paramlist = [[a, b, c, d] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles]
         
         if verbose:
-            print('Selected data files: ', paramlist)
+            print('Selected data files: ', dfiles)
         
         
         # setup multiprocessing loop here to process each file in list
@@ -326,6 +351,22 @@ def processL08(params, verbose=False):
     # for now, process all mixers
     umixers = np.unique(data['MIXER'])
     for mix in umixers:
+        # first check crudely if we have enough data of various scan_types
+        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr)
+        check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
+                (np.argwhere(data['scan_type']=='HOT').size > 3) & \
+                (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
+                (np.argwhere(data['scan_type']=='OTF').size > 5) & \
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0)
+        if not check:
+            print('mix, dfile')
+            print('specs: ', spec.shape)
+            print('REFs: ', np.argwhere(data['scan_type']=='REF').size)
+            print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
+            print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
+            print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
+            return 0
+        
         tsys, refs, rhots, rtime, htime, Thot, Tsky = getCalSpectra(mix, spec, data, hdr, verbose=True)
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
@@ -342,12 +383,20 @@ def processL08(params, verbose=False):
         
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, verbose=verbose)
         
-        osel = np.argwhere((otfID == data['scanID']) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
-        
+        # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
+        osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
+        print('otfID.size: ', otfID.size)
         if len(osel) > 0:
-            print('processing OTFs')
+            pass
+            # print('processing OTFs')
+            # if verbose:
+            #     print('OTFs: ', otfID)
+            #     print('REFs: ', rfsID)
+            #     print('REFHOTs: ', rhsID)
+            #     print('HOTs: ', hotID)
         else:
             print('WARNING: No OTF spectra available.')
+            return 0
     
         spec_OTF = np.squeeze(spec[osel,:])
         stime = data['UNIXTIME'][osel]
@@ -451,12 +500,17 @@ def processL08(params, verbose=False):
         header = wcs.to_header()
         
         # additional header keywords
+        header['TELESCOP'] = hdr['TELESCOP']
+        header['BAND'] = hdr['BAND']
         header['LINE'] = line
         header['OBJECT'] = 'GUSTO_GPS'
         header['FOFFSET'] = 0.0
         header['RESTFREQ'] = rfreq
+        header['LINEFREQ'] = hdr['LINEFREQ']
         header['IMAGFREQ'] = rfreq
-        header['VELO-LSR'] = 0.0    # m/s
+        header['IF0'] = hdr['IF0']
+        header['SYNTFREQ'] = hdr['SYNTFREQ']
+        header['VELO-LSR'] = hdr['VLSR']    # m/s
         header['VELDEF'] = 'RADI-LSR'
         header['DELTAV'] = 0.2
         header['GAINIMAG'] = 0.99999E-2
@@ -467,14 +521,29 @@ def processL08(params, verbose=False):
         header['DATE-RED'] = tred
         header['UT'] = 0.0
         header['OBSTIME'] = 0.1
+        header['CREATOR'] = 'GUSTO Level 0.9 Pipeline'
+        header['HISTORY'] = 'pipeline version: %s'%(__version__)
+        header['HISTORY'] = 'last pipeline update: %s'%(__updated__)
+        header['HISTORY'] = 'file created: %s'%(time.strftime("%c"))
+        header['CALID'] = hdr['CALID']
+        header['DLEVEL'] = '0.9'
+        header['PROCTIME'] = time.strftime("%c")
+        header['SER_FLAG'] = hdr['SER_FLAG']
+        header['T_MIXER'] = hdr['T_MIXER']
+        header['GOND_ALT'] = hdr['GOND_ALT']
+        header['GOND_LAT'] = hdr['GOND_LAT']
+        header['GOND_LON'] = hdr['GOND_LON']
+        header['ELEVATON'] = hdr['ELEVATON']
+        # header[''] = hdr['']
+        # header[''] = hdr['']
+        
         
         # now write the fits file
         hdu = fits.PrimaryHDU()
         hdu2 = fits.BinTableHDU(data=fT, header=header, name='MATRIX', ver=True)
         hdulist = fits.HDUList([hdu, hdu2])
-        opath = os.path.join(outDir, dfile.split('/')[0])
-        os.makedirs(opath, exist_ok=True)
-        ofile = os.path.join(outDir, dfile.replace('.fits','_%s_L09.fits'%(mix)))
+        os.makedirs(outDir, exist_ok=True)
+        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_%s_L09.fits'%(mix)))
         hdulist.writeto(ofile, overwrite=True)
         
         #if verbose:
