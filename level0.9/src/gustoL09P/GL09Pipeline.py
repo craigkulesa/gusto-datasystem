@@ -42,7 +42,7 @@ from .GL09PProcessControl import GL09PProcessControl
 from .GL09PDataIO import loadL08Data
 from .GL095Pipeline import GL095Pipeline
 from .GL09PUtils import *
-from .GL09PLogger
+from .GL09PLogger import *
 
 
 spectralLines = ['CII', 'NII', 'OI']
