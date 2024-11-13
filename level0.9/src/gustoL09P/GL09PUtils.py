@@ -162,12 +162,12 @@ def getSpecScanTypes(mixer, spec, data, hdr, verbose=False):
     otsel = (mixer == mixers) & (scan_type == 'OTF') & (row_flag==0)
     otfID = np.unique(scanID[otsel])
 
-    if verbose:
-        print('Mixer: ', mixer)
-        print('REF scan IDs: ', rfsID)
-        print('REFHOT scan IDs: ', rhsID)
-        print('HOT scan IDs: ', hotID)
-        print('OTF scan IDs: ', otfID)
+    # if verbose:
+    #     print('Mixer: ', mixer)
+    #     print('REF scan IDs: ', rfsID)
+    #     print('REFHOT scan IDs: ', rhsID)
+    #     print('HOT scan IDs: ', hotID)
+    #     print('OTF scan IDs: ', otfID)
 
     return otfID, rfsID, rhsID, hotID
 
@@ -245,8 +245,8 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
         
         # estimate Tsys for each Device
         y_factor  = spec_h/spec_r
-        print('spec_r: ', spec_r)
-        print('y-factor: ', y_factor)
+        # print('spec_r: ', spec_r)
+        # print('y-factor: ', y_factor)
         # if verbose:
         #     print(np.nanmean(spec_h), np.nanmean(spec_r))
         tsys = (THOT_avg - Tsky*y_factor[:])/(y_factor[:] - 1.)

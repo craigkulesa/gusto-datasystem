@@ -104,7 +104,7 @@ def runGL09P(verbose=False):
                         default=[2000, 30000],
                         help='Range of scans to be processed by pipeline.')
     parser.add_argument('--loglevel', '-l', type=str,
-                        default=INFO,
+                        default='INFO',
                         help='setting the log level of the {tpipe}')
     parser.add_argument('--verbose', '-v', type=bool,
                         default=False,
@@ -145,7 +145,7 @@ def runGL09P(verbose=False):
     
     # initialize logging:
     logDir = cfi['gdirs']['logDir']
-    numeric_level = getattr(logging, arg.loglevel.upper(), None)
+    numeric_level = getattr(logging, args.loglevel.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s\nValid options are: DEBUG, INFO, WARNING, ERROR, CRITICAL.' % loglevel)
     logfile = os.path.join(logDir,'gusto_pipeline_%s.log'%(time.strftime("%Y%m%d%H%M%S")))
@@ -246,6 +246,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     -------
 
     """
+    #logger = logging.getLogger('GL09PLogger')
+    
     if cfi['gprocs']['debug']==True:
         logger = multiprocessing.log_to_stderr()
         logger.setLevel(multiprocessing.SUBDEBUG)
@@ -273,7 +275,6 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             filter = '*.fits'
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
-        print()
         
         # sdirs = sorted(glob.glob(os.path.join(inDir,filter), root_dir=inDir))
         #print(glob.glob(os.path.join(inDir,filter)))
@@ -291,6 +292,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         n_ds = len(dfiles)
         
         paramlist = [[a, b, c, d] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles]
+        # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         
         if verbose:
             print('Selected data files: ', dfiles)
@@ -300,7 +302,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         with Pool(n_procs) as pool:
             # execute tasks in order
             for result in pool.imap(processL08, paramlist):
-                print(f'Got result: {result}', flush=True)
+                print(f'Processed: {result}', flush=True)
         
     return n_ds
 
@@ -344,7 +346,7 @@ def processL08(params, verbose=False):
         rfreq = 1461.131406
 
 
-    print('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
+    #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
     spec, data, hdr = loadL08Data(os.path.join(inDir,dfile), verbose=False)
     rowFlag = data['ROW_FLAG']
     
@@ -359,19 +361,22 @@ def processL08(params, verbose=False):
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
                 (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0)
         if not check:
-            print('mix, dfile')
-            print('specs: ', spec.shape)
-            print('REFs: ', np.argwhere(data['scan_type']=='REF').size)
-            print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
-            print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
-            print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
+            print('Not enough data available for processing')
+            #logger.error('Not enough data available for processing')
+            #logger.info('mix, dfile')
+            #logger.info('specs: ', spec.shape)
+            #logger.info('REFs: ', np.argwhere(data['scan_type']=='REF').size)
+            #logger.info('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
+            #logger.info('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
+            #logger.info('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
             return 0
         
         tsys, refs, rhots, rtime, htime, Thot, Tsky = getCalSpectra(mix, spec, data, hdr, verbose=True)
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
             print('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
-            print('Tsys: ', tsys)
+            # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
+            # logger.info('Tsys: ', tsys)
             break
         #print('<Tsys>: ', np.nanmean(tsys))
         tsys.fill_value = 0.0
@@ -385,7 +390,6 @@ def processL08(params, verbose=False):
         
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
         osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
-        print('otfID.size: ', otfID.size)
         if len(osel) > 0:
             pass
             # print('processing OTFs')
@@ -395,7 +399,8 @@ def processL08(params, verbose=False):
             #     print('REFHOTs: ', rhsID)
             #     print('HOTs: ', hotID)
         else:
-            print('WARNING: No OTF spectra available.')
+            print('No OTF spectra available.')
+            # logger.warning('No OTF spectra available.')
             return 0
     
         spec_OTF = np.squeeze(spec[osel,:])
@@ -548,6 +553,7 @@ def processL08(params, verbose=False):
         
         #if verbose:
         print('saved file: ', ofile)
+        # logger.info('saved file: ', ofile)
 
 
         # bunit = 'K (Ta)'
@@ -561,7 +567,7 @@ def processL08(params, verbose=False):
         # SPECSYS = 'LSRK'
         # OBJECT = 
         
-    return 1
+    return dfile
 
     
     
