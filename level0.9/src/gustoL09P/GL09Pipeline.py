@@ -290,6 +290,9 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                 dfiles.append(sdirs[i])
                         
         n_ds = len(dfiles)
+        if int(cfi['gprocs']['max_files']) > 0:
+            n_ds = int(cfi['gprocs']['max_files'])
+            dfiles = dfiles[:n_ds]
         
         paramlist = [[a, b, c, d] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
@@ -391,13 +394,12 @@ def processL08(params, verbose=False):
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
         osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
         if len(osel) > 0:
-            pass
             # print('processing OTFs')
-            # if verbose:
-            #     print('OTFs: ', otfID)
-            #     print('REFs: ', rfsID)
-            #     print('REFHOTs: ', rhsID)
-            #     print('HOTs: ', hotID)
+            # print('OTFs: ', otfID)
+            # print('REFs: ', rfsID)
+            # print('REFHOTs: ', rhsID)
+            # print('HOTs: ', hotID)
+            pass
         else:
             print('No OTF spectra available.')
             # logger.warning('No OTF spectra available.')
@@ -437,6 +439,7 @@ def processL08(params, verbose=False):
         dec = data['DEC'][osel]
         ra = data['RA']
         dec = data['DEC']
+        rflag = data['ROW_FLAG'][osel] 
         
         c0 = SkyCoord(ra[0], dec[0], unit=(u.deg, u.deg), frame='icrs')
         c1 = SkyCoord(ra[osel]*u.degree, dec[osel]*u.degree, frame='icrs')
@@ -445,7 +448,9 @@ def processL08(params, verbose=False):
         decoff = rc1.lat.deg 
         
         tsyseff_avg = np.nanmean(tsyseff[:,200:400], axis=1)
-        tobs = Time(data['UNIXTIME'][osel], format='unix').fits
+        timeobs = Time(data['UNIXTIME'][osel], format='unix').fits
+        dobs = [tt[0].split('T')[0] for tt in timeobs]
+        tobs = [tt[0].split('T')[1] for tt in timeobs]
         tred = Time(datetime.datetime.now()).fits
         
         aa = np.zeros(n_OTF)
@@ -459,13 +464,13 @@ def processL08(params, verbose=False):
         col3 = Column(ta, name='DATA', description='spectrum')
         col4 = Column(tsyseff_avg, name='TSYS', description='system temperature (K)')
         col5 = Column(aa, name='IMAGFREQ', description='image band frequency (Hz)')
-        col6 = Column(tobs, name='DATE-OBS', description='date of obs')
-        col7 = Column(aa, name='UT', description='time obs started')
-        col8 = Column(aa, name='ELEVATIO', description='')
+        col6 = Column(dobs, name='DATE-OBS', description='date of obs')
+        col7 = Column(tobs, name='UT', description='time obs started')
+        col8 = Column(ao*float(hdr['ELEVATON']), name='ELEVATIO', description='')
         col9 = Column(ao*(Thot[0]+Thot[1])/2., name='THOT', description='hot load temperature (K)')
         col10 = Column(ao*Tsky, name='TCOLD', description='Sky temperature (K)')
         col11 = Column(ta.mask, name='CHANNEL_FLAG', description='pixel mask')
-        col12 = Column(aa, name='Row_flag', description='flagging compromised spectra')
+        col12 = Column(rflag, name='Row_flag', description='flagging compromised spectra')
         fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12])
             
         # now, create the header

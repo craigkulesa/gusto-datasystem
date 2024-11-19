@@ -20,6 +20,9 @@ tmpDir = ${ghome}/work/tmp
 
 
 [GUSTO_Processing]
+# max files is used for debugging runs limiting the number of files processed
+# 0: process all files; n: process n files
+max_files = 10
 number_of_cpus = 10
 # list of processing parameters for individual pipelines
 l09save2fits = True
