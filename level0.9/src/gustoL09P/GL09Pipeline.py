@@ -275,7 +275,6 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             filter = '*.fits'
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
-        print()
         
         # sdirs = sorted(glob.glob(os.path.join(inDir,filter), root_dir=inDir))
         #print(glob.glob(os.path.join(inDir,filter)))
@@ -400,7 +399,8 @@ def processL08(params, verbose=False):
             #     print('REFHOTs: ', rhsID)
             #     print('HOTs: ', hotID)
         else:
-            print('WARNING: No OTF spectra available.')
+            print('No OTF spectra available.')
+            # logger.warning('No OTF spectra available.')
             return 0
     
         spec_OTF = np.squeeze(spec[osel,:])
