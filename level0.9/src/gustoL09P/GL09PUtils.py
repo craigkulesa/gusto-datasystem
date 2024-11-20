@@ -245,8 +245,8 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
         
         # estimate Tsys for each Device
         y_factor  = spec_h/spec_r
-        # print('spec_r: ', spec_r)
-        # print('y-factor: ', y_factor)
+        print('spec_r: ', spec_r)
+        print('y-factor: ', y_factor)
         # if verbose:
         #     print(np.nanmean(spec_h), np.nanmean(spec_r))
         tsys = (THOT_avg - Tsky*y_factor[:])/(y_factor[:] - 1.)
