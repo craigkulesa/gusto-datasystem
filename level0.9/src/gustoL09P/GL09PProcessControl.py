@@ -16,6 +16,8 @@ from numpy.lib import recfunctions as rfn
 from dataclasses import dataclass, asdict
 from .GL09PParameters import *
 import os
+import logging
+log = logging.getLogger(__name__)
 
 # primary function
 class GL09PProcessControl:

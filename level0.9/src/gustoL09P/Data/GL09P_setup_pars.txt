@@ -12,15 +12,15 @@ dhome = /rdat/Projects/GUSTO/Data
 # when executing, a date+time stamp is added to the work directory
 # within the python function
 workDir = ${ghome}/work
-L08DataDir = ${dhome}/L08Data
-L09DataDir = ${dhome}/L09Data
-L10DataDir = ${dhome}/L09Data
+L08DataDir = ${dhome}/level0.8
+L09DataDir = ${dhome}/level0.9
+L10DataDir = ${dhome}/level1.0
 logDir = ${ghome}/work/logs
 tmpDir = ${ghome}/work/tmp
 
 
 [GUSTO_Processing]
-number_of_cpus = 4
+number_of_cpus = 10
 # list of processing parameters for individual pipelines
 l09save2fits = True
 l09set_channel_flags = True

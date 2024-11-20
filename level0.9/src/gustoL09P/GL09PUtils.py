@@ -32,6 +32,8 @@ import warnings
 import pkg_resources
 from astropy.io import fits
 from tqdm import tqdm
+import logging
+log = logging.getLogger(__name__)
 
 
 __version__ = 0.11
@@ -160,12 +162,12 @@ def getSpecScanTypes(mixer, spec, data, hdr, verbose=False):
     otsel = (mixer == mixers) & (scan_type == 'OTF') & (row_flag==0)
     otfID = np.unique(scanID[otsel])
 
-    if verbose:
-        print('Mixer: ', mixer)
-        print('REF scan IDs: ', rfsID)
-        print('REFHOT scan IDs: ', rhsID)
-        print('HOT scan IDs: ', hotID)
-        print('OTF scan IDs: ', otfID)
+    # if verbose:
+    #     print('Mixer: ', mixer)
+    #     print('REF scan IDs: ', rfsID)
+    #     print('REFHOT scan IDs: ', rhsID)
+    #     print('HOT scan IDs: ', hotID)
+    #     print('OTF scan IDs: ', otfID)
 
     return otfID, rfsID, rhsID, hotID
 

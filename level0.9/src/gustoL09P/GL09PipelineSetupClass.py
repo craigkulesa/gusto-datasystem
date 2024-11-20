@@ -17,6 +17,8 @@ import pkg_resources
 from pprint import pprint
 import numpy as np
 #from joblib import Parallel, delayed, cpu_count
+import logging
+log = logging.getLogger(__name__)
 
 ProcFile0 = pkg_resources.resource_filename(
     'gustoL09P', 'data/CIIconfig.txt')

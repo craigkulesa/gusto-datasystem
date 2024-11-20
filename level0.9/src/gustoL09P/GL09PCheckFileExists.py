@@ -7,6 +7,8 @@ Version 0.1
 import os
 from os.path import expanduser
 import ntpath
+import logging
+log = logging.getLogger(__name__)
 
 __version__ = '0.1'
 __date__ = '9/19/2024'

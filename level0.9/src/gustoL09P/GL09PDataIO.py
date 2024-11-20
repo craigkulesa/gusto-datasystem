@@ -42,6 +42,9 @@ from parsl.configs.local_threads import config
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import LocalProvider
 
+import logging
+log = logging.getLogger(__name__)
+
 __updated___ = '20240919'
 __version__ = 0.1
 __date__ = '20240919'
@@ -75,6 +78,7 @@ def loadL08Data(ifile, verbose=False):
     with fits.open(ifile) as hdu:
         data   = hdu[1].data
         hdr    = hdu[0].header
+        hdr1    = hdu[1].header
 
     # header keys
     # ['SIMPLE', 'BITPIX', 'NAXIS', 'EXTEND', 'COMMENT', 'COMMENT', 'CALID', 'CUNIT1', 'CRPIX1', 'CRVAL1', 'CDELT1', 'HKSCANID', 'TELESCOP', 
@@ -91,16 +95,25 @@ def loadL08Data(ifile, verbose=False):
     # ('THOT', '>f4'), ('RA', '>f4'), ('DEC', '>f4'), ('filename', 'S48'), ('PSat', '>f4'), ('Imon', '>f4'), ('Gmon', '>f4'), 
     # ('spec', '>f4', (1024,)), ('CHANNEL_FLAG', '>i2', (1024,))])
     
-    if verbose:
-        print(list(hdr.keys()))
-        print(type(data))
-        print(data.dtype)
-        print('spectra: ', data['spec'].shape)
-        print('row flag: ', data['CHANNEL_FLAG'].shape)
-        print('channel mask: ', data['CHANNEL_FLAG'].shape)
+    keys = data.dtype.names
+    if 'spec' in keys:
+        dkey = 'spec'
+    elif 'DATA' in keys:
+        dkey = 'DATA'
+    
+    if 'MIXER' not in keys:
+        data['MIXER'] =  hdr1['MIXER']
+    
+    # if verbose:
+    #     print(list(hdr.keys()))
+    #     print(type(data))
+    #     print(data.dtype)
+    #     print('spectra: ', data[dkey].shape)
+    #     print('row flag: ', data['CHANNEL_FLAG'].shape)
+    #     print('channel mask: ', data['CHANNEL_FLAG'].shape)
 
     # combine spectrum and channel_flag mask
-    spec = ma.MaskedArray(data['spec'], mask=data['CHANNEL_FLAG'])
+    spec = ma.MaskedArray(data[dkey], mask=data['CHANNEL_FLAG'])
     spec = ma.masked_invalid(spec)
     spec.mask[:,612:1023] = 1
 

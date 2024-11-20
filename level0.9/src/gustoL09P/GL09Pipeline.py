@@ -42,6 +42,7 @@ from .GL09PProcessControl import GL09PProcessControl
 from .GL09PDataIO import loadL08Data
 from .GL095Pipeline import GL095Pipeline
 from .GL09PUtils import *
+from .GL09PLogger import *
 
 
 spectralLines = ['CII', 'NII', 'OI']
@@ -54,8 +55,6 @@ par_file0 = pkg_resources.resource_filename('gustoL09P', 'Data/GUSTO_BaselineDat
 tpipe = 'GUSTO L1 Pipeline'
 
 runtime = time.strftime('%Y%m%d%H%M%S')
-logfile = 'gusto_pipeline_%s.log'%(time.strftime("%c"))
-logging.basicConfig(filename=logfile, filemode='w', format='%(asctime)s - %(message)s', level=logging.INFO)
 
 def runGL09P(verbose=False):
     r"""Function running the GUSTO Level 2 pipeline.
@@ -104,6 +103,9 @@ def runGL09P(verbose=False):
     parser.add_argument('--scanRange', '-r', nargs=2, type=int,
                         default=[2000, 30000],
                         help='Range of scans to be processed by pipeline.')
+    parser.add_argument('--loglevel', '-l', type=str,
+                        default='INFO',
+                        help='setting the log level of the {tpipe}')
     parser.add_argument('--verbose', '-v', type=bool,
                         default=False,
                         help='enables verbosity of the {tpipe}')
@@ -138,10 +140,26 @@ def runGL09P(verbose=False):
     cfi = gL09P.getConfigInfo(verbose=verbose)
     if verbose:
         print('\nProcessing settings:')
-        pprint(cfi)
+        #pprint(cfi)
         
+    
+    # initialize logging:
+    logDir = cfi['gdirs']['logDir']
+    numeric_level = getattr(logging, args.loglevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s\nValid options are: DEBUG, INFO, WARNING, ERROR, CRITICAL.' % loglevel)
+    logfile = os.path.join(logDir,'gusto_pipeline_%s.log'%(time.strftime("%Y%m%d%H%M%S")))
+    logger = init_logger(loglevel=numeric_level, logfile=None, loggername='GL09PLogger')
+    
+    logger.info('Started logging.')
+    logger.info('Pipeline configuration file: %s'%(args.configFile))
+    logger.info('Pipeline configuration:')
+    logger.info(cfi)
+
+    
     if args.debug:
         cfi['gprocs']['debug'] = arg.debug
+        
 
     #########################################################
     # determine the pipeline parts to be executed
@@ -181,6 +199,8 @@ def runGL09P(verbose=False):
         print('Execution time: %.2fh  %.2fm   %.2fs'%((ent-stt)/3600.,(ent-stt)/60.,ent-stt))
         print('Execution time: %s'%(time.strftime("%Hh %Mm %Ss",time.gmtime(ent-stt))))
         print('Processed %i files.'%(n_pf))
+        print()
+        print('The logfile is: %s', logfile)
         print()
     
     if '0.95' in exlevels:
@@ -226,6 +246,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     -------
 
     """
+    #logger = logging.getLogger('GL09PLogger')
+    
     if cfi['gprocs']['debug']==True:
         logger = multiprocessing.log_to_stderr()
         logger.setLevel(multiprocessing.SUBDEBUG)
@@ -253,7 +275,6 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             filter = '*.fits'
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
-        print()
         
         # sdirs = sorted(glob.glob(os.path.join(inDir,filter), root_dir=inDir))
         #print(glob.glob(os.path.join(inDir,filter)))
@@ -271,6 +292,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         n_ds = len(dfiles)
         
         paramlist = [[a, b, c, d] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles]
+        # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         
         if verbose:
             print('Selected data files: ', dfiles)
@@ -280,7 +302,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         with Pool(n_procs) as pool:
             # execute tasks in order
             for result in pool.imap(processL08, paramlist):
-                print(f'Got result: {result}', flush=True)
+                print(f'Processed: {result}', flush=True)
         
     return n_ds
 
@@ -324,7 +346,7 @@ def processL08(params, verbose=False):
         rfreq = 1461.131406
 
 
-    print('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
+    #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
     spec, data, hdr = loadL08Data(os.path.join(inDir,dfile), verbose=False)
     rowFlag = data['ROW_FLAG']
     
@@ -345,13 +367,15 @@ def processL08(params, verbose=False):
             print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
             print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
+            print('Not enough data available for processing')
             return 0
         
         tsys, refs, rhots, rtime, htime, Thot, Tsky = getCalSpectra(mix, spec, data, hdr, verbose=True)
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
             print('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
-            print('Tsys: ', tsys)
+            # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
+            # logger.info('Tsys: ', tsys)
             break
         #print('<Tsys>: ', np.nanmean(tsys))
         tsys.fill_value = 0.0
@@ -376,6 +400,7 @@ def processL08(params, verbose=False):
             #     print('HOTs: ', hotID)
         else:
             print('WARNING: No OTF spectra available.')
+            # logger.warning('No OTF spectra available.')
             return 0
     
         spec_OTF = np.squeeze(spec[osel,:])
@@ -528,6 +553,7 @@ def processL08(params, verbose=False):
         
         #if verbose:
         print('saved file: ', ofile)
+        # logger.info('saved file: ', ofile)
 
 
         # bunit = 'K (Ta)'
@@ -541,7 +567,7 @@ def processL08(params, verbose=False):
         # SPECSYS = 'LSRK'
         # OBJECT = 
         
-    return 1
+    return dfile
 
     
     

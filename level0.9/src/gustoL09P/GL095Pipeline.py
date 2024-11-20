@@ -22,6 +22,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from pathlib import Path
 from pprint import pprint
+import logging
+log = logging.getLogger(__name__)
 
 
 def GL095Pipeline(cfi, scanRange, verbose=False):
