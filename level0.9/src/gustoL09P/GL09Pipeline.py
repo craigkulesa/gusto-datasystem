@@ -361,14 +361,13 @@ def processL08(params, verbose=False):
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
                 (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0)
         if not check:
+            print('mix, dfile')
+            print('specs: ', spec.shape)
+            print('REFs: ', np.argwhere(data['scan_type']=='REF').size)
+            print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
+            print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
+            print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
             print('Not enough data available for processing')
-            #logger.error('Not enough data available for processing')
-            #logger.info('mix, dfile')
-            #logger.info('specs: ', spec.shape)
-            #logger.info('REFs: ', np.argwhere(data['scan_type']=='REF').size)
-            #logger.info('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
-            #logger.info('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
-            #logger.info('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
             return 0
         
         tsys, refs, rhots, rtime, htime, Thot, Tsky = getCalSpectra(mix, spec, data, hdr, verbose=True)
@@ -390,6 +389,7 @@ def processL08(params, verbose=False):
         
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
         osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
+        print('otfID.size: ', otfID.size)
         if len(osel) > 0:
             pass
             # print('processing OTFs')
@@ -399,7 +399,7 @@ def processL08(params, verbose=False):
             #     print('REFHOTs: ', rhsID)
             #     print('HOTs: ', hotID)
         else:
-            print('No OTF spectra available.')
+            print('WARNING: No OTF spectra available.')
             # logger.warning('No OTF spectra available.')
             return 0
     

@@ -2,6 +2,8 @@
 """
 Support program creating a GUSTO Level 2 Pipeline configuration file.
 Newly create file must be modified to fit inidividual setup.
+
+This file needs updating!
 """
 import os
 import sys
