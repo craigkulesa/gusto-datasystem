@@ -263,4 +263,102 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky
 
 
+
+def getHotInfo(spec, data, verbose=False):
+    """Function determining the presence of HOT spectra in an 
+    OTF strip.
+
+
+    Parameters
+    ----------
+    spec : array
+            array containing only the spectra for the OTF scan
+    data : recarray
+            recarray with the binary table information from the FITS file
+
+    Returns
+    -------
+    The function returns 4 arrays: hgroup, ghots, ghtim, and glast
+    hgroup: the HOT group information for all spectra in data set
+    ghots: the averaged HOTs for each HOT group
+    ghtim: the average unixtime for each HOT group
+    glast: flag if there is a HOT after the last OTF spectrum
+
+    """
+    n_spec, n_pix = spec.shape
+    
+    # mixer index for testing: 0, 1, or 2
+    mx = 0
+    umixers = np.unique(data['MIXER'])
+    
+    unixtime = data['UNIXTIME']
+    ut0 = unixtime[0]
+    
+    hgroup = np.zeros(n_spec)
+    hcnt = 0   # counter counting the total number of hots
+    hgrp = 0   # counter for hot groups
+    
+    # determine the first hot scan
+    lasthot = np.argmin(unixtime[(data['MIXER']==mixers[mx])&(data['scan_type']=='HOT')])
+    
+    for i in range(n_spec):
+        for mx in umixers:
+            if data['MIXER'][i] == mx:
+                if (data['scan_type'][i] == 'HOT')|(data['scan_type'][i] == 'REFHOT'):
+                    if hcnt==0:
+                        #hgroup[i] = hgrp
+                        # if unixtime[i] - unixtime[lasthot] < 4.0:
+                        #     hgroup[i] = hgrp
+                        # else:
+                        #     hgrp += 1
+                        #     hgroup[i] = hgrp
+                        lasthot = i
+                    else:
+                        if unixtime[i] - unixtime[lasthot] < 4.0:
+                            pass
+                            #hgroup[i] = hgrp
+                        else:
+                            hgrp += 1
+                            #hgroup[i] = hgrp
+                        lasthot = i
+                    hcnt += 1
+                hgroup[i] = hgrp
+                        
+                if verbose:
+                    if i == 0:
+                        #     #  0   8897    0    0    0     REF  5  0          0.000     1.833
+                        print('#sp scanID hcnt hgrp hgrp scantyp Mx rf           time   inttime')
+                    print('%3i %6i  %3i %4i %4i  %6s  %i  %i  %13.3f  %8.3f'%(i, data['scanID'][i], hcnt, hgroup[i], hgrp, data['scan_type'][i], data['MIXER'][i], data['ROW_FLAG'][i], unixtime[i]-ut0, data['INTTIME'][i]))
+    
+    
+    if verbose:
+        print('\nNumber of hot groups per mixer: ', hgroup.max()+1,'\n')
+    
+    maxgrp = np.zeros(umixers.size, dtype=int)
+    ghots = np.zeros((int(umixers.size), int(hgroup.max()+1), n_pix))
+    ghtim = np.zeros((int(umixers.size), int(hgroup.max()+1)))
+    glast = np.zeros(int(umixers.size), dtype=bool)
+    
+    # now we have to average the hots for each group:
+    for i, mx in enumerate(umixers):
+        maxgrp[i] = int(hgroup[data['MIXER']==mx].max()+1)
+        if verbose:
+            print('mixer/# groups: ', mx, maxgrp[i])
+    
+        for j in range(maxgrp[i]):
+            sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']==0)
+            ghots[i,j,:] = np.mean(spec[sel,:], axis=0)
+            ghtim[i,j] = np.mean(unixtime[sel])
+    
+        # final check if the last OTF is followed by a HOT/REFHOT
+        sel = (data['MIXER']==mx) & (data['scan_type']=='OTF')
+        if np.max(data['UNIXTIME'][sel])<ghtim[i,-1]:
+            glast[i] = True
+        
+    if verbose:
+        print('\nglast: ', glast)
+
+    return hgroup, ghots, ghtim, glast
+
+
     
