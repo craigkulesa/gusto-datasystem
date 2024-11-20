@@ -1,3 +1,4 @@
+import os
 import sys
 import glob
 import numpy as np
@@ -7,6 +8,11 @@ from astropy import constants as const
 from pybaselines import Baseline, utils
 import matplotlib.pyplot as plt
 
+import argparse
+import multiprocessing
+from functools import partial
+
+from tqdm import tqdm
 
 '''
 Goal:
@@ -17,11 +23,6 @@ Goal:
 
 '''
 
-resgood = np.empty((0,3))   # (std_dev, unixtime, mixer#)  STD_DEV of good rows of baseband spectra
-resbad  = np.empty((0,3))   # (std_dev, unixtime, mixer#)  STD_DEV of bad  rows of baseband spectra
-ta_std  = np.empty((0,3))   # (tsys,    unixtime, mixer#)  STD_DEV of Level 1
-fitnes  = np.empty((0,3))   # (tsys,    unixtime, mixer#)  
-tsys    = np.empty((0,3))   # (tsys,    unixtime, mixer#)
 
 
 def find_mixer(line, mixer):
@@ -58,13 +59,30 @@ def doTmix(tsys_mix, spec, ref):
     return ta_mix[:]
 
 
-def doStuff(scan, ta_std, fitnes, tsys, resgood, resbad):
-    # open fits file
+def doStuff(scan, args, ta_std, fitnes, tsys, resgood, resbad):
+    # OPEN FITS FILE
     hdu    = fits.open(scan, mode='update')
-    # read header
+
+    # READ HEADER
     header = hdu[0].header
     line   = header['LINE']
-    # read data_table
+
+    if 'HISTORY' not in header:
+        tqdm.write("{:s}, No HISTORY in header .. flagging noisy rows".format(scan))
+    else:
+        history_list = header['HISTORY']
+
+        if f'noisy rows flagged' not in history_list: # 
+            tqdm.write("{:s}, No row flags in header .. flagging noisy rows".format(scan))
+
+        if f'noisy rows flagged' in history_list and  args.force:
+            tqdm.write("{:s}, Row flagging already done.. forcing flagging".format(scan))
+
+        elif (f'noisy rows flagged' in history_list) and not args.force:
+            tqdm.write("{:s}, Row flagging already done .. stopping".format(scan))
+            return None
+
+    # READ DATA_TABLE
     data   = hdu[1].data
     spec   = data['spec'] 
     scan_type = data['scan_type']
@@ -72,15 +90,6 @@ def doStuff(scan, ta_std, fitnes, tsys, resgood, resbad):
     unixtime  = data['UNIXTIME']
     THOT      = data['THOT']
     ROW_FLAG  = data['ROW_FLAG']
-
-    if 'HISTORY' not in header:
-        print(scan, " No bad row flags in header .. flagging bad rows")
-    else:
-        history_list = header['HISTORY']
-        if f'noisy rows flagged' in history_list:
-            print(scan, " Row flagging already done .. stopping")
-            #exit
-
 
     if(line=='NII'):
         x0=12
@@ -105,16 +114,19 @@ def doStuff(scan, ta_std, fitnes, tsys, resgood, resbad):
         z = np.polyfit(xdata, ydata, 5)
         p = np.poly1d(z)
         for j in range(l0):
-           data[j] = ydata[j] - p(j)
+            data[j] = ydata[j] - p(j)
+
+        #RESET
+        ROW_FLAG[i] = 0
 
         if(np.std(data)>thresh[find_mixer(line, mixer[i])]):
-            ROW_FLAG[i] = 1
+            ROW_FLAG[i] |=  (1<<26 | 1<<27)  # set "clear ringing"
             resbad  = np.vstack([resbad,  [[np.std(data), unixtime[i], mixer[i]]]])
         else:
-            ROW_FLAG[i] = 0
+            ROW_FLAG[i] &= ~(1<<26 | 1<<27)  # unset both ringing bits
             resgood  = np.vstack([resgood, [[np.std(data), unixtime[i], mixer[i]]]])
 
-        if(scan_type[i] == 'OTF'):
+        if(scan_type[i] == 'OTF' and args.stats):
             # compute Tsys around zero vlsr
             # for the current row, irrespective of the ROW_FLAG, see what the Tmix would be
 
@@ -141,30 +153,48 @@ def doStuff(scan, ta_std, fitnes, tsys, resgood, resbad):
     # Write the change back to the fits file
     hdu[0].header.add_history('noisy rows flagged')
     hdu.flush()
-    return(ta_std, fitnes, tsys, resgood, resbad)
+
+    if args.stats:
+        return(ta_std, fitnes, tsys, resgood, resbad)
+    else:
+        return None
 
 
-# ConfigParser Object
-config = configparser.ConfigParser()
+if __name__ == "__main__":
 
-# Read config file for Data Paths
-config.read('config.ini')
-paths=[]
-paths.append(config.get('Paths', 'B1_path'))
-paths.append(config.get('Paths', 'B2_path'))
+    # some data structures to place the Tsys statistics if needed
+    resgood = np.empty((0,3))   # (std_dev, unixtime, mixer#)  STD_DEV of good rows of baseband spectra
+    resbad  = np.empty((0,3))   # (std_dev, unixtime, mixer#)  STD_DEV of bad  rows of baseband spectra
+    ta_std  = np.empty((0,3))   # (tsys,    unixtime, mixer#)  STD_DEV of Level 1
+    fitnes  = np.empty((0,3))   # (tsys,    unixtime, mixer#)  
+    tsys    = np.empty((0,3))   # (tsys,    unixtime, mixer#)
 
-partial = sys.argv[1]
-search_files=[]
-for path in paths:
-   search_files+=sorted(glob.glob(f"{path}/{partial}.fits"))
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--files", help="\tFilename partial", default="ACS*")
+    parser.add_argument("--force", help="\tForce update", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--stats", help="\tDo OTF Ta_std statistics", action=argparse.BooleanOptionalAction, default=False)
+    args = parser.parse_args()
 
-# Debug
-#print("\n".join(search_files))
+    # ConfigParser Object
+    config = configparser.ConfigParser()
 
-for file in (search_files):
-    ta_std, fitnes, tsys, resgood, resbad = doStuff(file, ta_std, fitnes, tsys, resgood, resbad)
 
-plt.plot(ta_std[ta_std[:, 2] == 2])
-plt.plot(ta_std[ta_std[:, 2] == 3])
-plt.plot(ta_std[ta_std[:, 2] == 6])
-plt.ylim((0, 1000))
+    # Read config file for Data Paths
+    config.read('../../common/config.ini')
+    path = config.get('Paths', 'L08_path')
+
+    partial_filename = args.files
+    files = sorted(glob.glob(f"{path}/{partial_filename}.fits"))
+
+    # doesn't work with --stats yet.  
+    # TODO: access shared numpy arrays with threadsafe lock to make that work.
+    with multiprocessing.Pool() as pool:
+        pool.map(partial(doStuff, args=args, ta_std=ta_std, fitnes=fitnes, tsys=tsys, resgood=resgood, resbad=resbad), files)
+
+    if args.stats:
+        plt.plot(ta_std[ta_std[:, 2] == 2])
+        plt.plot(ta_std[ta_std[:, 2] == 3])
+        plt.plot(ta_std[ta_std[:, 2] == 5])
+        plt.plot(ta_std[ta_std[:, 2] == 8])
+        plt.show()
