@@ -294,7 +294,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
         
-        paramlist = [[a, b, c, d] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles]
+        paramlist = [[a, b, c, d] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in int([cfi['gprocs']['drmethod'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         
         if verbose:
@@ -325,7 +325,7 @@ def processL08(params, verbose=False):
     """
     
     #loadL08Data(dfile, verbose=True)
-    line, inDir, outDir, dfile = params[0], params[1], params[2], params[3]
+    line, inDir, outDir, dfile, drmethod = params[0], params[1], params[2], params[3], params[4]
     
     # define some processing data first (maybe relocat to function later?)
 
@@ -417,14 +417,41 @@ def processL08(params, verbose=False):
         ta = ma.zeros([n_OTF, n_pix])
         ta.mask = spec.mask
         tsyseff = np.zeros([n_OTF, n_pix])
+
+        # this call returns the results for all spectra, but we need only everything for the OTF spectra
+        # ahgroup is the assignment of hots to all spectra
+        # aghots are the grouped hots
+        # aghtim is the unixtime associated with the grouped hots
+        # aglast is a flag indicating that there is a hot at the end of the OTF strip
+        ahgroup, ghots, ghtim, glast = getHotInfo(spec, data, verbose=verbose)
+        # reduce the assignment to the OTF spectra only
+        hgroup = ahgroup[osel]
+        
     
         # create the calibrated spectra
         for i0 in range(n_OTF):
             tsyseff[i0,:] = fracb[i0] * tsys[0,:] + fraca[i0] * tsys[1,:]
             # we might have to replace flagged pixels in tsyseff to not cause a problem in the spectra
             # => skipped for now since pixel flags should be very similar to flagged pixels in spectra
-            spref = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
-            ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref)/spref
+            if drmethod==1:
+                # method 1
+                spref = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
+                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref)/spref
+            elif drmethod==2:
+                # method 2: using HOTS to mitigate drifts
+                # apply the REFHOTS to the refs
+                # ToDo: check if the inttime of refs/hots/otfs matters
+                # calculate the fraction of hot used for the spectrum
+                ht1 = ghtim[hgroup[i0]]
+                ht2 = ghtim[hgroup[i0]+1]
+                hfrac = (stime[i0]-ht1)/(ht2-ht1)
+                # determine the hots for the individual OTF spectra
+                hcorr = ghots[hgroup[i0]]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1]
+                # determine the hots-reduced REF spectra
+                spref = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
+                
+                # put everything together. issue: divide by zero -> catch in masks
+                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr - spref)/spref
             
             if type(ta)==type(np.ndarray(0)):
                 ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
