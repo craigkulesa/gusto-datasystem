@@ -39,5 +39,8 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
     -------
 
     """
-    
+    # 1: read in the data from file
+    # 2: apply bseline correction to each spectrum
+    # 3: save back to files with only setting a flag about the baseline correction,
+    # but all other parameters are passed through
     print('   GL095Pipeline to be implemented')
