@@ -1,6 +1,16 @@
+"""Logging functionality for gusto L09 pipline
+"""
+
 import logging
 import time
 
+
+__version__ = 0.11
+__date__ = '20240919'
+__updated__ = '20240919'
+fheader, tail = os.path.split(inspect.stack()[0][1])
+__pyfile__ = tail
+__path__ = fheader
 
 def init_logger(loglevel='DEBUG', logfile=None, loggername='GL09PLogger'):
     # create logger 
