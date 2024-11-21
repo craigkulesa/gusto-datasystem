@@ -158,7 +158,7 @@ def runGL09P(verbose=False):
 
     
     if args.debug:
-        cfi['gprocs']['debug'] = arg.debug
+        cfi['gprocs']['debug'] = args.debug
         
 
     #########################################################
@@ -294,9 +294,9 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
         
-        paramlist = [[a, b, c, d] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in int([cfi['gprocs']['drmethod'])]]
+        paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
-        
+        print(paramlist)
         if verbose:
             print('Selected data files: ', dfiles)
         
@@ -355,7 +355,7 @@ def processL08(params, verbose=False):
     
     # for now, process all mixers
     umixers = np.unique(data['MIXER'])
-    for mix in umixers:
+    for k, mix in enumerate(umixers):
         # first check crudely if we have enough data of various scan_types
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr)
         check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
@@ -442,13 +442,13 @@ def processL08(params, verbose=False):
                 # apply the REFHOTS to the refs
                 # ToDo: check if the inttime of refs/hots/otfs matters
                 # calculate the fraction of hot used for the spectrum
-                ht1 = ghtim[hgroup[i0]]
-                ht2 = ghtim[hgroup[i0]+1]
+                ht1 = ghtim[k,hgroup[i0]]
+                ht2 = ghtim[k,hgroup[i0]+1]
                 hfrac = (stime[i0]-ht1)/(ht2-ht1)
                 # determine the hots for the individual OTF spectra
-                hcorr = ghots[hgroup[i0]]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1]
+                hcorr = ghots[k,hgroup[i0],:]*hfrac + (1-hfrac) * ghots[k,hgroup[i0]+1,:]
                 # determine the hots-reduced REF spectra
-                spref = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
+                spref = fracb[i0] * refs[0,:] / ghots[k,0,:] + fraca[i0] * refs[1,:] / ghots[k,-1,:]
                 
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr - spref)/spref

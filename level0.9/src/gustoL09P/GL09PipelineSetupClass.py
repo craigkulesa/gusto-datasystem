@@ -239,10 +239,16 @@ class GL09PipelineSetupClass:
         configPath = "/".join(self.configFile.split('/')[:-1])
 
         if not os.path.isdir(configPath):
-            print(
-                'Error: GUSTO configuration directory does not exist: %s \n' % (configPath))
-            print('creating directory!\n')
-            os.makedirs(configPath, exist_ok=True)
+            if self.configFile is not None:
+                # check if the file is in the module data directory
+                self.configFile = pkg_resources.resource_filename(
+                        'gustoL09P', os.path.join('Data',self.configFile))
+            else:
+                print(
+                    'Error: GUSTO configuration directory does not exist: %s \n' % (configPath))
+                # print('creating directory!\n')
+                # os.makedirs(configPath, exist_ok=True)
+                sys.exit()
 
         if not os.path.exists(self.configFile):
             print('Error: config file does not exist: ', self.configFile)

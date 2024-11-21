@@ -206,7 +206,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
 
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, verbose=verbose)
     #if verbose:
-    if (len(otfID)<1) & (len(rfsID)<1) & (len(rhsID)<1) & (len(hotID)<1):
+    if (len(otfID)<1) | (len(rfsID)<1) | (len(rhsID)<1) | (len(hotID)<1):
         print('Not enough scans types for processing (otf/refs/refhots/hots): ', otfID, rfsID, rhsID, hotID)
         return -999, 0, 0, 0, 0, 0, 0
     
@@ -265,7 +265,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
 
 
 def getHotInfo(spec, data, verbose=False):
-    """Function determining the presence of HOT spectra in an 
+    """Function analyzing and processing HOT spectra in an 
     OTF strip.
 
 
@@ -294,12 +294,12 @@ def getHotInfo(spec, data, verbose=False):
     unixtime = data['UNIXTIME']
     ut0 = unixtime[0]
     
-    hgroup = np.zeros(n_spec)
+    hgroup = np.zeros(n_spec, dtype=int)
     hcnt = 0   # counter counting the total number of hots
     hgrp = 0   # counter for hot groups
     
     # determine the first hot scan
-    lasthot = np.argmin(unixtime[(data['MIXER']==mixers[mx])&(data['scan_type']=='HOT')])
+    lasthot = np.argmin(unixtime[(data['MIXER']==umixers[mx])&(data['scan_type']=='HOT')])
     
     for i in range(n_spec):
         for mx in umixers:
