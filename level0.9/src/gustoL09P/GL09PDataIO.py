@@ -117,9 +117,155 @@ def loadL08Data(ifile, verbose=False):
     spec = ma.masked_invalid(spec)
     spec.mask[:,612:1023] = 1
 
-    return spec, data, hdr
+    return spec, data, hdr, hdr1
 
 
+def saveProcData():
+    """This is not working code yet. Old code is just being parked until 
+    made usable.
+    """
+
+    # Table for data extension:
+    # ra = data['RA'][osel]
+    # dec = data['DEC'][osel]
+    # ra = data['RA']
+    # dec = data['DEC']
+    # rflag = data['ROW_FLAG'][osel] 
+    #
+    # c0 = SkyCoord(ra[0], dec[0], unit=(u.deg, u.deg), frame='icrs')
+    # c1 = SkyCoord(ra[osel]*u.degree, dec[osel]*u.degree, frame='icrs')
+    # rc1 = c1.transform_to(SkyOffsetFrame(origin=c0)) 
+    # raoff = rc1.lon.deg
+    # decoff = rc1.lat.deg 
+    
+    tsyseff_avg = np.nanmean(tsyseff[:,200:400], axis=1)
+    # timeobs = Time(data['UNIXTIME'][osel], format='unix').fits
+    # dobs = [tt[0].split('T')[0] for tt in timeobs]
+    # tobs = [tt[0].split('T')[1] for tt in timeobs]
+    tred = Time(datetime.datetime.now()).fits
+    
+    # aa = np.zeros(n_OTF)
+    # ao = np.ones(n_OTF)
+    
+    
+    # changing the output data format to
+    # primarily passing through the header and the data table
+    # and only few variables and the header keys are updated or added
+    
+    # this is the offset from the longitude in CRVAL2 -> RA
+    col1 = Column(raoff, name='CDELT2', description='longitude')
+    # this is the offset from the longitude in CRVAL3 -> Dec
+    col2 = Column(decoff, name='CDELT3', description='latitude')
+    col3 = Column(ta, name='DATA', description='spectrum')
+    col4 = Column(tsyseff_avg, name='TSYS', description='system temperature (K)')
+    col5 = Column(aa, name='IMAGFREQ', description='image band frequency (Hz)')
+    col6 = Column(dobs, name='DATE-OBS', description='date of obs')
+    col7 = Column(tobs, name='UT', description='time obs started')
+    col8 = Column(ao*float(hdr['ELEVATON']), name='ELEVATIO', description='')
+    col9 = Column(ao*(Thot[0]+Thot[1])/2., name='THOT', description='hot load temperature (K)')
+    col10 = Column(ao*Tsky, name='TCOLD', description='Sky temperature (K)')
+    col11 = Column(ta.mask, name='CHANNEL_FLAG', description='pixel mask')
+    col12 = Column(rflag, name='Row_flag', description='flagging compromised spectra')
+    fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12])
+        
+    # now, create the header
+    
+
+    # NAXIS1: number of channels
+    # NAXIS2: pos coord1
+    # NAXIS3: pos coord2
+    # NAXIS4: Stokes
+    wcs_dict = {
+        "CTYPE1": "Velocity    ",
+        "CUNIT1": "m/s",
+        "CDELT1": 0.2,
+        "CRPIX1": 0.0,
+        "CRVAL1": 0.0,
+        "NAXIS1": n_pix,
+        "CTYPE2": "RA---GLS",
+        "CUNIT2": "deg",
+        "CDELT2": 0.1,
+        "CRPIX2": 0.0,
+        "CRVAL2": ra[0],
+        "NAXIS2": 1,
+        "CTYPE3": "DEC--GLS",
+        "CUNIT3": "deg",
+        "CDELT3": 0.1,
+        "CRPIX3": 0.0,
+        "CRVAL3": dec[0],
+        "NAXIS3": 1,
+        # "CTYPE4": "STOKES  ",
+        # "CUNIT4": "",
+        # "CDELT4": 0.0,
+        # "CRPIX4": 0.0,
+        # "CRVAL4": 1,
+        # "NAXIS4": 1,
+    }
+    wcs = astropy.wcs.WCS(wcs_dict)
+    header = wcs.to_header()
+    
+    # additional header keywords
+    header['TELESCOP'] = hdr['TELESCOP']
+    header['BAND'] = hdr['BAND']
+    header['LINE'] = line
+    header['OBJECT'] = 'GUSTO_GPS'
+    header['FOFFSET'] = 0.0
+    header['RESTFREQ'] = rfreq
+    header['LINEFREQ'] = hdr['LINEFREQ']
+    header['IMAGFREQ'] = rfreq
+    header['IF0'] = hdr['IF0']
+    header['SYNTFREQ'] = hdr['SYNTFREQ']
+    header['VELO-LSR'] = hdr['VLSR']    # m/s
+    header['VELDEF'] = 'RADI-LSR'
+    header['DELTAV'] = 0.2
+    header['GAINIMAG'] = 0.99999E-2
+    header['BEAMEFF'] = 0.95
+    header['FORWEFF'] = 0.95
+    header['EPOCH'] = 2000
+    header['DATE-OBS'] = tobs[0][0]
+    header['DATE-RED'] = tred
+    header['UT'] = 0.0
+    header['OBSTIME'] = 0.1
+    header['CREATOR'] = 'GUSTO Level 0.9 Pipeline'
+    header['HISTORY'] = 'pipeline version: %s'%(__version__)
+    header['HISTORY'] = 'last pipeline update: %s'%(__updated__)
+    header['HISTORY'] = 'file created: %s'%(time.strftime("%c"))
+    header['CALID'] = hdr['CALID']
+    header['DLEVEL'] = '0.9'
+    header['PROCTIME'] = time.strftime("%c")
+    header['SER_FLAG'] = hdr['SER_FLAG']
+    header['T_MIXER'] = hdr['T_MIXER']
+    header['GOND_ALT'] = hdr['GOND_ALT']
+    header['GOND_LAT'] = hdr['GOND_LAT']
+    header['GOND_LON'] = hdr['GOND_LON']
+    header['ELEVATON'] = hdr['ELEVATON']
+    # header[''] = hdr['']
+    # header[''] = hdr['']
+    
+    
+    # now write the fits file
+    hdu = fits.PrimaryHDU()
+    hdu2 = fits.BinTableHDU(data=fT, header=header, name='MATRIX', ver=True)
+    hdulist = fits.HDUList([hdu, hdu2])
+    os.makedirs(outDir, exist_ok=True)
+    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_%s_L09.fits'%(mix)))
+    hdulist.writeto(ofile, overwrite=True)
+    
+    #if verbose:
+    print('saved file: ', ofile)
+    # logger.info('saved file: ', ofile)
+
+
+    # bunit = 'K (Ta)'
+    # RADESYS = 'FK5'
+    # EQUINOX = 2000
+    # RA = 
+    # DEC = 
+    # LINE = 'CII'
+    # RESTFREQ = 
+    # IMAGFREQ = 
+    # SPECSYS = 'LSRK'
+    # OBJECT = 
 
 
 if __name__ == "__main__":
