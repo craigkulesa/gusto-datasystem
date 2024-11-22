@@ -487,14 +487,6 @@ def processL08(params, verbose=False):
         fits.writeto(ofile, data=None, header=hdr, overwrite=True)
         fits.append(ofile, data=data, header=hdr1)
         
-        # now write the fits file
-        # hdu = fits.PrimaryHDU()
-        # hdu2 = fits.BinTableHDU(data=fT, header=header, name='MATRIX', ver=True)
-        # hdulist = fits.HDUList([hdu, hdu2])
-        # os.makedirs(outDir, exist_ok=True)
-        # ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_%s_L09.fits'%(mix)))
-        # hdulist.writeto(ofile, overwrite=True)
-        
         print('saved file: ', ofile)
         # logger.info('saved file: ', ofile)
         
