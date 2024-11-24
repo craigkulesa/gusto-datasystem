@@ -496,7 +496,6 @@ def processL08(params, verbose=False):
             # we have spectra/data for each otf spectrum: Tsyseff, hcorr, spref, fraca, fracb
             # single spectra: Tsys1, Tsys2, 
             # small groupf of spectra: hots
-            print(tsyseff.shape, hcorr.shape, spref.shape, fraca.shape, fracb.shape)
             col1 = Column(tsyseff, name='Tsyseff', description='effective Tsys per OTF spectrum')
             col2 = Column(hcorr, name='hcorr', description='effective hot spectrum')
             col3 = Column(spref, name='spref', description='effective hot for ref spectrum')
