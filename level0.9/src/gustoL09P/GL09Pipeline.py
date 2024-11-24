@@ -505,7 +505,6 @@ def processL08(params, verbose=False):
             fT = Table([col1, col2, col3, col4, col5])
             fits.append(ofile, data=fT.as_array(), extname='debug1')
             fits.append(ofile, data=ghots, extname='hots')
-            #Ts = np.vstack([Tsys1, Tsys2])
             fits.append(ofile, data=tsys.data, extname='tsys')
         
         print('saved file: ', ofile)
