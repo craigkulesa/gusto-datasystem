@@ -487,7 +487,7 @@ def processL08(params, verbose=False):
         os.makedirs(outDir, exist_ok=True)
         ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_%s_L09.fits'%(mix)))
         fits.writeto(ofile, data=None, header=hdr, overwrite=True)
-        fits.append(ofile, data=data, header=hdr1)
+        fits.append(ofile, data=data, header=hdr1, extname='Data')
         
         # if in debug mode, add more extensions
         if debug:
