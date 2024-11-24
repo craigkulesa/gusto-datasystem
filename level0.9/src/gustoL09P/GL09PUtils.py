@@ -245,9 +245,9 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
         
         # estimate Tsys for each Device
         y_factor  = spec_h/spec_r
-        #print('spec_r: ', spec_r)
-        #print('y-factor: ', y_factor)
+
         tsys = (THOT_avg - Tsky*y_factor[:])/(y_factor[:] - 1.)
+
         Thot.append(THOT_avg)
         Tsyss.append(tsys)
         REFs.append(spec_r)
