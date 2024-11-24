@@ -294,7 +294,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
         
-        paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])]]
+        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         print(paramlist)
         if verbose:
@@ -325,7 +325,7 @@ def processL08(params, verbose=False):
     """
     
     #loadL08Data(dfile, verbose=True)
-    line, inDir, outDir, dfile, drmethod = params[0], params[1], params[2], params[3], params[4]
+    line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
     
     # define some processing data first (maybe relocat to function later?)
 
@@ -417,6 +417,8 @@ def processL08(params, verbose=False):
         ta = ma.zeros([n_OTF, n_pix])
         ta.mask = spec.mask
         tsyseff = np.zeros([n_OTF, n_pix])
+        hcorr = np.zeros([n_OTF, n_pix])
+        spref = np.zeros([n_OTF, n_pix])
 
         # this call returns the results for all spectra, but we need only everything for the OTF spectra
         # ahgroup is the assignment of hots to all spectra
@@ -435,8 +437,8 @@ def processL08(params, verbose=False):
             # => skipped for now since pixel flags should be very similar to flagged pixels in spectra
             if drmethod==1:
                 # method 1
-                spref = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
-                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref)/spref
+                spref[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
+                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref[i0,:]
             elif drmethod==2:
                 # method 2: using HOTS to mitigate drifts
                 # apply the REFHOTS to the refs
@@ -446,12 +448,12 @@ def processL08(params, verbose=False):
                 ht2 = ghtim[k,hgroup[i0]+1]
                 hfrac = (stime[i0]-ht1)/(ht2-ht1)
                 # determine the hots for the individual OTF spectra
-                hcorr = ghots[k,hgroup[i0],:]*hfrac + (1-hfrac) * ghots[k,hgroup[i0]+1,:]
+                hcorr[i0,:] = ghots[k,hgroup[i0],:]*hfrac + (1-hfrac) * ghots[k,hgroup[i0]+1,:]
                 # determine the hots-reduced REF spectra
-                spref = fracb[i0] * refs[0,:] / ghots[k,0,:] + fraca[i0] * refs[1,:] / ghots[k,-1,:]
+                spref[i0,:] = fracb[i0] * refs[0,:] / ghots[k,0,:] + fraca[i0] * refs[1,:] / ghots[k,-1,:]
                 
                 # put everything together. issue: divide by zero -> catch in masks
-                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr - spref)/spref
+                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
             
             if type(ta)==type(np.ndarray(0)):
                 ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
@@ -486,6 +488,25 @@ def processL08(params, verbose=False):
         ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_%s_L09.fits'%(mix)))
         fits.writeto(ofile, data=None, header=hdr, overwrite=True)
         fits.append(ofile, data=data, header=hdr1)
+        
+        # if in debug mode, add more extensions
+        if debug:
+            # data needed
+            # Tsys1, Tsys2, fraca, fracb, Tsyseff, hcorr, spref
+            # we have spectra/data for each otf spectrum: Tsyseff, hcorr, spref, fraca, fracb
+            # single spectra: Tsys1, Tsys2, 
+            # small groupf of spectra: hots
+            print(tsyseff.shape, hcorr.shape, spref.shape, fraca.shape, fracb.shape)
+            col1 = Column(tsyseff, name='Tsyseff', description='effective Tsys per OTF spectrum')
+            col2 = Column(hcorr, name='hcorr', description='effective hot spectrum')
+            col3 = Column(spref, name='spref', description='effective hot for ref spectrum')
+            col4 = Column(fraca, name='fraca', description='fraction of Tsys1')
+            col5 = Column(fracb, name='fracb', description='fraction of Tsys2')
+            fT = Table([col1, col2, col3, col4, col5])
+            fits.append(ofile, data=fT.as_array(), extname='debug1')
+            fits.append(ofile, data=ghots, extname='hots')
+            #Ts = np.vstack([Tsys1, Tsys2])
+            fits.append(ofile, data=tsys.data, extname='tsys')
         
         print('saved file: ', ofile)
         # logger.info('saved file: ', ofile)

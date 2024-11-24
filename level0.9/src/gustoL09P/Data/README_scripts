@@ -9,7 +9,7 @@ pipeline code.
 	execGL09P
 
 # for debugging:
-	execGL09P -c GL09P_debug.txt -r 9000 9200 -d -v
+	execGL09P -c GL09P_debug.txt -r 9000 9200 -d True -v True
 
 
 # user specific commands should go below here:
