@@ -262,7 +262,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
 
 
 
-def getHotInfo(spec, data, verbose=False):
+def getHotInfo(spec, data, mixer, verbose=False):
     """Function analyzing and processing HOT spectra in an 
     OTF strip.
 
@@ -273,6 +273,8 @@ def getHotInfo(spec, data, verbose=False):
             array containing only the spectra for the OTF scan
     data : recarray
             recarray with the binary table information from the FITS file
+    mixer : float
+            mixer processed
 
     Returns
     -------
@@ -286,8 +288,9 @@ def getHotInfo(spec, data, verbose=False):
     n_spec, n_pix = spec.shape
     
     # mixer index for testing: 0, 1, or 2
-    mx = 0
+    #mx = mixer
     umixers = np.unique(data['MIXER'])
+    mx = np.argwhere(umixers==mixer).flatten()
     
     unixtime = data['UNIXTIME']
     ut0 = unixtime[0]
@@ -338,7 +341,8 @@ def getHotInfo(spec, data, verbose=False):
     glast = np.zeros(int(umixers.size), dtype=bool)
     
     # now we have to average the hots for each group:
-    for i, mx in enumerate(umixers):
+    # for i, mx in enumerate(umixers):
+    for i, mx in enumerate([mixer]):
         maxgrp[i] = int(hgroup[data['MIXER']==mx].max()+1)
         if verbose:
             print('mixer/# groups: ', mx, maxgrp[i])
@@ -349,7 +353,7 @@ def getHotInfo(spec, data, verbose=False):
             ghtim[i,j] = np.mean(unixtime[sel])
     
         # final check if the last OTF is followed by a HOT/REFHOT
-        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF'))
+        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (data['ROW_FLAG']==0))
         if np.max(data['UNIXTIME'][sel])<ghtim[i,-1]:
             glast[i] = True
         

@@ -386,8 +386,8 @@ def processL08(params, verbose=False):
             print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
             print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
-            print('Not enough data available for processing')
-            data['ROW_FLAG'][mix] = 4   # flagged as missing data
+            print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
+            data['ROW_FLAG'][msel] = 4   # flagged as missing data
             datavalid = False
             return 0
         
@@ -412,14 +412,15 @@ def processL08(params, verbose=False):
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
         osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & 
                            (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & 
-                           np.any(data['ROW_FLAG'][mix]==0)).flatten()
+                           (data['ROW_FLAG'][mix]==0)).flatten()
         #print('otfID.size: ', otfID.size)
         if len(osel) > 0:
-            print('processing OTFs')
-            print('OTFs: ', otfID)
-            print('REFs: ', rfsID)
-            print('REFHOTs: ', rhsID)
-            print('HOTs: ', hotID)
+            # print('processing OTFs')
+            # print('OTFs: ', otfID)
+            # print('REFs: ', rfsID)
+            # print('REFHOTs: ', rhsID)
+            # print('HOTs: ', hotID)
+            # print('mixer: ', mix)
             pass
         else:
             print('WARNING: No OTF spectra available.')
@@ -447,7 +448,7 @@ def processL08(params, verbose=False):
         # aghots are the grouped hots
         # aghtim is the unixtime associated with the grouped hots
         # aglast is a flag indicating that there is a hot at the end of the OTF strip
-        ahgroup, ghots, ghtim, glast = getHotInfo(spec, data, verbose=verbose)
+        ahgroup, ghots, ghtim, glast = getHotInfo(spec, data, mix, verbose=verbose)
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
         gsz = ghots.shape
@@ -525,7 +526,7 @@ def processL08(params, verbose=False):
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
-    fits.append(ofile, data=data, header=hdr1, extname='Data')
+    fits.append(ofile, data=data, header=hdr1)
     
     # if in debug mode, add more extensions
     if debug & datavalid:
@@ -538,18 +539,28 @@ def processL08(params, verbose=False):
         col2 = Column(ahcorr, name='hcorr', description='effective hot spectrum')
         col3 = Column(aspref, name='spref', description='effective hot for ref spectrum')
         col4 = Column(afrac, name='frac', description='fraction of Tsys1/2')
-        fT = Table([col1, col2, col3, col4])
-        fits.append(ofile, data=fT.as_array(), extname='debug1')
+        col5 = Column(spec, name='spec', description='original spectra')
+        fT = Table([col1, col2, col3, col4, col5])
+        fits.append(ofile, data=fT.as_array())
 
         col21 = Column(np.array(aghots), name='hots', description='averaged hot spectra')
         col22 = Column(np.array(aghtim), name='htime', description='utime of avg. hots')
         col23 = Column(np.array(aghmix), name='hmixer', description='mixer of avg. hots')
         fgh = Table([col21, col22, col23])
-        fits.append(ofile, data=fgh.as_array(), extname='hots')
+        fgh.write(ofile, append=True)
 
         col31 = Column(np.array(atsys), name='Tsys', description='Tsys before/after OTF')
         col32 = Column(np.array(atsmix), name='tsmix', description='mixer of Tsys')
         fits.append(ofile, data=Table([col31,col32]).as_array(), extname='tsys')
+        
+        # this is a crutch to properly name the extensions!
+        with fits.open(ofile) as hdu:
+            hdu[2].header['EXTNAME'] = 'DEBUG1'
+            hdu[3].header['EXTNAME'] = 'HOTS'
+            hdu[4].header['EXTNAME'] = 'Tsys'
+            hdu.writeto(ofile, overwrite=True)
+
+        
     
     print('saved file: ', ofile)
     # logger.info('saved file: ', ofile)
