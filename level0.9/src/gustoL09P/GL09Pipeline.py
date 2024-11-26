@@ -348,13 +348,28 @@ def processL08(params, verbose=False):
         Tsky = 33.5  # Kelvin
         rfreq = 1461.131406
 
+    datavalid = True
 
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
     rowFlag = data['ROW_FLAG']
     
+    n_spec, n_pix = spec.shape
+    
     # for now, process all mixers
     umixers = np.unique(data['MIXER'])
+    
+    tsyseff_avg = np.zeros(umixers.size)
+    aTsyseff = np.zeros([n_spec,n_pix])
+    ahcorr = np.zeros([n_spec,n_pix])
+    aspref = np.zeros([n_spec,n_pix])
+    afrac = np.zeros([n_spec,2])
+    aghots = []   # hots
+    aghtim = []   # time of hots
+    aghmix = []   # mixer of hots
+    atsys = []
+    atsmix = []
+
     for k, mix in enumerate(umixers):
         # first check crudely if we have enough data of various scan_types
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr)
@@ -371,6 +386,7 @@ def processL08(params, verbose=False):
             print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
             print('Not enough data available for processing')
+            datavalid = False
             return 0
         
         tsys, refs, rhots, rtime, htime, Thot, Tsky = getCalSpectra(mix, spec, data, hdr, verbose=True)
@@ -379,6 +395,7 @@ def processL08(params, verbose=False):
             print('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.info('Tsys: ', tsys)
+            datavalid = False
             break
         #print('<Tsys>: ', np.nanmean(tsys))
         tsys.fill_value = 0.0
@@ -403,6 +420,7 @@ def processL08(params, verbose=False):
         else:
             print('WARNING: No OTF spectra available.')
             # logger.warning('No OTF spectra available.')
+            datavalid = False
             return 0
     
         spec_OTF = np.squeeze(spec[osel,:])
@@ -412,13 +430,13 @@ def processL08(params, verbose=False):
         fracb = (stime - btime) / (atime - btime)
         fraca = (atime - stime) / (atime - btime)
         
-        n_OTF, n_pix = spec_OTF.shape
+        n_OTF, n_opix = spec_OTF.shape
         # antenna temperature is a masked array
-        ta = ma.zeros([n_OTF, n_pix])
+        ta = ma.zeros([n_OTF, n_opix])
         ta.mask = spec.mask
-        tsyseff = np.zeros([n_OTF, n_pix])
-        hcorr = np.zeros([n_OTF, n_pix])
-        spref = np.zeros([n_OTF, n_pix])
+        tsyseff = np.zeros([n_OTF, n_opix])
+        hcorr = np.zeros([n_OTF, n_opix])
+        spref = np.zeros([n_OTF, n_opix])
 
         # this call returns the results for all spectra, but we need only everything for the OTF spectra
         # ahgroup is the assignment of hots to all spectra
@@ -428,6 +446,15 @@ def processL08(params, verbose=False):
         ahgroup, ghots, ghtim, glast = getHotInfo(spec, data, verbose=verbose)
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
+        gsz = ghots.shape
+        n_ghots = gsz[0]
+        if n_ghots > 0:
+            aghots.append(ghots)
+            aghtim.append(ghtim)
+            aghmix.append(np.zeros(n_ghots)+mix)
+        
+        atsys.append(tsys)
+        atsmix.append(mix)
         
     
         # create the calibrated spectra
@@ -467,13 +494,12 @@ def processL08(params, verbose=False):
         # and only few variables and the header keys are updated or added
         
         
-        tsyseff_avg = np.nanmean(tsyseff[:,200:400], axis=1)
-        tred = Time(datetime.datetime.now()).fits
-        
-        hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
-        hdr.add_comment('Pipeline Processing', before='PROC_LEV')
-        hdr.insert('PROC_LEV', ('PROCDATE', tred.split('T')[0], 'Date of processing'))
-        hdr.insert('PROCDATE', ('PROCTIME', tred.split('T')[1], 'Time of processing'))
+        tsyseff_avg[k] = np.nanmean(tsys[:,200:400])
+        aTsyseff[osel,:] = tsyseff
+        ahcorr[osel,:] = hcorr
+        aspref[osel,:] = spref
+        afrac[osel,0] = fraca
+        afrac[osel,1] = fracb
     
         keys = data.dtype.names
         if 'spec' in keys:
@@ -484,30 +510,45 @@ def processL08(params, verbose=False):
         data[dkey][osel,:] = ta.data
         data['CHANNEL_FLAG'] [osel,:] = ta.mask
         
-        os.makedirs(outDir, exist_ok=True)
-        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_%s_L09.fits'%(mix)))
-        fits.writeto(ofile, data=None, header=hdr, overwrite=True)
-        fits.append(ofile, data=data, header=hdr1, extname='Data')
         
-        # if in debug mode, add more extensions
-        if debug:
-            # data needed
-            # Tsys1, Tsys2, fraca, fracb, Tsyseff, hcorr, spref
-            # we have spectra/data for each otf spectrum: Tsyseff, hcorr, spref, fraca, fracb
-            # single spectra: Tsys1, Tsys2, 
-            # small groupf of spectra: hots
-            col1 = Column(tsyseff, name='Tsyseff', description='effective Tsys per OTF spectrum')
-            col2 = Column(hcorr, name='hcorr', description='effective hot spectrum')
-            col3 = Column(spref, name='spref', description='effective hot for ref spectrum')
-            col4 = Column(fraca, name='fraca', description='fraction of Tsys1')
-            col5 = Column(fracb, name='fracb', description='fraction of Tsys2')
-            fT = Table([col1, col2, col3, col4, col5])
-            fits.append(ofile, data=fT.as_array(), extname='debug1')
-            fits.append(ofile, data=ghots, extname='hots')
-            fits.append(ofile, data=tsys.data, extname='tsys')
-        
-        print('saved file: ', ofile)
-        # logger.info('saved file: ', ofile)
+    tred = Time(datetime.datetime.now()).fits
+    
+    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
+    hdr.add_comment('Pipeline Processing', before='PROC_LEV')
+    hdr.insert('PROC_LEV', ('PROCDATE', tred.split('T')[0], 'Date of processing'))
+    hdr.insert('PROCDATE', ('PROCTIME', tred.split('T')[1], 'Time of processing'))
+    
+    os.makedirs(outDir, exist_ok=True)
+    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
+    fits.writeto(ofile, data=None, header=hdr, overwrite=True)
+    fits.append(ofile, data=data, header=hdr1, extname='Data')
+    
+    # if in debug mode, add more extensions
+    if debug & datavalid:
+        # data needed
+        # Tsys1, Tsys2, fraca, fracb, Tsyseff, hcorr, spref
+        # we have spectra/data for each otf spectrum: Tsyseff, hcorr, spref, fraca, fracb
+        # single spectra: Tsys1, Tsys2, 
+        # small groupf of spectra: hots
+        col1 = Column(aTsyseff, name='Tsyseff', description='effective Tsys per OTF spectrum')
+        col2 = Column(ahcorr, name='hcorr', description='effective hot spectrum')
+        col3 = Column(aspref, name='spref', description='effective hot for ref spectrum')
+        col4 = Column(afrac, name='frac', description='fraction of Tsys1/2')
+        fT = Table([col1, col2, col3, col4])
+        fits.append(ofile, data=fT.as_array(), extname='debug1')
+
+        col21 = Column(np.array(aghots), name='hots', description='averaged hot spectra')
+        col22 = Column(np.array(aghtim), name='htime', description='utime of avg. hots')
+        col23 = Column(np.array(aghmix), name='hmixer', description='mixer of avg. hots')
+        fgh = Table([col21, col22, col23])
+        fits.append(ofile, data=fgh.as_array(), extname='hots')
+
+        col31 = Column(np.array(atsys), name='Tsys', description='Tsys before/after OTF')
+        col32 = Column(np.array(atsmix), name='tsmix', description='mixer of Tsys')
+        fits.append(ofile, data=Table([col31,col32]).as_array(), extname='tsys')
+    
+    print('saved file: ', ofile)
+    # logger.info('saved file: ', ofile)
         
         
     return dfile

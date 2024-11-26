@@ -218,7 +218,9 @@ class GL09PipelineSetupClass:
 
         if verbose:
             print('loaded configuration file: %s\n' % (self.configFile))
-            print('self.GL09Pconf: ', self.GL09Pconf, '\n')
+            print('self.GL09Pconf: ')
+            pprint(self.GL09Pconf)
+            print()
 
         # checking if data directories are in place
         status = self.GL09PDirsSetup(verbose=verbose)
