@@ -410,7 +410,9 @@ def processL08(params, verbose=False):
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, verbose=verbose)
         
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
-        osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
+        osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & 
+                           (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & 
+                           np.any(data['ROW_FLAG'][mix]==0)).flatten()
         #print('otfID.size: ', otfID.size)
         if len(osel) > 0:
             # print('processing OTFs')
