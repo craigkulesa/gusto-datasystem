@@ -270,9 +270,9 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         inDir = cfi['gdirs']['L08DataDir']
         outDir = cfi['gdirs']['L09DataDir']
         if line=='CII':
-            filter = '*.fits'
+            filter = 'ACS5*.fits'
         else:
-            filter = '*.fits'
+            filter = 'ACS3*.fits'
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
         
@@ -372,12 +372,13 @@ def processL08(params, verbose=False):
 
     for k, mix in enumerate(umixers):
         # first check crudely if we have enough data of various scan_types
+        msel = np.argwhere(data['MIXER']==mix)
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr)
         check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0)
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(rowFlag[msel]==0)
         if not check:
             print('mix, dfile')
             print('specs: ', spec.shape)
@@ -386,6 +387,7 @@ def processL08(params, verbose=False):
             print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
             print('Not enough data available for processing')
+            data['ROW_FLAG'][mix] = 4   # flagged as missing data
             datavalid = False
             return 0
         
