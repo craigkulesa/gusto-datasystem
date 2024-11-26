@@ -415,11 +415,11 @@ def processL08(params, verbose=False):
                            np.any(data['ROW_FLAG'][mix]==0)).flatten()
         #print('otfID.size: ', otfID.size)
         if len(osel) > 0:
-            # print('processing OTFs')
-            # print('OTFs: ', otfID)
-            # print('REFs: ', rfsID)
-            # print('REFHOTs: ', rhsID)
-            # print('HOTs: ', hotID)
+            print('processing OTFs')
+            print('OTFs: ', otfID)
+            print('REFs: ', rfsID)
+            print('REFHOTs: ', rhsID)
+            print('HOTs: ', hotID)
             pass
         else:
             print('WARNING: No OTF spectra available.')
