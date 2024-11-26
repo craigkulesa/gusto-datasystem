@@ -34,7 +34,7 @@ l09save2fits = True
 l09set_channel_flags = True
 # select lines for processing
 # lines = ['CII']
-lines = NII, CII
+lines = CII
 debug = False
 
 

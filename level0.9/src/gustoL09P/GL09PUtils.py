@@ -349,7 +349,7 @@ def getHotInfo(spec, data, verbose=False):
             ghtim[i,j] = np.mean(unixtime[sel])
     
         # final check if the last OTF is followed by a HOT/REFHOT
-        sel = (data['MIXER']==mx) & (data['scan_type']=='OTF')
+        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF'))
         if np.max(data['UNIXTIME'][sel])<ghtim[i,-1]:
             glast[i] = True
         
