@@ -363,8 +363,10 @@ def processL08(params, verbose=False):
     aTsyseff = np.zeros([n_spec,n_pix])
     ahcorr = np.zeros([n_spec,n_pix])
     aspref = np.zeros([n_spec,n_pix])
+    aspref2 = np.zeros([n_spec,n_pix])
     afrac = np.zeros([n_spec,2])
     aTa = np.zeros([n_spec,n_pix])
+    aTa2 = np.zeros([n_spec,n_pix])
     aghots = []   # hots
     aghtim = []   # time of hots
     aghmix = []   # mixer of hots
@@ -440,9 +442,12 @@ def processL08(params, verbose=False):
         # antenna temperature is a masked array
         ta = ma.zeros([n_OTF, n_opix])
         ta.mask = spec.mask
+        ta2 = ma.zeros([n_OTF, n_opix])
+        ta2.mask = spec.mask
         tsyseff = np.zeros([n_OTF, n_opix])
         hcorr = np.zeros([n_OTF, n_opix])
         spref = np.zeros([n_OTF, n_opix])
+        spref2 = np.zeros([n_OTF, n_opix])
 
         # this call returns the results for all spectra, but we need only everything for the OTF spectra
         # ahgroup is the assignment of hots to all spectra
@@ -484,15 +489,18 @@ def processL08(params, verbose=False):
                 hcorr[i0,:] = ghots[k,hgroup[i0],:]*hfrac + (1-hfrac) * ghots[k,hgroup[i0]+1,:]
                 # determine the hots-reduced REF spectra
                 spref[i0,:] = fracb[i0] * refs[0,:] / ghots[k,0,:] + fraca[i0] * refs[1,:] / ghots[k,-1,:]
+                spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
                 
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
+                ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
                 print(ta[i0,200:400].min(), ta[i0,200:400].max())
             
             if type(ta)==type(np.ndarray(0)):
                 ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
             else:
                 ta[i0,ta[i0,:].mask>0] = 0.0
+                ta2[i0,ta2[i0,:].mask>0] = 0.0
 
     
         # now we have to save the data in a FITS file
@@ -508,6 +516,8 @@ def processL08(params, verbose=False):
         afrac[osel,0] = fraca
         afrac[osel,1] = fracb
         aTa[osel,:] = ta
+        aspref2[osel,:] = spref2
+        aTa2[osel,:] = ta2
     
         keys = data.dtype.names
         if 'spec' in keys:
@@ -541,9 +551,11 @@ def processL08(params, verbose=False):
         col1 = Column(aTsyseff, name='Tsyseff', description='effective Tsys per OTF spectrum')
         col2 = Column(ahcorr, name='hcorr', description='effective hot spectrum')
         col3 = Column(aspref, name='spref', description='effective hot for ref spectrum')
-        col4 = Column(afrac, name='frac', description='fraction of Tsys1/2')
-        col5 = Column(spec, name='spec', description='original spectra')
-        fT = Table([col1, col2, col3, col4, col5])
+        col4 = Column(aspref2, name='spref2', description='ref spectrum')
+        col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
+        col6 = Column(spec, name='spec', description='original spectra')
+        col7 = Column(tant, name='tant', description='spectrum without hot correction')
+        fT = Table([col1, col2, col3, col4, col5, col6, col7])
         fits.append(ofile, data=fT.as_array())
 
         col21 = Column(np.array(aghots), name='hots', description='averaged hot spectra')
