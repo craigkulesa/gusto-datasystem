@@ -494,7 +494,7 @@ def processL08(params, verbose=False):
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
-                print(ta[i0,200:400].min(), ta[i0,200:400].max())
+                print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, ta[i0,200:400].min(), ta[i0,200:400].max(), ta2[i0,200:400].min(), ta2[i0,200:400].max()))
             
             if type(ta)==type(np.ndarray(0)):
                 ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
@@ -554,7 +554,7 @@ def processL08(params, verbose=False):
         col4 = Column(aspref2, name='spref2', description='ref spectrum')
         col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
         col6 = Column(spec, name='spec', description='original spectra')
-        col7 = Column(tant, name='tant', description='spectrum without hot correction')
+        col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
         fT = Table([col1, col2, col3, col4, col5, col6, col7])
         fits.append(ofile, data=fT.as_array())
 
