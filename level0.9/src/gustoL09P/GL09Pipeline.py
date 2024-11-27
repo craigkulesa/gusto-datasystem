@@ -296,7 +296,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         
         paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
-        print(paramlist)
+        #print(paramlist)
         if verbose:
             print('Selected data files: ', dfiles)
         
@@ -364,6 +364,7 @@ def processL08(params, verbose=False):
     ahcorr = np.zeros([n_spec,n_pix])
     aspref = np.zeros([n_spec,n_pix])
     afrac = np.zeros([n_spec,2])
+    aTa = np.zeros([n_spec,n_pix])
     aghots = []   # hots
     aghtim = []   # time of hots
     aghmix = []   # mixer of hots
@@ -486,6 +487,7 @@ def processL08(params, verbose=False):
                 
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
+                print(ta[i0,200:400].min(), ta[i0,200:400].max())
             
             if type(ta)==type(np.ndarray(0)):
                 ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
@@ -505,6 +507,7 @@ def processL08(params, verbose=False):
         aspref[osel,:] = spref
         afrac[osel,0] = fraca
         afrac[osel,1] = fracb
+        aTa[osel,:] = ta
     
         keys = data.dtype.names
         if 'spec' in keys:
@@ -551,13 +554,17 @@ def processL08(params, verbose=False):
 
         col31 = Column(np.array(atsys), name='Tsys', description='Tsys before/after OTF')
         col32 = Column(np.array(atsmix), name='tsmix', description='mixer of Tsys')
-        fits.append(ofile, data=Table([col31,col32]).as_array(), extname='tsys')
+        fits.append(ofile, data=Table([col31,col32]).as_array())
+
+        col41 = Column(aTa, name='Ta', description='single mixer antenna temperature')
+        fits.append(ofile, data=Table([col41]).as_array())
         
         # this is a crutch to properly name the extensions!
         with fits.open(ofile) as hdu:
             hdu[2].header['EXTNAME'] = 'DEBUG1'
             hdu[3].header['EXTNAME'] = 'HOTS'
             hdu[4].header['EXTNAME'] = 'Tsys'
+            hdu[5].header['EXTNAME'] = 'Ta'
             hdu.writeto(ofile, overwrite=True)
 
         
