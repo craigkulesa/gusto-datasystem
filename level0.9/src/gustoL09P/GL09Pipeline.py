@@ -494,7 +494,7 @@ def processL08(params, verbose=False):
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
-                print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, ta[i0,200:400].min(), ta[i0,200:400].max(), ta2[i0,200:400].min(), ta2[i0,200:400].max()))
+                print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), ta2[i0,200:400].min(), ta2[i0,200:400].max()))
             
             if type(ta)==type(np.ndarray(0)):
                 ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
