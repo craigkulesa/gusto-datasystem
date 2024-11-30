@@ -368,7 +368,8 @@ def processL08(params, verbose=False):
     aTa = np.zeros([n_spec,n_pix])
     aTa2 = np.zeros([n_spec,n_pix])
     aghots = []   # hots
-    aghtim = []   # time of hots
+    aghtim = []   # unixtime of hots
+    aghtint = []  # integration time of hots
     aghmix = []   # mixer of hots
     atsys = []
     atsmix = []
@@ -454,7 +455,7 @@ def processL08(params, verbose=False):
         # aghots are the grouped hots
         # aghtim is the unixtime associated with the grouped hots
         # aglast is a flag indicating that there is a hot at the end of the OTF strip
-        ahgroup, ghots, ghtim, glast = getHotInfo(spec, data, mix, verbose=verbose)
+        ahgroup, ghots, ghtim, ghtint, glast = getHotInfo(spec, data, mix, verbose=True)
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
         gsz = ghots.shape
@@ -462,6 +463,7 @@ def processL08(params, verbose=False):
         if n_ghots > 0:
             aghots.append(ghots)
             aghtim.append(ghtim)
+            aghtint.append(ghtint)
             aghmix.append(np.zeros(n_ghots)+mix)
         
         atsys.append(tsys)
@@ -482,19 +484,19 @@ def processL08(params, verbose=False):
                 # apply the REFHOTS to the refs
                 # ToDo: check if the inttime of refs/hots/otfs matters
                 # calculate the fraction of hot used for the spectrum
-                ht1 = ghtim[k,hgroup[i0]]
-                ht2 = ghtim[k,hgroup[i0]+1]
+                ht1 = ghtim[hgroup[i0]]
+                ht2 = ghtim[hgroup[i0]+1]
                 hfrac = (stime[i0]-ht1)/(ht2-ht1)
                 # determine the hots for the individual OTF spectra
-                hcorr[i0,:] = ghots[k,hgroup[i0],:]*hfrac + (1-hfrac) * ghots[k,hgroup[i0]+1,:]
+                hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
                 # determine the hots-reduced REF spectra
-                spref[i0,:] = fracb[i0] * refs[0,:] / ghots[k,0,:] + fraca[i0] * refs[1,:] / ghots[k,-1,:]
+                spref[i0,:] = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
                 spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
                 
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
-                print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), ta2[i0,200:400].min(), ta2[i0,200:400].max()))
+                #print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), ta2[i0,200:400].min(), ta2[i0,200:400].max()))
             
             if type(ta)==type(np.ndarray(0)):
                 ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
@@ -561,7 +563,8 @@ def processL08(params, verbose=False):
         col21 = Column(np.array(aghots), name='hots', description='averaged hot spectra')
         col22 = Column(np.array(aghtim), name='htime', description='utime of avg. hots')
         col23 = Column(np.array(aghmix), name='hmixer', description='mixer of avg. hots')
-        fgh = Table([col21, col22, col23])
+        col24 = Column(np.array(aghtint), name='htint', description='integration time of avg. hots')
+        fgh = Table([col21, col22, col23, col24])
         fgh.write(ofile, append=True)
 
         col31 = Column(np.array(atsys), name='Tsys', description='Tsys before/after OTF')
