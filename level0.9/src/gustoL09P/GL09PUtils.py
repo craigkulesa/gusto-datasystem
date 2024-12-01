@@ -261,7 +261,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky
 
 
-def getHotInfo(spec, data, mixer, verbose=False):
+def getHotInfo(spec, data, mixer, dfile='', verbose=False):
     """Function analyzing and processing HOT spectra in an 
     OTF strip.
     There are caveats in the current data (tbc) including that there are duplicate
@@ -295,7 +295,7 @@ def getHotInfo(spec, data, mixer, verbose=False):
     #mx = mixer
     umixers = np.unique(data['MIXER'])
     mx = np.argwhere(umixers==mixer).flatten()
-    print(umixers, mixer)
+    #print(umixers, mixer)
     
     unixtime = data['UNIXTIME']
     tint = data['INTTIME']
@@ -308,7 +308,7 @@ def getHotInfo(spec, data, mixer, verbose=False):
     # determine the first hot scan
     lasthot = np.argmin(unixtime[(data['MIXER']==umixers[mx])&(data['scan_type']=='HOT')])
     firstref = True if (np.argwhere((data['MIXER']==umixers[mx])&(data['scan_type']=='REF')).min() < 10) else False
-    print('firstref: ', firstref)
+    #print('firstref: ', firstref)
 
     # added check for REFHOT duplicates at end of sequence
     # there should only be one REFHOT at the beginning and one at
@@ -318,11 +318,11 @@ def getHotInfo(spec, data, mixer, verbose=False):
     if firstref:
         good_rhs = urhs[:2]
     else:
-        if good_rhs.size>=1:
+        if urhs.size>=1:
             good_rhs = urhs[:1]
         else:
             good_rhs = [urhs]
-    print('good_rhs: ', good_rhs)
+    #print('good_rhs: ', good_rhs)
     uflag = np.zeros(n_spec)
     
     for i in range(n_spec):
@@ -352,14 +352,14 @@ def getHotInfo(spec, data, mixer, verbose=False):
             
                     
             if verbose:
-                if i == 0:
-                    #     #  0   8897    0    0    0     REF  5  0          0.000     1.833
-                    print('#sp scanID hcnt hgrp hgrp huse scantyp Mx rf           time   inttime')
-                print('%3i %6i  %3i %4i %4i %4i  %6s  %i  %i  %13.3f  %8.3f'%(i, data['scanID'][i], hcnt, hgroup[i], hgrp, uflag[i], data['scan_type'][i], data['MIXER'][i], data['ROW_FLAG'][i], unixtime[i]-ut0, data['INTTIME'][i]))
+                # if i == 0:
+                #     #     #  0   8897    0    0    0     REF  5  0          0.000     1.833
+                #     print('#sp scanID hcnt hgrp hgrp huse scantyp Mx rf           time   inttime')
+                # print('%3i %6i  %3i %4i %4i %4i  %6s  %i  %i  %13.3f  %8.3f'%(i, data['scanID'][i], hcnt, hgroup[i], hgrp, uflag[i], data['scan_type'][i], data['MIXER'][i], data['ROW_FLAG'][i], unixtime[i]-ut0, data['INTTIME'][i]))
+                pass
     
-    
-    if verbose:
-        print('\nNumber of hot groups per mixer: ', hgroup.max()+1,'\n')
+    # if verbose:
+    #     print('\nNumber of hot groups per mixer: ', hgroup.max()+1,'\n')
     
     # maxgrp = np.zeros(umixers.size, dtype=int)
     # ghots = np.zeros((int(umixers.size), int(hgroup.max()+1), n_pix))
@@ -394,8 +394,8 @@ def getHotInfo(spec, data, mixer, verbose=False):
     # for i, mx in enumerate(umixers):
     for i, mx in enumerate([mixer]):
         maxgrp = int(hgroup[data['MIXER']==mx].max()+1)
-        if verbose:
-            print('mixer/# groups: ', mx, maxgrp)
+        # if verbose:
+        #     print('mixer/# groups: ', mx, maxgrp)
     
         for j in range(maxgrp):
             sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']==0) & (uflag==1)
@@ -409,13 +409,14 @@ def getHotInfo(spec, data, mixer, verbose=False):
             glast = True
         
     if verbose:
-        print('\nglast: ', glast)
+        print('mx: ', mixer, '  good_rhs: ', good_rhs, '  firstref: ', firstref, '  glast: ', glast, '  #hgrp: ', hgroup.max()+1, maxgrp, dfile,'\n')
+        
 
     return hgroup, ghots, ghtim, ghtint, glast
 
 
-
-def getHotInfo2(spec, data, mixer, verbose=False):
+# old version of getHotInfo - not working correctly
+def getHotInfo_old(spec, data, mixer, verbose=False):
     """Function analyzing and processing HOT spectra in an 
     OTF strip.
 
@@ -480,11 +481,11 @@ def getHotInfo2(spec, data, mixer, verbose=False):
                 hgroup[i] = hgrp
                         
                 if verbose:
-                    if i == 0:
-                        #     #  0   8897    0    0    0     REF  5  0          0.000     1.833
-                        print('#sp scanID hcnt hgrp hgrp scantyp Mx rf           time   inttime')
-                    print('%3i %6i  %3i %4i %4i  %6s  %i  %i  %13.3f  %8.3f'%(i, data['scanID'][i], hcnt, hgroup[i], hgrp, data['scan_type'][i], data['MIXER'][i], data['ROW_FLAG'][i], unixtime[i]-ut0, data['INTTIME'][i]))
-    
+                    # if i == 0:
+                    #     #     #  0   8897    0    0    0     REF  5  0          0.000     1.833
+                    #     print('#sp scanID hcnt hgrp hgrp scantyp Mx rf           time   inttime')
+                    # print('%3i %6i  %3i %4i %4i  %6s  %i  %i  %13.3f  %8.3f'%(i, data['scanID'][i], hcnt, hgroup[i], hgrp, data['scan_type'][i], data['MIXER'][i], data['ROW_FLAG'][i], unixtime[i]-ut0, data['INTTIME'][i]))
+                    pass
     
     if verbose:
         print('\nNumber of hot groups per mixer: ', hgroup.max()+1,'\n')

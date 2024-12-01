@@ -455,7 +455,8 @@ def processL08(params, verbose=False):
         # aghots are the grouped hots
         # aghtim is the unixtime associated with the grouped hots
         # aglast is a flag indicating that there is a hot at the end of the OTF strip
-        ahgroup, ghots, ghtim, ghtint, glast = getHotInfo(spec, data, mix, verbose=True)
+        print(dfile)
+        ahgroup, ghots, ghtim, ghtint, glast = getHotInfo(spec, data, mix, dfile=dfile, verbose=True)
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
         gsz = ghots.shape
