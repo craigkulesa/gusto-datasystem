@@ -249,6 +249,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     #logger = logging.getLogger('GL09PLogger')
     
     if cfi['gprocs']['debug']==True:
+        print('\nExecuting debug mode.\n')
         logger = multiprocessing.log_to_stderr()
         logger.setLevel(multiprocessing.SUBDEBUG)
         n_procs = 1
@@ -261,6 +262,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     lines = cfi['gprocs']['lines'].replace('[','').replace(']','').replace(' ','').split(',')
     print('Lines: ', lines[0])
     lines= ['CII', 'NII']
+    
+    ignore = [9182, 11026, 11126, 11134]
     
     
     for line in lines:
@@ -286,7 +289,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         
         dfiles = []
         for i,ds in enumerate(dsc):
-            if (ds >= scanRange[0]) & (ds <= scanRange[1]):
+            if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
                 dfiles.append(sdirs[i])
                         
         n_ds = len(dfiles)
