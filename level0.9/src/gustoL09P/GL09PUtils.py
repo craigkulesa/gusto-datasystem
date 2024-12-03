@@ -287,15 +287,23 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False):
     ghtim: the average unixtime for each HOT group
     ghtint: the integration time for the averaged hots
     glast: flag if there is a HOT after the last OTF spectrum
+    htflag: flag indicating the availability of REFs and REFHOTs
+        0: clean sequence with REFs at start and end
+        1:
+        2: double REFs at start
+        3: double REFs at end
+        4: REF at start
+        5: REF at end
+        -1: no or too man OTFs
+        -2: too many OTF scan IDs
+        -3: 2 REFs at start or end; reverting to method 1
+        -4: 
 
     """
     n_spec, n_pix = spec.shape
     
-    # mixer index for testing: 0, 1, or 2
-    #mx = mixer
     umixers = np.unique(data['MIXER'])
     mx = np.argwhere(umixers==mixer).flatten()
-    #print(umixers, mixer)
     
     unixtime = data['UNIXTIME']
     tint = data['INTTIME']
@@ -308,26 +316,106 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False):
     # determine the first hot scan
     lasthot = np.argmin(unixtime[(data['MIXER']==umixers[mx])&(data['scan_type']=='HOT')])
     firstref = True if (np.argwhere((data['MIXER']==umixers[mx])&(data['scan_type']=='REF')).min() < 10) else False
-    #print('firstref: ', firstref)
 
-    # added check for REFHOT duplicates at end of sequence
+    # added check for REFHOT duplicates at beginning and at end of sequence
     # there should only be one REFHOT at the beginning and one at
     # the end
     rhscans = data['scanID'][data['scan_type']=='REFHOT']
+    rfscans = data['scanID'][data['scan_type']=='REF']
+    otscans = data['scanID'][data['scan_type']=='OTF']
     urhs = np.unique(rhscans)
-    if firstref:
-        good_rhs = urhs[:2]
-    else:
-        if urhs.size>=1:
-            good_rhs = urhs[:1]
+    urfs = np.unique(rfscans)
+    uots = np.unique(otscans)
+    htflag = 0
+
+    # print('urhs: ', urhs)
+    # print('urfs: ', urfs)
+    # print('uots: ', uots)
+    # print()
+    
+    # the first OTF scan ID should be the one determining the sequence
+    if uots.size == 0:
+        # bad sequence with no OTFs
+        htflag = -1
+        return 0,0,0,0,0, -1
+    elif uots.size == 1:
+        htflag = 0
+        tscan = uots[0]
+    elif uots.size > 1:
+        # bad sequence with too many OTFs
+        htflag = -2
+        return 0,0,0,0,0, -2
+
+    # print('htflag: ', htflag)
+    
+    # case 2 REFHOTs
+    if urfs.size==1:
+        # print('size: 1\n')
+        if (urfs[0]<tscan):
+            # REF at beginning
+            htflag = 4
+            good_rhs = urhs
+        elif (urfs[0]>tscan):
+            htflag = 5
+            good_rhs = urhs
+    elif urfs.size==2:
+        # print('size: 2\n')
+        # check if on rfscan is smaller and one larger than tscan
+        if (urfs[0]<tscan) & (urfs[1]>tscan):
+            # clean sequence REF OTF REF
+            htflag = 0
+            good_rhs = urhs
         else:
-            good_rhs = [urhs]
-    #print('good_rhs: ', good_rhs)
+            # start double REFs
+            # end double REFs
+            # either case should revert to cal method 1!
+            good_rhs = urhs
+            htflag = -3
+            return 0,0,0,0,0, -1
+    elif urfs.size==3:
+        # print('size: 3\n')
+        # print('tscan: ', tscan)
+        # print()
+        # print('tscan < urfs[2]: ', tscan < urfs[2])
+        # print('tscan > urfs[1]: ', tscan > urfs[1])
+        # print()
+        # now we duplicate REFs
+        if (tscan < urfs[1]):
+            # double at end
+            htflag = 3
+            good_rhs = urhs[:2]
+        elif tscan > urfs[1]:
+            # double at beginning
+            htflag = 2
+            good_rhs = urhs[1:3]
+        elif tscan < urfs[2]:
+            # double at beginning, 
+            htflag = 2
+            good_rhs = urhs[1:3]
+    elif urfs.size>3:
+        # print('size: >3\n')
+        if tscan > urfs[1]:
+            # double at beginning
+            htflag = 2
+            good_rhs = urhs[1:3]
+        elif tscan < urfs[1]:
+            # double at end
+            htflag = 3
+            good_rhs = urhs[:2]
+        else:
+            # totally wrong sequence
+            htflag = -4
+            return 0,0,0,0,0, -1
+            
+    # print()
+    # print('htflag: ', htflag)
+    # print('good_rhs: ', good_rhs)
     uflag = np.zeros(n_spec)
     
     for i in range(n_spec):
         if data['MIXER'][i] == mixer:
             if (data['scan_type'][i] == 'HOT')|((data['scan_type'][i] == 'REFHOT')&(data['scanID'][i] in good_rhs)):
+                # print(hcnt, data['scanID'][i], good_rhs, (data['scanID'][i] in good_rhs), (data['scan_type'][i] == 'HOT'))
                 if hcnt==0:
                     #hgroup[i] = hgrp
                     # if unixtime[i] - unixtime[lasthot] < 4.0:
@@ -346,20 +434,20 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False):
                     lasthot = i
                 uflag[i] = 1
                 hcnt += 1
+            else:
+                uflag[i] = 0
             hgroup[i] = hgrp
             if ((data['scan_type'][i] == 'REF')&(data['scanID'][i] in good_rhs)):
                 uflag[i] = 1
             
                     
-            if verbose:
-                # if i == 0:
-                #     #     #  0   8897    0    0    0     REF  5  0          0.000     1.833
-                #     print('#sp scanID hcnt hgrp hgrp huse scantyp Mx rf           time   inttime')
-                # print('%3i %6i  %3i %4i %4i %4i  %6s  %i  %i  %13.3f  %8.3f'%(i, data['scanID'][i], hcnt, hgroup[i], hgrp, uflag[i], data['scan_type'][i], data['MIXER'][i], data['ROW_FLAG'][i], unixtime[i]-ut0, data['INTTIME'][i]))
-                pass
+            # if verbose:
+            #     if i == 0:
+            #         #     #  0   8897    0    0    0     REF  5  0          0.000     1.833
+            #         print('#sp scanID hcnt hgrp hgrp huse scantyp Mx rf           time   inttime')
+            #     print('%3i %6i  %3i %4i %4i %4i  %6s  %i  %i  %13.3f  %8.3f'%(i, data['scanID'][i], hcnt, hgroup[i], hgrp, uflag[i], data['scan_type'][i], data['MIXER'][i], data['ROW_FLAG'][i], unixtime[i]-ut0, data['INTTIME'][i]))
     
-    # if verbose:
-    #     print('\nNumber of hot groups per mixer: ', hgroup.max()+1,'\n')
+    
     
     # maxgrp = np.zeros(umixers.size, dtype=int)
     # ghots = np.zeros((int(umixers.size), int(hgroup.max()+1), n_pix))
@@ -408,11 +496,10 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False):
         if np.max(data['UNIXTIME'][sel])<ghtim[-1]:
             glast = True
         
-    if verbose:
-        print('mx: ', mixer, '  good_rhs: ', good_rhs, '  firstref: ', firstref, '  glast: ', glast, '  #hgrp: ', hgroup.max()+1, maxgrp, dfile,'\n')
-        
+    # if verbose:
+    #     print('mx: ', mixer, '  good_rhs: ', good_rhs, '  firstref: ', firstref, '  glast: ', glast, '  #hgrp: ', hgroup.max()+1, maxgrp, dfile,'\n')
 
-    return hgroup, ghots, ghtim, ghtint, glast
+    return hgroup, ghots, ghtim, ghtint, glast, htflag
 
 
 # old version of getHotInfo - not working correctly

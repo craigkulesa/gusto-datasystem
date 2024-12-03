@@ -456,7 +456,7 @@ def processL08(params, verbose=False):
         # aghtim is the unixtime associated with the grouped hots
         # aglast is a flag indicating that there is a hot at the end of the OTF strip
         print(dfile)
-        ahgroup, ghots, ghtim, ghtint, glast = getHotInfo(spec, data, mix, dfile=dfile, verbose=True)
+        ahgroup, ghots, ghtim, ghtint, glast, htflag = getHotInfo(spec, data, mix, dfile=dfile, verbose=True)
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
         gsz = ghots.shape
@@ -561,10 +561,10 @@ def processL08(params, verbose=False):
         fT = Table([col1, col2, col3, col4, col5, col6, col7])
         fits.append(ofile, data=fT.as_array())
 
-        col21 = Column(np.array(aghots), name='hots', description='averaged hot spectra')
-        col22 = Column(np.array(aghtim), name='htime', description='utime of avg. hots')
-        col23 = Column(np.array(aghmix), name='hmixer', description='mixer of avg. hots')
-        col24 = Column(np.array(aghtint), name='htint', description='integration time of avg. hots')
+        col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')
+        col22 = Column(np.hstack(aghtim), name='htime', description='utime of avg. hots')
+        col23 = Column(np.hstack(aghmix), name='hmixer', description='mixer of avg. hots')
+        col24 = Column(np.hstack(aghtint), name='htint', description='integration time of avg. hots')
         fgh = Table([col21, col22, col23, col24])
         fgh.write(ofile, append=True)
 
