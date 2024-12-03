@@ -279,7 +279,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         # sdirs = sorted(glob.glob(os.path.join(inDir,filter), root_dir=inDir))
         #print(glob.glob(os.path.join(inDir,filter)))
         sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
-        print('single result: ', sdirs[0], os.path.split(sdirs[0]))
+        #print('single result: ', sdirs[0], os.path.split(sdirs[0]))
         dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
         
         sdirs.sort(key=lambda sdirs: dsc)
@@ -298,6 +298,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
         if verbose:
+            print('Number of data files: ', n_ds, len(sdirs))
             print('Selected data files: ', dfiles)
         
         
