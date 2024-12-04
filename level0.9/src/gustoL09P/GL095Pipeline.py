@@ -199,6 +199,8 @@ def processL09(params, verbose=False):
             # this call might require to address the baseline correction method
             # possible methods are 1); polunomial and 2) 
             #basecorr[i0,:] = baseCorrection()
+            # only correct the good part of the spectrum
+            # try to mask bad spectral pixels using weights set to zero: TBI
             
             bs, ws = arplsw(spec_OTF[i0,:], lam=1e2, ratio=0.02, itermax=100)
             
