@@ -263,12 +263,13 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     print('Lines: ', lines[0])
     lines= ['CII', 'NII']
     
-    ignore = [9182, 11026, 11126, 11134]
+    ignore = [8194, 8338, 9182, 9306, 9314, 9342, 10246, 10250, 10254, 10446, 10606, 
+              10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24803, 24881, 26294, 26296]
     
     
     for line in lines:
         if verbose:
-            print(line)
+            print('Processing line: ', line)
         # identify the files for processing
         inDir = cfi['gdirs']['L08DataDir']
         outDir = cfi['gdirs']['L09DataDir']
@@ -355,6 +356,7 @@ def processL08(params, verbose=False):
     datavalid = True
 
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
+    print('Loading file: ', dfile)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
     rowFlag = data['ROW_FLAG']
     
@@ -459,7 +461,6 @@ def processL08(params, verbose=False):
         # aghots are the grouped hots
         # aghtim is the unixtime associated with the grouped hots
         # aglast is a flag indicating that there is a hot at the end of the OTF strip
-        print(dfile)
         ahgroup, ghots, ghtim, ghtint, glast, htflag = getHotInfo(spec, data, mix, dfile=dfile, verbose=True)
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
