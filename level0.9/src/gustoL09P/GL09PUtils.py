@@ -320,9 +320,9 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False):
     # added check for REFHOT duplicates at beginning and at end of sequence
     # there should only be one REFHOT at the beginning and one at
     # the end
-    rhscans = data['scanID'][data['scan_type']=='REFHOT']
-    rfscans = data['scanID'][data['scan_type']=='REF']
-    otscans = data['scanID'][data['scan_type']=='OTF']
+    rhscans = data['scanID'][(data['scan_type']=='REFHOT')&(data['ROW_FLAG']==0)&(data['MIXER']==mixer)]
+    rfscans = data['scanID'][(data['scan_type']=='REF')&(data['ROW_FLAG']==0)&(data['MIXER']==mixer)]
+    otscans = data['scanID'][(data['scan_type']=='OTF')&(data['ROW_FLAG']==0)&(data['MIXER']==mixer)]
     urhs = np.unique(rhscans)
     urfs = np.unique(rfscans)
     uots = np.unique(otscans)
