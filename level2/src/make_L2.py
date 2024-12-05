@@ -6,6 +6,7 @@ import glob
 import math
 import random
 import numpy as np
+import argparse
 import configparser
 from pathlib import Path
 
@@ -27,8 +28,8 @@ import matplotlib.pyplot as plt
 
 # 10/29/2024 Makes L2 maps
 # Little script to look at Volker's L0.9 data 
-# NOT WORKING YET, porting over from May 2024 codebase
-# Does a disciplined least squares baseline fit to make L1
+# NOT FULLY FEATURED YET, porting over from May 2024 codebase
+# Does a disciplined least squares baseline fit to flatten L1 data
 # Makes an integrated intensity map.
 # ra,dec and l,b coordinates mish-mashed, working it...
 
@@ -40,7 +41,7 @@ import matplotlib.pyplot as plt
 
 
 ################################################################################
-def doStuff(self):
+def doStuff(self, args):
    my_file = Path(self)
    try:
        my_file.resolve(strict=True)
@@ -73,8 +74,8 @@ def doStuff(self):
    c_ra_dec = SkyCoord(ra=(crval2+cdelt2)*u.degree, dec=(crval3+cdelt3)*u.degree, frame='icrs')
 
    # Setup baseline fitting
-   xlow   = 204
-   xhigh  = 328
+   xlow   = 204 # low spectral channel
+   xhigh  = 328 # hi spectral channel
    base = np.zeros([n_OTF,xhigh-xlow])
    baseline_fitter = Baseline(x_data=x[xlow:xhigh])
    y_flat = np.zeros(xhigh-xlow)
@@ -84,7 +85,8 @@ def doStuff(self):
    l=np.array([])
    b=np.array([])
 
-   #plt.clf()
+   if args.plot:
+       plt.clf()
    # Main routine run on every Level 1 fits file
    for i in range(n_OTF):
        mask = (1<<26)|(1<<27)   # Mask off rining rows
@@ -101,30 +103,35 @@ def doStuff(self):
           ii = np.append(ii, sum(y_flat[20:40]))
           l  = np.append(l, c_l_b.l.value[0])
           b  = np.append(b, c_l_b.b.value[0])
-          #plt.plot(y_flat)
+          if args.plot:
+              plt.plot(y_flat)
        else:
           pass
 
-   #plt.ylim(-10, 80)
-   #plt.vlines(20, -5, 40)
-   #plt.vlines(40, -5, 40)
+   if args.plot:
+       plt.ylim(-10, 80)
+       plt.vlines(20, -5, 40)
+       plt.vlines(40, -5, 40)
 
-   #plt.vlines(62, -5, 40)
-   #plt.vlines(68, -5, 40)
+       plt.vlines(62, -5, 40)
+       plt.vlines(68, -5, 40)
 
-   #plt.vlines(90, -5, 40)
-   #plt.vlines(99, -5, 40)
-   #plt.savefig(f'NGC6334-{self[46:-11]}.png') 
-   #plt.show(block=False)
-   #plt.pause(1)
+       plt.vlines(90, -5, 40)
+       plt.vlines(99, -5, 40)
+       plt.savefig(f'NGC6334-{self[-16:-11]}.png') 
+
+   print(l.mean())
+
    # Return the (l,b) position and integrated intensity
    data = (l, b, ii)
-   print(l.mean())
+
    return data
 
 
 def regrid(l, b, T, beam):
-   THRESHOLD = 0.05
+   # Interpolate data onto rectangular grid
+
+   THRESHOLD = 0.05 # Any gridded data point Threshold (deg) distance from real data point is NaN
 
    # Calculate the range of glon and glat values
    l_min, l_max = np.min(l), np.max(l)
@@ -140,6 +147,7 @@ def regrid(l, b, T, beam):
    # Initialize array
    image = interpolate.griddata((l, b), T, (l_grid, b_grid), method='cubic')
 
+   # KD-TREE and RESHAPE are used to NaN pixels greated than THRESHOLD distance from nearest real data points
    # Construct kd-tree, functionality copied from scipy.interpolate
    tree = cKDTree(np.c_[l, b])
    grid_points = np.c_[l_grid.ravel(), b_grid.ravel()]
@@ -171,11 +179,17 @@ def get_filenames(directory, scan_file):
 # ConfigParser Object
 config = configparser.ConfigParser()
 
+# Parse arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("--files", help="\tFile containing scans", default="scans.txt")
+parser.add_argument("--plot", help="\tMake pngs", action=argparse.BooleanOptionalAction, default=False)
+args = parser.parse_args()
+
 # Read config file for Data Paths
 config.read('../../common/config.ini')
 path = config.get('Paths', 'L09_path')
 
-search_files = get_filenames(path, sys.argv[1])
+search_files = get_filenames(path, args.files)
 
 # Initialize empty lists to accumulate data
 glon_list = []
@@ -186,7 +200,7 @@ for file in search_files:
     # get glon, glat, and calibrated spectra from each OTF file
     print("trying OTF file: ", file, end="   ")
 
-    result = doStuff(file)
+    result = doStuff(file, args)
 
     if result is None:
         print("nothing returned")
@@ -205,6 +219,8 @@ glon = np.array(glon_list)
 glat = np.array(glat_list)
 Ta  = np.array(Ta_list)
 
+# Regrid parameters
+beam = 0.004 # beam width (deg)
 
 # open a new blank FITS file
 hdr = fits.Header()
@@ -215,14 +231,14 @@ hdr['BUNIT']   = 'K (Ta*)     '
 
 hdr['CTYPE1']  = 'GLON        '
 hdr['CRVAL1']  = min(glon)
-hdr['CDELT1']  = 0.004              # 1 arcmin beam
+hdr['CDELT1']  = beam               # 1 arcmin beam
 hdr['CRPIX1']  = 0                  # reference pixel array index
 hdr['CROTA1']  = 0
 hdr['CUNIT1']  = 'deg         '
 
 hdr['CTYPE2']  = 'GLAT        '
 hdr['CRVAL2']  = min(glat)
-hdr['CDELT2']  = 0.004              # 1 arcmin beam
+hdr['CDELT2']  = beam               # 1 arcmin beam
 hdr['CRPIX2']  = 0                  # reference pixel array index
 hdr['CROTA2']  = 0
 hdr['CUNIT2']  = 'deg         '
@@ -230,12 +246,9 @@ hdr['CUNIT2']  = 'deg         '
 hdr['OBJECT']  = 'NGC6334     '
 hdr['GLON']    = min(glon)            # Fiducial is arbitrarily (glat,glon) min
 hdr['GLAT']    = min(glat)
-hdr['EQUINOX'] = 2000
-hdr['LONPOLE'] = 180
-hdr['LATPOLE'] = min(glat)
 
 # Do the regridding
-image = regrid(glon, glat, Ta, 0.004)
+image = regrid(glon, glat, Ta, beam)
 
 # Write the data cube and header to a FITS file
 hdu = fits.PrimaryHDU(data=image, header=hdr)
