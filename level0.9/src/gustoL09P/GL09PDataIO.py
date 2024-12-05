@@ -100,6 +100,9 @@ def loadL08Data(ifile, verbose=False):
         dkey = 'spec'
     elif 'DATA' in keys:
         dkey = 'DATA'
+        
+    ss = np.argsort(data['UNIXTIME'])
+    data = data[ss]
     
     if 'MIXER' not in keys:
         data['MIXER'] =  hdr1['MIXER']
