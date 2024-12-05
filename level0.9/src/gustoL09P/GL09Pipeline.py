@@ -535,6 +535,8 @@ def processL08(params, verbose=False):
             
         data[dkey][osel,:] = ta.data
         data['CHANNEL_FLAG'] [osel,:] = ta.mask
+        print('ta: ', ta.data[:5,:10])
+        print('data: ', (data[dkey][osel,:])[:30,:10])
         
         
     tred = Time(datetime.datetime.now()).fits
