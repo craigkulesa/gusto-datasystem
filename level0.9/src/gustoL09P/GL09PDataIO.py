@@ -118,7 +118,7 @@ def loadL08Data(ifile, verbose=False):
     # combine spectrum and channel_flag mask
     spec = ma.MaskedArray(data[dkey], mask=data['CHANNEL_FLAG'])
     spec = ma.masked_invalid(spec)
-    spec.mask[:,612:1023] = 1
+    #spec.mask[:,612:1023] = 1
 
     return spec, data, hdr, hdr1
 

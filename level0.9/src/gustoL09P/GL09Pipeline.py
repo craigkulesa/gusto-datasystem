@@ -4,8 +4,8 @@ This is the GUSTO L09 Pipeline.
 """
 
 __date__ = '9/19/2024'
-__updated__ = '20241031'
-__version__ = '0.2'
+__updated__ = '20241206'
+__version__ = '0.3'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
 from joblib import Parallel, delayed
@@ -337,8 +337,9 @@ def processL08(params, verbose=False):
     if 'ACS3' in dfile:
         pfr_ra = np.array(list([[-0.01,0.01],[0.25,0.38],[2.25,2.33]]), dtype=float)
         pp_ra = np.array([[20,83],[132,138],[200,205],[265,274],[323,340],[399,407],[498,509]], dtype=int)
-        # all pixels above this value are masked as bad
-        pixel_cut = 600
+        # all pixels before and after these values are masked as bad
+        pixel_st = 80
+        pixel_en = 600
         band = 2
         add = 'B2'
         Tsky = 45  # Kelvin
@@ -347,7 +348,9 @@ def processL08(params, verbose=False):
         pfr_ra = np.array(list([[-0.01,0.01],[0.33,0.37],[2.26,2.31],[3.92,3.96]]), dtype=float)
         pp_ra = np.array([[23,50],[65,71],[100,103],[163,170],[198,206],[300, 511]], dtype=int)
         # all pixels above this value are masked as bad
-        pixel_cut = 300
+        # all pixels before and after these values are masked as bad
+        pixel_st = 80
+        pixel_en = 300
         band = 1
         add = 'B1'
         Tsky = 33.5  # Kelvin
@@ -358,6 +361,15 @@ def processL08(params, verbose=False):
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
     print('Loading file: ', dfile)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
+    # we perform a global setting of the data mask to avoid math problems
+    # like division by zero below for Tsys and the calibration
+    # this defines the global good pixel (or channel) range of the spectra
+    # the values in these pixels will be set to nan outside the good range and 
+    # interpolated within the good range later in the pipeline processing after 
+    # the baseline fit.
+    spec.mask[:,pixel_en:] = 1
+    spec.mask[:,:pixel_st] = 1
+    
     rowFlag = data['ROW_FLAG']
     
     n_spec, n_pix = spec.shape
@@ -541,10 +553,18 @@ def processL08(params, verbose=False):
         
     tred = Time(datetime.datetime.now()).fits
     
-    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
-    hdr.add_comment('Pipeline Processing', before='PROC_LEV')
-    hdr.insert('PROC_LEV', ('PROCDATE', tred.split('T')[0], 'Date of processing'))
-    hdr.insert('PROCDATE', ('PROCTIME', tred.split('T')[1], 'Time of processing'))
+    # updating header keywords
+    hdr['DLEVEL'] = 0.95
+    hdr['PROCTIME'] = tred
+#    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
+#    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
+    hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
+    hdr.set('pgpixst', value=pixel_st, comment='pixel index where good pixels start')
+    hdr.set('pgpixen', value=pixel_en, comment='pixel index of upper good pixel range')
+    hdr.add_comment('L0.9 processing time: '%(tred.split('T')))
+    hdr.add_comment('L0.9 version: %s'%(__version__))
+    hdr.add_comment('L0.9 last pipeline update: %s'%(__update__))
+    hdr.add_comment('L0.9 developer: %s'%(__author__))
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
