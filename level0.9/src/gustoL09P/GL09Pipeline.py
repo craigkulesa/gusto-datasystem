@@ -563,7 +563,7 @@ def processL08(params, verbose=False):
     hdr.set('pgpixen', value=pixel_en, comment='pixel index of upper good pixel range')
     hdr.add_comment('L0.9 processing time: '%(tred.split('T')))
     hdr.add_comment('L0.9 version: %s'%(__version__))
-    hdr.add_comment('L0.9 last pipeline update: %s'%(__update__))
+    hdr.add_comment('L0.9 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.9 developer: %s'%(__author__))
     
     os.makedirs(outDir, exist_ok=True)
