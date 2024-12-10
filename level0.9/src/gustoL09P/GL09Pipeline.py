@@ -264,7 +264,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     lines= ['CII', 'NII']
     
     ignore = [8194, 8338, 9182, 9306, 9314, 9342, 10246, 10250, 10254, 10446, 10606, 
-              10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24803, 24881, 26294, 26296]
+              10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24531, 24803, 24881, 26294, 26296]
     
     
     for line in lines:
@@ -364,11 +364,13 @@ def processL08(params, verbose=False):
     # we perform a global setting of the data mask to avoid math problems
     # like division by zero below for Tsys and the calibration
     # this defines the global good pixel (or channel) range of the spectra
+    # and is indicated by setting bit 8 of the channel_flag
     # the values in these pixels will be set to nan outside the good range and 
     # interpolated within the good range later in the pipeline processing after 
     # the baseline fit.
-    spec.mask[:,pixel_en:] = 1
-    spec.mask[:,:pixel_st] = 1
+    # set bit 8: += 128 or 2^(8-1)
+    spec.mask[:,pixel_en:] += bool(128)
+    spec.mask[:,:pixel_st] += bool(128)
     
     rowFlag = data['ROW_FLAG']
     
@@ -503,10 +505,18 @@ def processL08(params, verbose=False):
                 # ToDo: check if the inttime of refs/hots/otfs matters
                 # calculate the fraction of hot used for the spectrum
                 ht1 = ghtim[hgroup[i0]]
-                ht2 = ghtim[hgroup[i0]+1]
+                if hgroup[i0]+1 <= hgroup.max():
+                    ht2 = ghtim[hgroup[i0]+1]
+                else:
+                    ht2 = ghtim[hgroup[i0]]
+                # ht2 = ghtim[hgroup[i0]+1]
                 hfrac = (stime[i0]-ht1)/(ht2-ht1)
                 # determine the hots for the individual OTF spectra
-                hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
+                if hgroup[i0]+1 <= hgroup.max():
+                    hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
+                else:
+                    hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0],:]
+                # hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
                 # determine the hots-reduced REF spectra
                 spref[i0,:] = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
                 spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
@@ -547,9 +557,7 @@ def processL08(params, verbose=False):
             
         data[dkey][osel,:] = ta.data
         data['CHANNEL_FLAG'] [osel,:] = ta.mask
-        print('ta: ', ta.data[:5,:10])
-        print('data: ', (data[dkey][osel,:])[:30,:10])
-        
+
         
     tred = Time(datetime.datetime.now()).fits
     
@@ -561,7 +569,7 @@ def processL08(params, verbose=False):
     hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
     hdr.set('pgpixst', value=pixel_st, comment='pixel index where good pixels start')
     hdr.set('pgpixen', value=pixel_en, comment='pixel index of upper good pixel range')
-    hdr.add_comment('L0.9 processing time: '%(tred.split('T')))
+    hdr.add_comment('L0.9 processing time: %s'%(tred))
     hdr.add_comment('L0.9 version: %s'%(__version__))
     hdr.add_comment('L0.9 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.9 developer: %s'%(__author__))
