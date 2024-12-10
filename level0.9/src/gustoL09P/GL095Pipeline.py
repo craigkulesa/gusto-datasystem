@@ -19,9 +19,18 @@ import sys
 import os
 import logging
 import matplotlib.pyplot as plt
+import multiprocessing
 from matplotlib.patches import Rectangle
 from pathlib import Path
 from pprint import pprint
+from multiprocessing.pool import Pool
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
+from scipy.linalg import cholesky
+from scipy.stats import norm
+from .GL09PDataIO import loadL08Data
+from .GL09PUtils import *
+from .GL09PLogger import *
 import logging
 log = logging.getLogger(__name__)
 
@@ -95,13 +104,14 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
         if int(cfi['gprocs']['max_files']) > 0:
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
+            
         
         paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
         if verbose:
             print('Number of data files: ', n_ds, len(sdirs))
-            print('Selected data files: ', dfiles)
+            #print('Selected data files: ', dfiles)
         
         
         # setup multiprocessing loop here to process each file in list
@@ -144,79 +154,55 @@ def processL09(params, verbose=False):
     datavalid = True
 
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
-    spec, data, hdr, hdr1 = loadL09Data(os.path.join(inDir,dfile), verbose=False)
+    spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
     rowFlag = data['ROW_FLAG']
     
     n_spec, n_pix = spec.shape
     
-    # for now, process all mixers
-    umixers = np.unique(data['MIXER'])
+    prange = [int(hdr['pgpixst']), int(hdr['pgpixen'])]
     
-    for k, mix in enumerate(umixers):
-        # first check crudely if we have enough data of various scan_types
-        msel = np.argwhere(data['MIXER']==mix)
-        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr)
-        check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
-                (np.argwhere(data['scan_type']=='HOT').size > 3) & \
-                (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
-                (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(rowFlag[msel]==0)
-        if not check:
-            print('mix, dfile')
-            print('specs: ', spec.shape)
-            print('REFs: ', np.argwhere(data['scan_type']=='REF').size)
-            print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
-            print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
-            print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
-            print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
-            data['ROW_FLAG'][msel] = 4   # flagged as missing data
-            datavalid = False
-            return 0
-        
-        prange = [40, 350]
-        
-        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, verbose=verbose)
-        
-        # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
-        osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (mix == data['MIXER']) & 
-                           (data['scan_type'] == 'OTF') & (data['ROW_FLAG'][mix]==0)).flatten()
-        
-        if len(osel) <= 0:
-            print('WARNING: No OTF spectra available.')
-            # logger.warning('No OTF spectra available.')
-            datavalid = False
-            return 0
+    # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
+    osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
     
-        spec_OTF = np.squeeze(spec[osel,:])
-        
-        basecorr = np.zeros(spec_OTF.shape)
-        
+    if len(osel) <= 0:
+        print('WARNING: No OTF spectra available.')
+        # logger.warning('No OTF spectra available.')
+        datavalid = False
+        return 0
+
+    spec_OTF = np.squeeze(spec[osel,:])
+    n_OTF, n_otfpix = spec_OTF.shape 
     
-        # create the calibrated spectra
-        for i0 in range(n_OTF):
-            # perform a baseline correction on all OTF spectra
-            
-            # this call might require to address the baseline correction method
-            # possible methods are 1); polunomial and 2) 
-            #basecorr[i0,:] = baseCorrection()
-            # only correct the good part of the spectrum
-            # try to mask bad spectral pixels using weights set to zero: TBI
-            
-            bs, ws = arplsw(spec_OTF[i0,:], lam=1e2, ratio=0.02, itermax=100)
-            
-            spec_OTF[i0,:] -= basecorr[i0,:]
+    basecorr = np.zeros(spec_OTF.shape)
     
-        # now we have to save the data in a FITS file
-    
-        keys = data.dtype.names
-        if 'spec' in keys:
-            dkey = 'spec'
-        elif 'DATA' in keys:
-            dkey = 'DATA'
-            
-        data[dkey][osel,:] = ta.data
-        data['CHANNEL_FLAG'] [osel,:] = ta.mask
+
+    # create the calibrated spectra
+    for i0 in range(n_OTF):
+        # perform a baseline correction on all OTF spectra
         
+        # this call might require to address the baseline correction method
+        # possible methods are 1); polunomial and 2) 
+        #basecorr[i0,:] = baseCorrection()
+        # only correct the good part of the spectrum
+        # try to mask bad spectral pixels using weights set to zero: TBI
+        
+        bs, ws = arplsw(spec_OTF[i0,prange[0]:prange[1]], lam=1e2, ratio=0.02, itermax=100)
+        
+        basecorr[i0,prange[0]:prange[1]] = bs
+        
+        spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
+
+    # now we have to save the data in a FITS file
+
+    keys = data.dtype.names
+    if 'spec' in keys:
+        dkey = 'spec'
+    elif 'DATA' in keys:
+        dkey = 'DATA'
+        
+    data[dkey][osel,:] = ta.data
+    data['CHANNEL_FLAG'] [osel,:] = ta.mask
+    
         
     tred = Time(datetime.datetime.now()).fits
     

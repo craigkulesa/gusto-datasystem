@@ -174,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("--files", help="\tFilename partial", default="ACS*")
     parser.add_argument("--force", help="\tForce update", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--stats", help="\tDo OTF Ta_std statistics", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--path", help="\tPath to L0.8 data", default="")
     args = parser.parse_args()
 
     # ConfigParser Object
@@ -182,7 +183,10 @@ if __name__ == "__main__":
 
     # Read config file for Data Paths
     config.read('../../common/config.ini')
-    path = config.get('Paths', 'L08_path')
+    if args.path == "":
+        path = config.get('Paths', 'L08_path')
+    else:
+        path = args.path
 
     partial_filename = args.files
     files = sorted(glob.glob(f"{path}/{partial_filename}.fits"))
