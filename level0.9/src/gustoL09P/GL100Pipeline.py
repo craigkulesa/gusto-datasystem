@@ -34,20 +34,22 @@ from .GL09PLogger import *
 import logging
 log = logging.getLogger(__name__)
 
+offsetsfile0 = pkg_resources.resource_filename('gustoL09P', 'Data/offsets.txt')
 
-def GL095Pipeline(cfi, scanRange, verbose=False):
-    """Function processing the Level 0.9 data and perform a
-    baseline correction. 
+
+def GL100Pipeline(cfi, scanRange, verbose=False):
+    """Function processing the Level 0.95 data injecting 
+    coordinate corrections. 
 
     1: read in the data from file
-    2: apply bseline correction to each spectrum
+    2: apply coordinate offset correction to each spectrum
     3: save back to files with only setting a flag about the baseline correction,
     but all other parameters are passed through
 
 
     Parameters
     ----------
-    scanRange : int
+    scanRange : int array
 
     Returns
     -------
@@ -73,6 +75,17 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
     
     ignore = [0]
     
+    # read offsets file
+    offsetsfile = cfi['gdirs']['L09DataDir']
+    if offsetsfile is None:
+        offsetsfile = offsetsfile0
+    if not os.path.exists(offsetsfile):
+        print('No file with coordinate offsets available. Terminating pipeline run!')
+        os.exit(1)
+        
+    offs = np.genfromtxt(offsetsfile, delimiter='\t', skip_header=2, 
+                     dtype=[('mxpix', 'U4'), ('az', '<f8'), ('el', '<f8'), ('comment', 'U16')])
+
     
     for line in lines:
         if verbose:
@@ -105,8 +118,9 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
             
+        offsets = 
         
-        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
+        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [offsets] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
         if verbose:
@@ -138,7 +152,7 @@ def processL09(params, verbose=True):
     """
     
     #loadL08Data(dfile, verbose=True)
-    line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
+    line, inDir, outDir, dfile, offsets, debug = params[0], params[1], params[2], params[3], params[4], params[5]
     
     # define some processing data first (maybe relocat to function later?)
 

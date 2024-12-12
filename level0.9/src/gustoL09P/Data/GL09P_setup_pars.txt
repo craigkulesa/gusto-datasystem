@@ -38,6 +38,9 @@ l09set_channel_flags = True
 lines = CII NII
 debug = False
 
+# coordinate offsets file
+offsetsfile = 
+
 
 [GUSTO_Parameters]
 # with full path!

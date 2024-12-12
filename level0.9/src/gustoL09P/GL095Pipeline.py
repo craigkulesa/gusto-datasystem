@@ -209,7 +209,8 @@ def processL09(params, verbose=True):
                     
             baseline_fitter = Baseline(x_data=xx)
             bs, pars = baseline_fitter.aspls(yy, bs_lam)
-            rbs, rws = arplsw(yy, lam=bs_lam2, ratio=bs_ratio, itermax=bs_itermax)
+            rbs, rpars = baseline_fitter.aspls(yy, bs_lam2)
+            # rbs, rws = arplsw(yy, lam=bs_lam2, ratio=bs_ratio, itermax=bs_itermax)
             rmsotf[i0] = np.std(yy-rbs)
             
             bswn = np.zeros(yywn.size)
