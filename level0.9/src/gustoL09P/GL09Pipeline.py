@@ -526,11 +526,11 @@ def processL08(params, verbose=False):
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
                 #print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), ta2[i0,200:400].min(), ta2[i0,200:400].max()))
             
-            if type(ta)==type(np.ndarray(0)):
-                ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
-            else:
-                ta[i0,ta[i0,:].mask>0] = 0.0
-                ta2[i0,ta2[i0,:].mask>0] = 0.0
+            # if type(ta)==type(np.ndarray(0)):
+            #     ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
+            # else:
+            #     ta[i0,ta[i0,:].mask>0] = 0.0
+            #     ta2[i0,ta2[i0,:].mask>0] = 0.0
 
     
         # now we have to save the data in a FITS file
@@ -566,9 +566,13 @@ def processL08(params, verbose=False):
     hdr['PROCTIME'] = tred
 #    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
 #    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
-    hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
+    #hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
+    hdr.set('L09PTIME', value=tred, comment=('L0.9 pipeline processing time'))
     hdr.set('pgpixst', value=pixel_st, comment='pixel index where good pixels start')
     hdr.set('pgpixen', value=pixel_en, comment='pixel index of upper good pixel range')
+    hdr.set('', value='', after='VLSR')
+    hdr.set('', value='          Level 0.9 Pipeline Processing', after='VLSR')
+    hdr.set('', value='', after='VLSR')
     hdr.add_comment('L0.9 processing time: %s'%(tred))
     hdr.add_comment('L0.9 version: %s'%(__version__))
     hdr.add_comment('L0.9 last pipeline update: %s'%(__updated__))

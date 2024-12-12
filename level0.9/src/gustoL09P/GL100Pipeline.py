@@ -3,7 +3,7 @@
 This is the executable for the GUSTO L2 Pipeline.
 """
 
-__date__ = '12/06/2024'
+__date__ = '12/12/2024'
 __updated__ = '20241212'
 __version__ = '0.1'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
@@ -173,24 +173,15 @@ def processL09(params, verbose=True):
     spec_OTF = np.squeeze(spec[osel,:])
     n_OTF, n_otfpix = spec_OTF.shape 
     
-    basecorr = np.zeros(spec_OTF.shape)
     
     print('processing data ...')
     # create the calibrated spectra
     for i0 in range(n_OTF):
-        # perform a baseline correction on all OTF spectra
+        # insert the coordinate corrections
+        # Note: the coordinate correction is not yet final
+        # and will be (iteratively) improved
         
-        # this call might require to address the baseline correction method
-        # possible methods are 1); polunomial and 2) 
-        #basecorr[i0,:] = baseCorrection()
-        # only correct the good part of the spectrum
-        # try to mask bad spectral pixels using weights set to zero: TBI
-        
-        bs, ws = arplsw(spec_OTF[i0,prange[0]:prange[1]], lam=1e2, ratio=0.02, itermax=100)
-        
-        basecorr[i0,prange[0]:prange[1]] = bs
-        
-        spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
+        pass
 
     # now we have to save the data in a FITS file
 
