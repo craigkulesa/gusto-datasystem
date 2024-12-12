@@ -562,7 +562,7 @@ def processL08(params, verbose=False):
     tred = Time(datetime.datetime.now()).fits
     
     # updating header keywords
-    hdr['DLEVEL'] = 0.95
+    hdr['DLEVEL'] = 0.9
     hdr['PROCTIME'] = tred
 #    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
 #    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')

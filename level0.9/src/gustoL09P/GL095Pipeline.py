@@ -25,6 +25,10 @@ from pathlib import Path
 from pprint import pprint
 from multiprocessing.pool import Pool
 from pybaselines import Baseline, utils
+from astropy.time import Time
+from astropy.io import fits
+from astropy.table import QTable, Table, Column
+from astropy import units as u
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 from scipy.linalg import cholesky
@@ -152,6 +156,12 @@ def processL09(params, verbose=True):
         band = 1
         add = 'B1'
 
+    # values needed for baseline correction 
+    # will be moved to config file eventually
+    bs_lam = 5e4
+    bs_lam2 = 1e2
+    bs_ratio = 0.02
+    bs_itermax = 100
     datavalid = True
 
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
@@ -159,6 +169,9 @@ def processL09(params, verbose=True):
     rowFlag = data['ROW_FLAG']
     
     n_spec, n_pix = spec.shape
+    
+    rms = np.zeros(n_spec)
+    basecorrf = np.zeros((n_spec,n_pix))
     
     prange = [int(hdr['pgpixst']), int(hdr['pgpixen'])]
     
@@ -175,6 +188,8 @@ def processL09(params, verbose=True):
     n_OTF, n_otfpix = spec_OTF.shape 
     
     basecorr = np.zeros(spec_OTF.shape)
+    rmsotf = np.zeros(n_OTF)
+    rf = np.zeros(n_OTF)
     
     print('processing data ...')
     # create the calibrated spectra
@@ -186,13 +201,28 @@ def processL09(params, verbose=True):
         #basecorr[i0,:] = baseCorrection()
         # only correct the good part of the spectrum
         # try to mask bad spectral pixels using weights set to zero: TBI
-        
-        bs, ws = arplsw(spec_OTF[i0,prange[0]:prange[1]], lam=1e2, ratio=0.02, itermax=100)
-        
-        basecorr[i0,prange[0]:prange[1]] = bs
-        
-        spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
-
+        yywn = spec_OTF[i0,prange[0]:prange[1]]
+        nsel = np.argwhere(np.isfinite(yywn))
+        yy = yywn[nsel]
+        if yy.size > 0:
+            xx = np.arange(yy.size)
+                    
+            baseline_fitter = Baseline(x_data=xx)
+            bs, pars = baseline_fitter.aspls(yy, bs_lam)
+            rbs, rws = arplsw(yy, lam=bs_lam2, ratio=bs_ratio, itermax=bs_itermax)
+            rmsotf[i0] = np.std(yy-rbs)
+            
+            bswn = np.zeros(yywn.size)
+            bswn[:] = np.nan
+            bswn[np.squeeze(nsel)] = bs
+            basecorr[i0,prange[0]:prange[1]] = bswn
+            
+            spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
+    
+        else:
+            # we have to set the rowflag since no valid data
+            rf[i0] = 9
+            
     # now we have to save the data in a FITS file
 
     keys = data.dtype.names
@@ -203,61 +233,47 @@ def processL09(params, verbose=True):
         
     data[dkey][osel,:] = spec_OTF.data
     data['CHANNEL_FLAG'] [osel,:] = spec_OTF.mask
+    data['ROW_FLAG'][osel] = rf
+    rms[osel] = rmsotf
+    basecorrf[osel,:] = basecorr
     
         
     tred = Time(datetime.datetime.now()).fits
     
-    # hdr.insert('VLSR', ('PROC_LEV', 0.95, 'pipeline processing level'), after=True)
-    # hdr.add_comment('Pipeline Processing', before='PROC_LEV')
-    # hdr.insert('PROC_LEV', ('PROCDATE', tred.split('T')[0], 'Date of processing'))
-    # hdr.insert('PROCDATE', ('PROCTIME', tred.split('T')[1], 'Time of processing'))
-    hdr['PROC_LEV'] = 0.95
-    hdr['PROCDATE'] = tred.split('T')[0]
-    hdr['PROCTIME'] = tred.split('T')[1]
+    # updating header keywords
+    hdr['DLEVEL'] = 0.95
+    hdr['PROCTIME'] = tred
+#    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
+#    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
+    #hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
+    hdr.set('L095PTIME', value=tred, comment=('L0.9 pipeline processing time'))
+    hdr.set('bs_lam', value=bs_lam, comment='lambda value for ASPLS baseline correction')
+    hdr.set('bs_lam2', value=bs_lam2, comment='lambda value for arplsw rms baseline correction')
+    hdr.set('bs_ratio', value=bs_ratio, comment='ratio value for arplsw rms baseline correction')
+    hdr.set('bs_iterm', value=bs_itermax, comment='max. iterations value for arplsw rms baseline correction')
+    hdr.set('', value='', after='VLSR')
+    hdr.set('', value='          Level 0.95 Pipeline Processing', after='VLSR')
+    hdr.set('', value='', after='VLSR')
+    hdr.add_comment('L0.95 processing time: %s'%(tred))
+    hdr.add_comment('L0.95 version: %s'%(__version__))
+    hdr.add_comment('L0.95 last pipeline update: %s'%(__updated__))
+    hdr.add_comment('L0.95 developer: %s'%(__author__))
     
     os.makedirs(outDir, exist_ok=True)
-    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L095.fits'))
+    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L09.fits','_L095.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=data, header=hdr1)
     
     # if in debug mode, add more extensions
-    # if debug & datavalid:
-    #     # data needed
-    #     # Tsys1, Tsys2, fraca, fracb, Tsyseff, hcorr, spref
-    #     # we have spectra/data for each otf spectrum: Tsyseff, hcorr, spref, fraca, fracb
-    #     # single spectra: Tsys1, Tsys2, 
-    #     # small groupf of spectra: hots
-    #     col1 = Column(aTsyseff, name='Tsyseff', description='effective Tsys per OTF spectrum')
-    #     col2 = Column(ahcorr, name='hcorr', description='effective hot spectrum')
-    #     col3 = Column(aspref, name='spref', description='effective hot for ref spectrum')
-    #     col4 = Column(aspref2, name='spref2', description='ref spectrum')
-    #     col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
-    #     col6 = Column(spec, name='spec', description='original spectra')
-    #     col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
-    #     fT = Table([col1, col2, col3, col4, col5, col6, col7])
-    #     fits.append(ofile, data=fT.as_array())
-    #
-    #     col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')
-    #     col22 = Column(np.hstack(aghtim), name='htime', description='utime of avg. hots')
-    #     col23 = Column(np.hstack(aghmix), name='hmixer', description='mixer of avg. hots')
-    #     col24 = Column(np.hstack(aghtint), name='htint', description='integration time of avg. hots')
-    #     fgh = Table([col21, col22, col23, col24])
-    #     fgh.write(ofile, append=True)
-    #
-    #     col31 = Column(np.array(atsys), name='Tsys', description='Tsys before/after OTF')
-    #     col32 = Column(np.array(atsmix), name='tsmix', description='mixer of Tsys')
-    #     fits.append(ofile, data=Table([col31,col32]).as_array())
-    #
-    #     col41 = Column(aTa, name='Ta', description='single mixer antenna temperature')
-    #     fits.append(ofile, data=Table([col41]).as_array())
-    #
-    #     # this is a crutch to properly name the extensions!
-    #     with fits.open(ofile) as hdu:
-    #         hdu[2].header['EXTNAME'] = 'DEBUG1'
-    #         hdu[3].header['EXTNAME'] = 'HOTS'
-    #         hdu[4].header['EXTNAME'] = 'Tsys'
-    #         hdu[5].header['EXTNAME'] = 'Ta'
-    #         hdu.writeto(ofile, overwrite=True)
+    if debug & datavalid:
+        col51 = Column(basecorrf, name='basecorr', description='baseline correction')
+        col52 = Column(rms, name='rms', description='baseline RMS')
+        col53 = Column(spec.data, name='spec', description='spectrum before baseline correction')
+        fits.append(ofile, data=Table([col51,col52]).as_array())
+        # this is a crutch to properly name the extensions!
+        with fits.open(ofile) as hdu:
+            hdu[2].header['EXTNAME'] = 'Baseline'
+            hdu.writeto(ofile, overwrite=True)
 
     
     print('saved file: ', ofile)
