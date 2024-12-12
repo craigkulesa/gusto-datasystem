@@ -1,2 +1,7 @@
-This folder contains source code for the level 0.9 pipeline, "2nd level deSpur and calibration/normalization". 
+This folder contains source code for the level 0.9 to 1.0 pipeline.
+
+The code is executed with execGL4P <switches>
+
+the <switches> are opyional and some features are also controlled by the
+configuration file found in the <module>/Data directory.
 
