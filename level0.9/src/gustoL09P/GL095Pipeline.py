@@ -24,6 +24,7 @@ from matplotlib.patches import Rectangle
 from pathlib import Path
 from pprint import pprint
 from multiprocessing.pool import Pool
+from pybaselines import Baseline, utils
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 from scipy.linalg import cholesky
