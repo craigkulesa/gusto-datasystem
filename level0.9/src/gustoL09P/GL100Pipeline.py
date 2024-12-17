@@ -305,7 +305,7 @@ def getMixerOffsets(band, mixers, type='THEORY', offsetfile=None, verbose=False)
         cband = 'B2'
 
     if offsetfile is None:
-        offsetfile = '/Users/volkertolls/git/gusto-datasystem/level0.9/src/gustoL09P/Data/offsets.txt'
+        offsetfile = offsetsfile0
 
     data = np.genfromtxt(offsetfile, delimiter='\t', skip_header=2, 
                          dtype=[('mxpix', 'U4'), ('az', '<f8'), ('el', '<f8'), ('type', 'U16')])
