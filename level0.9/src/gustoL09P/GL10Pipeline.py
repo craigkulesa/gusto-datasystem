@@ -264,7 +264,7 @@ def processL10(params, verbose=True):
     hdr['PROCTIME'] = tred.split('T')[1]
     
     os.makedirs(outDir, exist_ok=True)
-    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L095.fits'))
+    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L095.fits','_L10.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=odata, header=hdr1)
     
