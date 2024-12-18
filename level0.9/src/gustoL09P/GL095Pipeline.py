@@ -242,6 +242,7 @@ def processL09(params, verbose=True):
     if 'rms' not in data.names:
         rms_col = fits.ColDefs([fits.Column(name='rms', format='E', array=rms)])
         hdu = fits.BinTableHDU.from_columns(data.columns + rms_col)
+        data = hdu.data
     else:
         data['rms'] = rms
         
@@ -253,14 +254,14 @@ def processL09(params, verbose=True):
 #    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
 #    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
     #hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
-    hdr.set('L095PTIME', value=tred, comment=('L0.9 pipeline processing time'))
+    hdr.set('L095PTIME', value=tred, comment=('L0.95 pipeline processing time'))
     hdr.set('bs_lam', value=bs_lam, comment='lambda value for ASPLS baseline correction')
     hdr.set('bs_lam2', value=bs_lam2, comment='lambda value for arplsw rms baseline correction')
     hdr.set('bs_ratio', value=bs_ratio, comment='ratio value for arplsw rms baseline correction')
     hdr.set('bs_iterm', value=bs_itermax, comment='max. iterations value for arplsw rms baseline correction')
-    hdr.set('', value='', after='VLSR')
-    hdr.set('', value='          Level 0.95 Pipeline Processing', after='VLSR')
-    hdr.set('', value='', after='VLSR')
+    hdr.set('', value='', before='L095PTIME')
+    hdr.set('', value='          Level 0.95 Pipeline Processing', before='L095PTIME')
+    hdr.set('', value='', before='L095PTIME')
     hdr.add_comment('L0.95 processing time: %s'%(tred))
     hdr.add_comment('L0.95 version: %s'%(__version__))
     hdr.add_comment('L0.95 last pipeline update: %s'%(__updated__))
