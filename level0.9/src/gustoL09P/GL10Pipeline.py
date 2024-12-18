@@ -28,9 +28,18 @@ from scipy import sparse
 from scipy.sparse.linalg import spsolve
 from scipy.linalg import cholesky
 from scipy.stats import norm
+
+from astropy import constants as const
+from astropy.table import Table
+from astropy.io import fits
+from astropy import units as u
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz
+from astropy.time import Time
+
 from .GL09PDataIO import loadL08Data
 from .GL09PUtils import *
 from .GL09PLogger import *
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -76,12 +85,13 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
     ignore = [0]
     
     # read offsets file
-    offsetsfile = cfi['gdirs']['L09DataDir']
-    if offsetsfile is None:
+    offsetsfile = cfi['gprocs']['offsetsfile']
+    if offsetsfile == '':
         offsetsfile = offsetsfile0
     if not os.path.exists(offsetsfile):
+        print('offsetsfile: ', offsetsfile)
         print('No file with coordinate offsets available. Terminating pipeline run!')
-        os.exit(1)
+        sys.exit(1)
         
     offs = np.genfromtxt(offsetsfile, delimiter='\t', skip_header=2, 
                      dtype=[('mxpix', 'U4'), ('az', '<f8'), ('el', '<f8'), ('comment', 'U16')])
@@ -92,7 +102,7 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
             print(line)
         # identify the files for processing
         inDir = cfi['gdirs']['L095DataDir']
-        outDir = cfi['gdirs']['L1DataDir']
+        outDir = cfi['gdirs']['L10DataDir']
         if line=='CII':
             filter = 'ACS5*.fits'
         else:
@@ -118,7 +128,7 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
                     
-        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [offsets] for f in [bool(cfi['gprocs']['debug'])]]
+        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [offs] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
         if verbose:
@@ -167,6 +177,7 @@ def processL10(params, verbose=True):
 
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
+    print(os.path.join(inDir,dfile))
     rowFlag = data['ROW_FLAG']
     
     n_spec, n_pix = spec.shape
@@ -176,35 +187,35 @@ def processL10(params, verbose=True):
     # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
     # osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
     
-    if len(osel) <= 0:
-        print('WARNING: No OTF spectra available.')
-        # logger.warning('No OTF spectra available.')
-        datavalid = False
-        return 0
+    # if len(osel) <= 0:
+    #     print('WARNING: No OTF spectra available.')
+    #     # logger.warning('No OTF spectra available.')
+    #     datavalid = False
+    #     return 0
 
+    osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
     spec_OTF = np.squeeze(spec[osel,:])
     n_OTF, n_otfpix = spec_OTF.shape 
     
     umixers = np.unique(data['MIXER'])
     
     
-    print('processing data ...')
-    # create the calibrated spectra
-    for i0 in range(n_OTF):
-        # insert the coordinate corrections
-        # Note: the coordinate correction is not yet final
-        # and will be (iteratively) improved
+    print('processing data of %s...'%(dfile))
+    # insert the coordinate corrections
+    # Note: the coordinate correction is not yet final
+    # and will be (iteratively) improved
+    
+    mxoffs = getMixerOffsets(band, umixers, verbose=verbose)
+    
+    for i, mix in enumerate(umixers):
+        azoff = mxoffs['az'][i]
+        eloff = mxoffs['el'][i]
         
-        mxoffs = getMixerOffsets(band, umixers, verbose=verbose)
-        
-        for i, mix in enumerate(mixers):
-            azoff = mxoffs['az'][i]
-            eloff = mxoffs['el'][i]
-            
-            osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0) & (data['MIXER']==mix)).flatten()
-            ras = data['RA'][osel]
-            decs = data['DEC'][osel]
-            utime = data1['UNIXTIME']
+        msel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0) & (data['MIXER']==mix)).flatten()
+        if msel.size > 0:
+            ras = data['RA'][msel]
+            decs = data['DEC'][msel]
+            utime = data['UNIXTIME'][msel]
             
             glat = hdr['GOND_LAT']
             glon = hdr['GOND_LON']
@@ -225,21 +236,20 @@ def processL10(params, verbose=True):
             
             # apply beam offsets
             naz = altaz.az.deg*u.deg + azoff*u.deg
-            nalt = altaz.alt.deg*u.deg + altoff*u.deg
+            nalt = altaz.alt.deg*u.deg + eloff*u.deg
             
             ncc = SkyCoord(AltAz(az=naz, alt=nalt, obstime=otime, location=balloon))
             nradec = ncc.transform_to('icrs')
             
-            data['RA'][osel] = nradec.ra.deg
-            data['DEC'][osel] = nradec.dec.deg
+            data['RA'][msel] = nradec.ra.deg
+            data['DEC'][msel] = nradec.dec.deg
         
-        pass
 
     # now we have to save the data in a FITS file
 
     data['CHANNEL_FLAG'] [osel,:] = spec_OTF.mask
     
-    osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
+    # osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
     odata = data[osel]
     
         
@@ -306,18 +316,20 @@ def getMixerOffsets(band, mixers, type='THEORY', offsetfile=None, verbose=False)
 
     if offsetfile is None:
         offsetfile = offsetsfile0
+    # if verbose:
+    #     print('\nCoordinate offset file: ', offsetfile)
 
     data = np.genfromtxt(offsetfile, delimiter='\t', skip_header=2, 
                          dtype=[('mxpix', 'U4'), ('az', '<f8'), ('el', '<f8'), ('type', 'U16')])
     
     cmixers = ['B%iM%i'%(band, i) for i in mixers]
     
-    ar = [np.argwhere((cmixer == data['mxpix'])&(type==data['type'])).flatten() for cmixer in cmixers]
+    ar = [np.argwhere((cmixer == data['mxpix'])&((type==data['type'])|(data['type']=='FIDUCIAL'))).flatten() for cmixer in cmixers]
 
-    if verbose:
-        print('cmixers: ', cmixers)
-        print('args: ', ar)
-        print('data: \n', data[ar].flatten())
+    # if verbose:
+    #     print('cmixers: ', cmixers)
+    #     print('args: ', ar)
+    #     print('data: \n', data[ar].flatten())
         
     return data[ar].flatten()
 

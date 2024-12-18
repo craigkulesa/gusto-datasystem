@@ -238,6 +238,12 @@ def processL09(params, verbose=True):
     rms[osel] = rmsotf
     basecorrf[osel,:] = basecorr
     
+    # add the rms column to the data array
+    if 'rms' not in data.names:
+        rms_col = fits.ColDefs([fits.Column(name='rms', format='E', array=rms)])
+        hdu = fits.BinTableHDU.from_columns(data.columns + rms_col)
+    else:
+        data['rms'] = rms
         
     tred = Time(datetime.datetime.now()).fits
     

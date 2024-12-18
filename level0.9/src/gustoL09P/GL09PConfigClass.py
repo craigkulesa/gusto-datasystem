@@ -19,10 +19,13 @@ import configparser
 import os
 import sys
 import numpy as np
+import pkg_resources
 from os.path import expanduser, expandvars
 #from joblib import Parallel, delayed, cpu_count
 import logging
 log = logging.getLogger(__name__)
+
+cfg_file0 = pkg_resources.resource_filename('gustoL09P', 'Data/GL09P_setup_pars.txt')
 
 
 def getRange(icpar, dtype='float', endpoint=True):
@@ -82,10 +85,12 @@ class GL09PConfigClass:
 
         """
 
-        if configFile is None:
+        print('Init configFile: ', configFile)
+        print()
+        if configFile == '':
             # check if there is a config File in the GUSTO config directory
             uhome = expanduser("~")
-            infile = uhome+'/.gusto/GL2P_setup_pars.txt'
+            infile = cfg_file0   #uhome+'/.gusto/GL2P_setup_pars.txt'
 
             # check if standard config file exists
             ret = os.path.exists(infile)
@@ -121,7 +126,7 @@ class GL09PConfigClass:
         # read the configuration file, but parsing is done in another function
         self.cfg = self.readConfigFile(self.cffile, verbose=verbose)
         if verbose:
-            print('getConfigInfo: ', self.cfg)
+            print('\ngetConfigInfo: \n', self.cfg)
 
         return self.cfg
 
