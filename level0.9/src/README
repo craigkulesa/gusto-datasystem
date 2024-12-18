@@ -1,7 +1,36 @@
 This folder contains source code for the level 0.9 to 1.0 pipeline.
 
-The code is executed with execGL4P <switches>
-
-the <switches> are opyional and some features are also controlled by the
+The code is executed with execGL09P <switches>
+the <switches> are optional and some features are also controlled by the
 configuration file found in the <module>/Data directory.
 
+
+usage: execGL09P [-h] [--configFile [CONFIGFILE]] [--startLevel [STARTLEVEL]] [--endLevel [ENDLEVEL]] [--scanRange SCANRANGE SCANRANGE] [--loglevel LOGLEVEL]
+               [--verbose] [--debug]
+
+GUSTO Level 1 Pipeline CLI
+--------------------------------
+
+options:
+  -h, --help            show this help message and exit
+  --configFile [CONFIGFILE], -c [CONFIGFILE]
+                        GUSTO L1 Pipeline configuration file. This file contains the data directories, etc.
+  --startLevel [STARTLEVEL], -s [STARTLEVEL]
+                        GUSTO Data Level the pipeline should start processing (default=0.8); possible entries are 0.8, 0.9 and 0.95
+  --endLevel [ENDLEVEL], -e [ENDLEVEL]
+                        GUSTO Data Level produced by pipeline (default=1.0); possible entries are 0.9 and 1.0
+  --scanRange SCANRANGE SCANRANGE, -r SCANRANGE SCANRANGE
+                        Range of scans to be processed by pipeline.
+  --loglevel LOGLEVEL, -l LOGLEVEL
+                        setting the log level of the {tpipe}
+  --verbose, -v         enables verbosity of the {tpipe}
+  --debug, -d           enables settings for debugging pipeline
+  
+
+EXAMPLES:
+
+Running only the Level 0.9 pipeline for scans 9180 to 9210:
+    execGL09P -r 9180 9210
+
+Running the pipeline from Level 0.9 to Level 1.0:
+    execGL09P -s 0.8 -e 1.0

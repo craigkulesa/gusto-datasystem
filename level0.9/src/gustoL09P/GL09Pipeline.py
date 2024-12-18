@@ -43,6 +43,7 @@ from .GL09PDataIO import loadL08Data
 from .GL095Pipeline import GL095Pipeline
 from .GL09PUtils import *
 from .GL09PLogger import *
+from .GL10Pipeline import *
 
 
 spectralLines = ['CII', 'NII', 'OI']
@@ -175,7 +176,7 @@ def runGL09P(verbose=False):
         print('Please check end data level!\nPossible levels are: %s'%(elevels))
     earg = levels.index(iel)
     exlevels = levels[iarg:earg+1]
-    print('levels: ', isl, iel, exlevels)
+    print('\nExecuting pipeline levels: ', isl, iel, exlevels)
     print()
 
     #########################################################
@@ -208,9 +209,9 @@ def runGL09P(verbose=False):
         res = GL095Pipeline(cfi, scanRange, verbose=verbose)
         print('Level 0.9 to 0.95 done.\n')
     
-    if '1' in exlevels:
+    if '1.0' in exlevels:
         print('Executing Level 1.0 pipeline: coordinate corrections')
-        #res = GL10Pipeline(cfi, scanRange, verbose=verbose)
+        res = GL10Pipeline(cfi, scanRange, verbose=verbose)
         print('Level 0.95 to 1.0 done.\n')
     
 
