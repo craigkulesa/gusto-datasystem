@@ -51,8 +51,8 @@ def doStuff(scan, args):
     # 972       100-101 201-203
     #
     # Iridium
-    # 1314      133-136 :wq
-
+    # 1314      133-136 266-272
+    # 1458      147-152 294-303
     # 1610      165-168 331-335
     # Look through all of the spectra to set row_flags for noisy data
 

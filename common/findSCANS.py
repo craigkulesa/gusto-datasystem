@@ -32,18 +32,28 @@ bucket = f'{database}/{retention_policy}'
 client = InfluxDBClient('localhost', 8086, '', '', 'gustoDBlp')
 
 # half-beam size for searching l,b grid
-size = 0.05*u.degree
+size = 1*u.degree
 
 # image coordinates
-gc = SkyCoord(l=351.0*u.degree, b=0.89*u.degree, frame='galactic')
-l_img = 0.8*u.degree
-b_img = 0.4*u.degree
+coords = "17h20m50.9s -36d06m54.0s" # NGC6334
+c = SkyCoord(coords, unit=(u.hourangle, u.deg), frame='icrs')
+lat = c.galactic.l.value
+lon = c.galactic.b.value
 
+#galactic image coordinates
+gc = SkyCoord(l=lat*u.degree, b=lon*u.degree, frame='galactic')
+
+# image size
+l_img = 6*u.degree
+b_img = 2*u.degree
+
+# create l index
 start_l  = gc.l.deg - l_img.value/2
 end_l    = gc.l.deg + l_img.value/2
 N_l      = int(l_img.value/(2*size.value))
 l_indx   = np.linspace(start_l, end_l, N_l)
 
+# create b index
 start_b  = gc.b.deg - b_img.value/2
 end_b    = gc.b.deg + b_img.value/2
 N_b      = int(b_img.value/(2*size.value))
@@ -68,28 +78,28 @@ for l in l_indx:
 
         # For loop over all of these pointings
         # POINTS contains a (time, scanID) for each pointing at (ra,dec)
-        tmp_list = []   # temporary list for (l,b,0/1) output
-        for point in points:
-            tmp_list.append(point.get("scanID"))
+        #tmp_list = []   # temporary list for (l,b,0/1) output
+        #for point in points:
+        #    tmp_list.append(point.get("scanID"))
 
-        my_list.append(tmp_list)
+        #my_list.append(tmp_list)
         for point in points:
             my_list.append(point.get("scanID"))
 
         # output of l,b and yes/no for udpPointing
         # used for plotting where we may have data
-        if tmp_list:
-            print(l, b, 1)
-        elif not tmp_list:
-            print(l, b, 0)
+        #if tmp_list:
+        #    print(l, b, 1)
+        #elif not tmp_list:
+        #    print(l, b, 0)
 
 
 prefix = "ACS3_"
 suffix = "_5_L09.fits"
 scanID_list = sorted(list(set(my_list)))
-filenames = [f"{prefix}{num}{suffix}" for num in scanID_list]
+filenames = ["{:s}{:05d}{:s}".format(prefix,int(num),suffix) for num in scanID_list]
 
 # output sorted list of L1 fits filenames
-#print("\n".join(filenames))
+print("\n".join(filenames))
 
 
