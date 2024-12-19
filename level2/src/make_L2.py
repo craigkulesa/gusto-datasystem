@@ -15,6 +15,8 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 from scipy.spatial import cKDTree
 
 from astropy import units as u
+from astropy import constants
+from astropy import constants
 
 from astropy.io import fits
 from astropy.io.fits import Header
@@ -39,6 +41,16 @@ import matplotlib.pyplot as plt
 # combine files:  ffmpeg -r 3 -pattern_type glob -i 'NGC6334-*.png' -i palette.png -lavfi paletteuse test.gif
 # view:           mpv test.gif
 
+# 12/12/2024
+# TODO: Use as-is with the 4 Dec level09 commit CLASS format, or accept new 0.9/0.95 FITS format
+# 4 Dec FITS format             new format
+# =================             ==========
+# single file per scanID        singlle file per scanID
+# single mixer per file         all mixers from band in a single file (2-4)
+# s-r/r with hots only          s-r/r with optional at 0.95 of baseline corr
+# primary header zero           primary header is preserved from level 0.8
+#   -- deltas primarily impact how velocity scale information is computed
+
 
 ################################################################################
 def doStuff(self, args):
@@ -58,8 +70,26 @@ def doStuff(self, args):
    data   = hdu[1].data
    spec   = data['DATA']
    ROW_FLAG  = data['ROW_FLAG']
+
+   # compute velocity
+   npix    = len(spec[0]) # 'NPIX' doesn't exist in 0.9 header
+   IF_pix  = header['CRPIX1']
+   IF_val  = header['CRVAL1']
+   IF_del  = 4.887586
+   IF_freq = (np.arange(npix)-IF_pix)*IF_del+IF_val
+   VLSR    = header['VELO-LSR'] # 'VLSR' doesn't exist in 0.9 header
+
+   IF_vlsr0= header['IF0']
+   line_freq = header['LINEFREQ']
+   vlsr    = (IF_vlsr0 - IF_freq)/line_freq*constants.c.value/1.e3 + VLSR # Vlsr in km/s
+
+   # Onyl use some rows
+   #mixer  = data['mixer']
+   #row_mask = np.logical_and(mixer == 5, ROW_FLAG & mask == 0)
+
    n_OTF  = len(data)
    x = np.arange(1024)
+
 
    # Reference Coordinate System
    crval2 = header['CRVAL2']   # reference RA pixel
@@ -73,9 +103,14 @@ def doStuff(self, args):
    # Instantiate for ra,dec->l,b transform
    c_ra_dec = SkyCoord(ra=(crval2+cdelt2)*u.degree, dec=(crval3+cdelt3)*u.degree, frame='icrs')
 
-   # Setup baseline fitting
-   xlow   = 204 # low spectral channel
-   xhigh  = 328 # hi spectral channel
+   # Setup baseline fitting and integrated intensity
+   # baseline from -80 km/s to +16 km/s
+   xlow   = np.argmin(np.abs(vlsr - 16))
+   xhigh  = np.argmin(np.abs(vlsr - -80))
+   # integrated intensity from -15.5 km/s to +4.5 km/s
+   iilow  = np.argmin(np.abs(vlsr - 4.5)) - xlow
+   iihigh = np.argmin(np.abs(vlsr - -15.5)) - xhigh
+
    base = np.zeros([n_OTF,xhigh-xlow])
    baseline_fitter = Baseline(x_data=x[xlow:xhigh])
    y_flat = np.zeros(xhigh-xlow)
@@ -89,7 +124,7 @@ def doStuff(self, args):
        plt.clf()
    # Main routine run on every Level 1 fits file
    for i in range(n_OTF):
-       mask = (1<<26)|(1<<27)   # Mask off rining rows
+       mask = (1<<26)|(1<<27)   # Mask off ringing rows
        if ((int(ROW_FLAG[i]) & mask) == 0):
           c_l_b = c_ra_dec[i].transform_to(Galactic)    # transform to l,b
 
@@ -100,25 +135,23 @@ def doStuff(self, args):
           y_flat = spec_new - base2[0]
 
           # Fill integrated intensity and l,b
-          ii = np.append(ii, sum(y_flat[20:40]))
+          ii = np.append(ii, sum(y_flat[iilow:iihigh]))
           l  = np.append(l, c_l_b.l.value[0])
           b  = np.append(b, c_l_b.b.value[0])
           if args.plot:
-              plt.plot(y_flat)
+              plt.plot(vlsr[xlow:xhigh],y_flat)
        else:
           pass
 
    if args.plot:
        plt.ylim(-10, 80)
-       plt.vlines(20, -5, 40)
-       plt.vlines(40, -5, 40)
+       plt.vlines(4.5, -5, 40)
+       plt.vlines(-15.5, -5, 40)
 
-       plt.vlines(62, -5, 40)
-       plt.vlines(68, -5, 40)
-
-       plt.vlines(90, -5, 40)
-       plt.vlines(99, -5, 40)
        plt.savefig(f'NGC6334-{self[-16:-11]}.png') 
+
+   #plt.show(block=False)
+   #plt.pause(1)
 
    print(l.mean())
 
@@ -130,7 +163,6 @@ def doStuff(self, args):
 
 def regrid(l, b, T, beam):
    # Interpolate data onto rectangular grid
-
    THRESHOLD = 0.05 # Any gridded data point Threshold (deg) distance from real data point is NaN
 
    # Calculate the range of glon and glat values
@@ -145,7 +177,7 @@ def regrid(l, b, T, beam):
    l_grid, b_grid = np.meshgrid(np.linspace(l_min, l_max, N_l),np.linspace(b_min, b_max, N_b))
 
    # Initialize array
-   image = interpolate.griddata((l, b), T, (l_grid, b_grid), method='cubic')
+   image = interpolate.griddata((l, b), T, (l_grid, b_grid), method='linear')
 
    # KD-TREE and RESHAPE are used to NaN pixels greated than THRESHOLD distance from nearest real data points
    # Construct kd-tree, functionality copied from scipy.interpolate
@@ -209,6 +241,7 @@ for file in search_files:
         (glon, glat, Ta) = result
 
         for i in range(0,len(glon)):
+            # why am i doing this test? document things better!
             if glat[i]<2 and glat[i]>-2:
                 glon_list.append(glon[i])
                 glat_list.append(glat[i])
