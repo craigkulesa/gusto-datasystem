@@ -106,13 +106,12 @@ def runGL09P(verbose=False):
                         help='Range of scans to be processed by pipeline.')
     parser.add_argument('--loglevel', '-l', type=str,
                         default='INFO',
-                        help='setting the log level of the {tpipe}')
+                        help='sets the log level of the {tpipe}')
     parser.add_argument('--verbose', '-v', action='store_true',
                         default=False,
-                        help='enables verbosity of the {tpipe}')
-    parser.add_argument('--debug', '-d', action='store_false',
-                        default=False,
-                        help='enables settings for debugging pipeline')
+                        help='sets verbosity of the {tpipe}')
+    parser.add_argument('--debug', '-d', type=bool,
+                        help='sets settings for debugging pipeline')
     args = parser.parse_args()
     if verbose:
         print('commandline arguments:\n', args, '\n')
@@ -122,7 +121,7 @@ def runGL09P(verbose=False):
     # this overrides the verbosity from above in case it is enabled
     if args.verbose:
         verbose = args.verbose
-
+        
     # inspect any provided arguments
 
     # initialize the pipeline
@@ -157,8 +156,7 @@ def runGL09P(verbose=False):
     logger.info('Pipeline configuration:')
     logger.info(cfi)
 
-    
-    if args.debug:
+    if args.debug is not None:
         cfi['gprocs']['debug'] = args.debug
         
 

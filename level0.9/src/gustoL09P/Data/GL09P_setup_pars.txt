@@ -39,7 +39,7 @@ lines = CII NII
 debug = False
 
 # coordinate offsets file
-offsetsfile = 
+#offsetsfile = 
 
 
 [GUSTO_Parameters]
