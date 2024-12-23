@@ -4,8 +4,8 @@ This is the GUSTO L09 Pipeline.
 """
 
 __date__ = '9/19/2024'
-__updated__ = '20241217'
-__version__ = '0.3'
+__updated__ = '20241223'
+__version__ = '0.3.1'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
 from joblib import Parallel, delayed
