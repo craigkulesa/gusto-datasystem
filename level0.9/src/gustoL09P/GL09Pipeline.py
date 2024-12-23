@@ -45,6 +45,7 @@ from .GL09PUtils import *
 from .GL09PLogger import *
 from .GL10Pipeline import *
 
+#logger = logging.getLogger(__name__)
 
 spectralLines = ['CII', 'NII', 'OI']
 n_sL = len(spectralLines)
@@ -58,7 +59,7 @@ tpipe = 'GUSTO L1 Pipeline'
 runtime = time.strftime('%Y%m%d%H%M%S')
 
 def runGL09P(verbose=False):
-    r"""Function running the GUSTO Level 2 pipeline.
+    r"""Function executing the GUSTO Level 2 pipeline.
     The process is:
     1) read the command line parameters
     2) read the configuration parameters
@@ -105,12 +106,11 @@ def runGL09P(verbose=False):
                         default=[2000, 30000],
                         help='Range of scans to be processed by pipeline.')
     parser.add_argument('--loglevel', '-l', type=str,
-                        default='INFO',
+                        #default='INFO',
                         help='sets the log level of the {tpipe}')
     parser.add_argument('--verbose', '-v', action='store_true',
-                        default=False,
                         help='sets verbosity of the {tpipe}')
-    parser.add_argument('--debug', '-d', type=bool,
+    parser.add_argument('--debug', '-d',
                         help='sets settings for debugging pipeline')
     args = parser.parse_args()
     if verbose:
@@ -119,7 +119,7 @@ def runGL09P(verbose=False):
         print()
 
     # this overrides the verbosity from above in case it is enabled
-    if args.verbose:
+    if args.verbose is not None:
         verbose = args.verbose
         
     # inspect any provided arguments
@@ -145,19 +145,30 @@ def runGL09P(verbose=False):
     
     # initialize logging:
     logDir = cfi['gdirs']['logDir']
-    numeric_level = getattr(logging, args.loglevel.upper(), None)
+    if args.loglevel is not None:
+        numeric_level = getattr(logging, args.loglevel.upper(), None)
+    elif cfi['gprocs']['loglevel'] != '':
+        print('cfi: ', cfi['gprocs']['loglevel'].upper())
+        numeric_level = getattr(logging, cfi['gprocs']['loglevel'].upper(), None)
+    else:
+        numeric_level = getattr(logging, 'INFO', None)
+    cfi['gprocs']['loglevel'] = numeric_level
+    
     if not isinstance(numeric_level, int):
-        raise ValueError('Invalid log level: %s\nValid options are: DEBUG, INFO, WARNING, ERROR, CRITICAL.' % loglevel)
+        raise ValueError('Invalid log level: %s\nValid options are: DEBUG, INFO, WARNING, ERROR, CRITICAL.' % numeric_level)
     logfile = os.path.join(logDir,'gusto_pipeline_%s.log'%(time.strftime("%Y%m%d%H%M%S")))
-    logger = init_logger(loglevel=numeric_level, logfile=None, loggername='GL09PLogger')
+    logger = init_logger(loglevel=numeric_level, logfile=logfile, loggername='GL09PLogger')
+    logger.addHandler(logging.StreamHandler())
     
     logger.info('Started logging.')
     logger.info('Pipeline configuration file: %s'%(args.configFile))
     logger.info('Pipeline configuration:')
     logger.info(cfi)
 
+    print('debug1: ', args.debug, cfi['gprocs']['debug'])
     if args.debug is not None:
         cfi['gprocs']['debug'] = args.debug
+    print('debug2: ', args.debug, cfi['gprocs']['debug'])
         
 
     #########################################################
@@ -214,6 +225,10 @@ def runGL09P(verbose=False):
     
 
     print()
+    print('Pipeline log file: ', logfile)
+    print()
+    
+    
     #########################################################
     # setup the processing loop for each file
     # the loop should use multiprocessing (parameters like # of cores, should be in setup file)
@@ -223,11 +238,7 @@ def runGL09P(verbose=False):
     # - for each file process the OTFs
     # - re-evaluate the row flags for each OTF spectrum
     # save spectra to FITS file
-    
-    
-    #########################################################
-    # determine the range of data files to be processed
-    
+        
     
 
 
@@ -249,8 +260,10 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     
     if cfi['gprocs']['debug']==True:
         print('\nExecuting debug mode.\n')
-        logger = multiprocessing.log_to_stderr()
-        logger.setLevel(multiprocessing.SUBDEBUG)
+        # logger = multiprocessing.log_to_stderr()
+        # logger.setLevel(multiprocessing.SUBDEBUG)
+        logger = logging.getLogger()
+        logger.setLevel()
         n_procs = 1
     else:
         n_procs = multiprocessing.cpu_count() - 2

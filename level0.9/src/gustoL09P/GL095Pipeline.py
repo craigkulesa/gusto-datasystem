@@ -37,7 +37,8 @@ from .GL09PDataIO import loadL08Data
 from .GL09PUtils import *
 from .GL09PLogger import *
 import logging
-log = logging.getLogger(__name__)
+
+logger = logging.getLogger('GL09PLogger')
 
 
 def GL095Pipeline(cfi, scanRange, verbose=False):
@@ -60,11 +61,19 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
     """
     
         #logger = logging.getLogger('GL09PLogger')
+        
+    # logger
+    logger = logging.getLogger('GL09PLogger')
+    logger.addHandler(logging.StreamHandler())
+    logger.setLevel(cfi['gprocs']['loglevel'])
+    logger.info('Started Level 0.95 Pipeline')
     
-    if cfi['gprocs']['debug']==True:
+    debug = cfi['gprocs']['debug']
+
+    if debug==True:
         print('\nExecuting debug mode.\n')
-        logger = multiprocessing.log_to_stderr()
-        logger.setLevel(multiprocessing.SUBDEBUG)
+        # logger = multiprocessing.log_to_stderr()
+        # logger.setLevel(multiprocessing.SUBDEBUG)
         n_procs = 1
     else:
         n_procs = multiprocessing.cpu_count() - 2
@@ -110,8 +119,8 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
             
-        
-        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
+        print('debug 095: ', debug)
+        paramlist = [[a, b, c, d, e, f, g] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [debug] for g in [cfi['gprocs']['loglevel']]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
         if verbose:
@@ -123,8 +132,10 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
         with Pool(n_procs) as pool:
             # execute tasks in order
             for result in pool.imap(processL09, paramlist):
-                print(f'Processed: {result}', flush=True)
+                #print(f'Processed: {result}', flush=True)
+                logger.info(f'Processed: {result}')
         
+    logger.info('Level 0.95 Pipeline finished')
     return n_ds
 
 
@@ -141,9 +152,18 @@ def processL09(params, verbose=True):
     -------
 
     """
+    import logging
     
     #loadL08Data(dfile, verbose=True)
-    line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
+    line, inDir, outDir, dfile, drmethod, debug, loglevel = params[0], params[1], params[2], params[3], params[4], params[5], params[6]
+
+    logger = logging.getLogger('GL09PLogger')
+    logger.addHandler(logging.StreamHandler())
+    print('loglevel: ', loglevel)
+    logger.setLevel(loglevel)
+    if debug:
+        logger.info('in debug mode')
+    print('debug proc 0.95: ', debug)
     
     # define some processing data first (maybe relocat to function later?)
 
@@ -164,7 +184,8 @@ def processL09(params, verbose=True):
     bs_itermax = 100
     datavalid = True
 
-    #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
+    lstr = 'loading file: %s for line: %s'%(os.path.join(inDir,dfile), line)
+    logger.info(lstr)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
     rowFlag = data['ROW_FLAG']
     
@@ -285,7 +306,7 @@ def processL09(params, verbose=True):
 
     
     print('saved file: ', ofile)
-    # logger.info('saved file: ', ofile)
+    logger.info('saved file: %s'%(ofile))
         
         
     return dfile
