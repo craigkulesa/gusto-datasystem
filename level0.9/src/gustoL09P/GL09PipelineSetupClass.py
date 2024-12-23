@@ -1,9 +1,9 @@
 """Gusto Level 2 Pipeline class
 """
 
-__version__ = '0.1'
+__version__ = '0.1.1'
 __date__ = '20240919'
-__updated__ = '20240919'
+__updated__ = '20241223'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
 
@@ -141,6 +141,7 @@ class GL09PipelineSetupClass:
 
         return self.GL09Pproc
 
+
     def initializePipeline(self, verbose=False, configFile=None):
         """Function reading the pipeline configuration file and 
         setting up the pipeline. The pipeline configuration file is different from the 
@@ -173,6 +174,7 @@ class GL09PipelineSetupClass:
 
         config = configparser.ConfigParser(interpolation=EnvInterpolation())
         config.optionxform = str
+        config.BOOLEAN_STATES = {'True': True, 'False': False}
 
         # read the configuration file
         config.read(self.configFile)
@@ -203,7 +205,28 @@ class GL09PipelineSetupClass:
         gpars = config["GUSTO_Parameters"]
         gpdict = {}
         for key in gpars.keys():
-            gpdict[key] = gpars[key]
+            if gpars[key]=='False':
+                gpdict[key] = False
+            elif gpars[key]=='True':
+                gpdict[key] = True
+            else:
+                gpdict[key] = gpars[key]
+        gpars = config["CII_Parameters"]
+        for key in gpars.keys():
+            if gpars[key]=='False':
+                gpdict[key] = False
+            elif gpars[key]=='True':
+                gpdict[key] = True
+            else:
+                gpdict[key] = gpars[key]
+        gpars = config["NII_Parameters"]
+        for key in gpars.keys():
+            if gpars[key]=='False':
+                gpdict[key] = False
+            elif gpars[key]=='True':
+                gpdict[key] = True
+            else:
+                gpdict[key] = gpars[key]
 
         # GUSTO_Processing
         gpars = config["GUSTO_Processing"]
@@ -215,7 +238,6 @@ class GL09PipelineSetupClass:
                 gcdict[key] = True
             else:
                 gcdict[key] = gpars[key]
-            print(key, gcdict[key], type(gcdict[key]))
 
         self.GL09Pconf = {}
         self.GL09Pconf['default'] = defdict
