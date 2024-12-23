@@ -99,6 +99,7 @@ class GL09PipelineSetupClass:
 
         pconfig = configparser.ConfigParser(interpolation=EnvInterpolation())
         pconfig.optionxform = str
+        pconfig.BOOLEAN_STATES = {'True': True, 'False': False}
 
         # read the configuration file
         pconfig.read(procFile)
@@ -208,7 +209,13 @@ class GL09PipelineSetupClass:
         gpars = config["GUSTO_Processing"]
         gcdict = {}
         for key in gpars.keys():
-            gcdict[key] = gpars[key]
+            if gpars[key]=='False':
+                gcdict[key] = False
+            elif gpars[key]=='True':
+                gcdict[key] = True
+            else:
+                gcdict[key] = gpars[key]
+            print(key, gcdict[key], type(gcdict[key]))
 
         self.GL09Pconf = {}
         self.GL09Pconf['default'] = defdict
