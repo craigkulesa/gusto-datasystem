@@ -37,7 +37,7 @@ from astropy.io import fits
 from multiprocessing.pool import Pool
 
 from .GL09PipelineSetupClass import GL09PipelineSetupClass
-from .GL09PConfigClass import GL09PConfigClass, getValues, getRange
+#from .GL09PConfigClass import GL09PConfigClass, getValues, getRange
 from .GL09PProcessControl import GL09PProcessControl
 from .GL09PDataIO import loadL08Data
 from .GL095Pipeline import GL095Pipeline
@@ -156,6 +156,7 @@ def runGL09P(verbose=False):
     logger.info('Pipeline configuration:')
     logger.info(cfi)
 
+    print(type(cfi['gprocs']['debug']), type(args.debug))
     if args.debug is not None:
         cfi['gprocs']['debug'] = args.debug
         
@@ -297,6 +298,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
         
+        print(cfi['gprocs']['debug'])
         paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
