@@ -38,6 +38,9 @@ l09set_channel_flags = True
 lines = CII NII
 debug = False
 loglevel = 
+# clean up the L1.0 data and save only good OTF spectra
+l10OTFonly = True
+
 
 # coordinate offsets file
 offsetsfile = 
