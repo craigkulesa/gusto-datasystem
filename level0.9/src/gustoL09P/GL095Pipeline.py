@@ -154,7 +154,6 @@ def processL09(params, verbose=True):
     """
     import logging
     
-    #loadL08Data(dfile, verbose=True)
     line, inDir, outDir, drmethod, debug, loglevel, dfile = params[0], params[1], params[2], params[3], params[4], params[5], params[6]
 
     logger = logging.getLogger('GL09PLogger')
