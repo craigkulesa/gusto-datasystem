@@ -24,7 +24,7 @@ import astropy.units as u
 # this file has been created using gustoL09P/support/GUSTO_create_master_table.py
 ifile = '/Users/volkertolls/Projects/GUSTO/Data/master_table_20241223.csv'
 
-def gusto_get_lb_region_list(mt_file=None, mt=None):
+def gusto_get_lb_region_list(lrange=None, mt_file=None, mt=None, verbose=False):
     """Function to get list of scans for l,b-region..
 
 
@@ -46,24 +46,35 @@ def gusto_get_lb_region_list(mt_file=None, mt=None):
     
     if mt == None:
         mt = Table().read(mt_file, delimiter=',')
+        
+    if verbose:
+        print(mt.dtype)
+        print()
     
     cc = SkyCoord(mt['ra']*u.deg, mt['dec']*u.deg, frame='icrs')
     mt['l'] = cc.galactic.l.deg
     mt['b'] = cc.galactic.b.deg
     
-    print(mt[0:20])
-    
-    ra0 = '17h12m23.2s'
-    dec0 = '−38d26m51.2s'
-    cc0 = SkyCoord(ra0, dec0, frame='icrs')
-    print(cc0.galactic.l.deg, cc0.galactic.b.deg)
-    
-    lrange = [347.5, 348.75]
+    if verbose:
+        print(mt[0:20])
     
     scans = mt['scanID'][(lrange[0]<mt['l'])&(lrange[1]>mt['l'])&(mt['band']==2)]
     return scans
 
-scans = gusto_get_lb_region_list()
+if __name__ == '__main__':
+    
+    cregion = 'RCW120'
+    ra0 = '17h12m23.2s'
+    dec0 = '−38d26m51.2s'
+    cc0 = SkyCoord(ra0, dec0, frame='icrs')
+    
+    print('Region: ', cregion)
+    print(cc0.galactic.l.deg, cc0.galactic.b.deg)
+    
+    lrange = [347.5, 348.75]
+    print('l-range: ', lrange)
 
-print(scans.value.size)
-print(scans.value)
+    scans = gusto_get_lb_region_list(lrange=lrange, verbose=True)
+    
+    print(scans.value.size)
+    print(scans.value)

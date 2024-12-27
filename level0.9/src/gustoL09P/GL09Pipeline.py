@@ -37,7 +37,7 @@ from astropy.io import fits
 from multiprocessing.pool import Pool
 
 from .GL09PipelineSetupClass import GL09PipelineSetupClass
-from .GL09PConfigClass import GL09PConfigClass, getValues, getRange
+#from .GL09PConfigClass import GL09PConfigClass, getValues, getRange
 from .GL09PProcessControl import GL09PProcessControl
 from .GL09PDataIO import loadL08Data
 from .GL095Pipeline import GL095Pipeline
@@ -165,10 +165,10 @@ def runGL09P(verbose=False):
     logger.info('Pipeline configuration:')
     logger.info(cfi)
 
-    print('debug1: ', args.debug, cfi['gprocs']['debug'])
+    #print('debug1: ', args.debug, cfi['gprocs']['debug'])
     if args.debug is not None:
         cfi['gprocs']['debug'] = args.debug
-    print('debug2: ', args.debug, cfi['gprocs']['debug'])
+    #print('debug2: ', args.debug, cfi['gprocs']['debug'])
         
 
     #########################################################
