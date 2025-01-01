@@ -285,7 +285,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         # identify the files for processing
         inDir = cfi['gdirs']['L08DataDir']
         outDir = cfi['gdirs']['L09DataDir']
-        if line=='CII':
+        if line=='NII':
             filter = 'ACS5*.fits'
         else:
             filter = 'ACS3*.fits'
