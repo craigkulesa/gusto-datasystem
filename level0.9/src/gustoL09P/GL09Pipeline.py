@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 import itertools
 import multiprocessing
 import astropy.wcs
+import zipfile
 from matplotlib.patches import Rectangle
 from pathlib import Path
 from pprint import pprint
@@ -35,6 +36,7 @@ from astropy.coordinates import SkyCoord, SkyOffsetFrame, ICRS
 from astropy.time import Time
 from astropy.io import fits
 from multiprocessing.pool import Pool
+from itertools import repeat
 
 from .GL09PipelineSetupClass import GL09PipelineSetupClass
 #from .GL09PConfigClass import GL09PConfigClass, getValues, getRange
@@ -309,8 +311,22 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         if int(cfi['gprocs']['max_files']) > 0:
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
+            
+        if line == 'NII':
+            vcut = float(cfi['gprocs']['vcut1'])
+            args = getRange(cfi['gprocs']['args1'], dtype=int)
+        elif line == 'CII':
+            vcut = float(cfi['gprocs']['vcut2'])
+            args = getRange(cfi['gprocs']['args2'], dtype=int)
+            
+        print('args: ', args, type(args), type(args[0]))
         
-        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
+        params = {'line': line, 'inDir': inDir, 'outDir': outDir, 
+                  'drmethod': int(cfi['gprocs']['drmethod']),
+                  'debug': cfi['gprocs']['debug'], 'verbose': verbose,
+                  'vcut': vcut, 'args': args}
+        paramlist = [[a, b] for a in dfiles for b in [params]]
+        # paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
         if verbose:
@@ -322,12 +338,13 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         with Pool(n_procs) as pool:
             # execute tasks in order
             for result in pool.imap(processL08, paramlist):
+            # for result in pool.imap(processL08, zip(dfiles, repeat(params))):
                 print(f'Processed: {result}', flush=True)
         
     return n_ds
 
 
-def processL08(params, verbose=False):
+def processL08(paramlist):
     """Function processing the Level 0.8 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
 
@@ -342,10 +359,15 @@ def processL08(params, verbose=False):
     """
     
     #loadL08Data(dfile, verbose=True)
-    line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
+    dfile = paramlist[0]
+    params = paramlist[1]
+    # line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
+    line, inDir, outDir, drmethod, debug = params['line'], params['inDir'], params['outDir'], params['drmethod'], params['debug']
+    verbose = params['verbose']
+    vcut = params['vcut']
+    args = range(int(params['args'][0]), int(params['args'][1]))
     
-    # define some processing data first (maybe relocat to function later?)
-
+    # define some additional processing data (maybe relocat to function later?)
     if 'ACS3' in dfile:
         pfr_ra = np.array(list([[-0.01,0.01],[0.25,0.38],[2.25,2.33]]), dtype=float)
         pp_ra = np.array([[20,83],[132,138],[200,205],[265,274],[323,340],[399,407],[498,509]], dtype=int)
@@ -384,7 +406,7 @@ def processL08(params, verbose=False):
     spec.mask[:,pixel_en:] += bool(128)
     spec.mask[:,:pixel_st] += bool(128)
     
-    rowFlag = data['ROW_FLAG']
+    #rowFlag = data['ROW_FLAG']
     
     n_spec, n_pix = spec.shape
     
@@ -414,7 +436,7 @@ def processL08(params, verbose=False):
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(rowFlag[msel]==0)
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==0)
         if not check:
             print('mix, dfile')
             print('specs: ', spec.shape)
@@ -570,7 +592,20 @@ def processL08(params, verbose=False):
         data[dkey][osel,:] = ta.data
         data['CHANNEL_FLAG'] [osel,:] = ta.mask
 
-        
+    # check if there is rining in the callibrated spectra
+    var = np.zeros(n_spec)
+    for i in range(0,n_spec):
+        #sp = spec[i,:]
+        if np.any(np.isfinite(spec[i,args])):
+            var[i] = (np.nanmax(spec[i,args] - np.nanmin(spec[i,args]))) / np.nanmean(spec[i,args])
+            if (np.abs(var[i]) >= vcut)&(data['scan_type'][i]=='OTF'):
+                data['ROW_FLAG'][i] = (1 << 26) # set bit 26
+        else:
+            var[i] = 9999
+            data['ROW_FLAG'][i] = (1 << 13)   # set bit 13
+        if debug:
+            print('%4i  %7.3f  %2i  %6s  %i  %i'%(i, var[i], data1['MIXER'][i], data1['scan_type'][i], data1['row_flag'][i], data['ROW_FLAG'][i]))
+
     tred = Time(datetime.datetime.now()).fits
     
     # updating header keywords
@@ -609,7 +644,8 @@ def processL08(params, verbose=False):
         col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
         col6 = Column(spec, name='spec', description='original spectra')
         col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
-        fT = Table([col1, col2, col3, col4, col5, col6, col7])
+        col8 = Column(var, name='ringvar', description='value to determine if ringing in spectrum')
+        fT = Table([col1, col2, col3, col4, col5, col6, col7, col8])
         fits.append(ofile, data=fT.as_array())
 
         col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')

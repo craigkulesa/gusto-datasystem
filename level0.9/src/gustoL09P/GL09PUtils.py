@@ -55,6 +55,42 @@ def lprint(*args, **kwargs):
     print(*args, **kwargs)
 
 
+def getRange(icpar, dtype='float', endpoint=True):
+    """Function reading an input str and convert ranges to 
+    an array of floats. 
+    Uses getValues() and returns a numpy float array if <3 parameters are
+    provided. 
+        
+    Parameters
+    ----------
+    icpar: str
+        parameter str like '[start, stop, step]'
+    """
+    pars = getValues(icpar)
+    
+    if pars.size < 3:
+        return pars
+    else:
+        # create a grid from the parameters
+        if endpoint:
+            return np.arange(pars[0], pars[1]+pars[2], pars[2])
+        else:
+            return np.arange(pars[0], pars[1], pars[2])
+
+
+def getValues(icpar, dtype='float'):
+    """Function converting str data to numpy float array.
+        
+    Parameters
+    ----------
+    icpar: str
+        parameter str like '[start, stop, step]' or '3.45'
+    """
+    icpars = icpar.replace('[','').replace(']','').replace(' ','').split(',')
+    ipars = np.array((icpars), dtype=dtype)
+    
+    return ipars
+
 
 def simpleDespikeSpectra(spec0, data, hdr, pwidth=10, verbose=False, interpflag=False):
     """Function determining spikes in data array and save the
