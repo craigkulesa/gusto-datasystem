@@ -109,7 +109,7 @@ def doStuff(self, args):
    xhigh  = np.argmin(np.abs(vlsr - -80))
    # integrated intensity from -15.5 km/s to +4.5 km/s
    iilow  = np.argmin(np.abs(vlsr - 4.5)) - xlow
-   iihigh = np.argmin(np.abs(vlsr - -15.5)) - xhigh
+   iihigh = np.argmin(np.abs(vlsr - -15.5)) - xlow
 
    base = np.zeros([n_OTF,xhigh-xlow])
    baseline_fitter = Baseline(x_data=x[xlow:xhigh])
