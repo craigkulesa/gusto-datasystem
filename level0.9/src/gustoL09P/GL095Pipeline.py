@@ -94,6 +94,7 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
         # identify the files for processing
         inDir = cfi['gdirs']['L09DataDir']
         outDir = cfi['gdirs']['L095DataDir']
+        os.makedirs(outDir, exist_ok=True)
         if line=='CII':
             filter = 'ACS5*.fits'
         else:

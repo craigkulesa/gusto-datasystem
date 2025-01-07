@@ -147,6 +147,8 @@ def runGL09P(verbose=False):
     
     # initialize logging:
     logDir = cfi['gdirs']['logDir']
+    os.makedirs(logDir, exist_ok=True)
+
     if args.loglevel is not None:
         numeric_level = getattr(logging, args.loglevel.upper(), None)
     elif cfi['gprocs']['loglevel'] != '':
@@ -287,6 +289,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         # identify the files for processing
         inDir = cfi['gdirs']['L08DataDir']
         outDir = cfi['gdirs']['L09DataDir']
+        os.makedirs(outDir, exist_ok=True)
         if line=='NII':
             filter = 'ACS5*.fits'
         else:
