@@ -595,7 +595,7 @@ def processL08(paramlist):
         data[dkey][osel,:] = ta.data
         data['CHANNEL_FLAG'] [osel,:] = ta.mask
 
-    # check if there is rining in the callibrated spectra
+    # check if there is ringing in the callibrated spectra
     var = np.zeros(n_spec)
     for i in range(0,n_spec):
         #sp = spec[i,:]
@@ -612,8 +612,9 @@ def processL08(paramlist):
     tred = Time(datetime.datetime.now()).fits
     
     # updating header keywords
-    hdr['DLEVEL'] = 0.9
+    hdr.set('DLEVEL', value = 0.9, after='PROCTIME')
     hdr['PROCTIME'] = tred
+    
 #    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
 #    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
     #hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
@@ -627,6 +628,7 @@ def processL08(paramlist):
     hdr.add_comment('L0.9 version: %s'%(__version__))
     hdr.add_comment('L0.9 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.9 developer: %s'%(__author__))
+    hdr.set('', value='', after='PGPIXEN')
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))

@@ -194,8 +194,6 @@ def processL10(params, verbose=True):
     #     return 0
 
     osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
-    spec_OTF = np.squeeze(spec[osel,:])
-    n_OTF, n_otfpix = spec_OTF.shape 
     
     umixers = np.unique(data['MIXER'])
     
@@ -229,10 +227,6 @@ def processL10(params, verbose=True):
             
             aa = AltAz(location=EarthLocation(lat=glat, lon=glon, height=galt*u.m), obstime=otime)
             altaz = cc.transform_to(aa)
-               
-            # get beam offsets
-            az_bm = 0.030104  #azoffset[band, mix]
-            alt_bm = 0.000023  #eloffset[band, mix]
             
             # apply beam offsets
             naz = altaz.az.deg*u.deg + azoff*u.deg
@@ -246,28 +240,55 @@ def processL10(params, verbose=True):
         
 
     # now we have to save the data in a FITS file
-
-    data['CHANNEL_FLAG'] [osel,:] = spec_OTF.mask
     
-    # osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
+    # insert delta_ra and delta_dec in table for compatibility with WCS
+    # insert WCS information in header
+    # all will be relative to the first ra/dec pair
+    cc0 = SkyCoord(data['ra'][osel[0]]*u.deg, data['dec'][osel[0]]*u.deg, frame='icrs')
+    cc = SkyCoord(data['ra']*u.deg, data['dec']*u.deg, frame='icrs')    
+    dra, ddec = cc0.spherical_offsets_to(cc)
+    # add the columns to the data
+    cols = data.columns
+    new_cols = fits.ColDefs([
+        fits.Column(name='dra', format='D', array=dra.deg),
+        fits.Column(name='ddec', format='D', array=ddec.deg)])
+    nhdu = fits.BinTableHDU.from_columns(cols + new_cols)
+    data = nhdu.data
+
+    # select only the processed good data
     odata = data[osel]
     
-        
+    # add 
+    hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
+    hdr.set('CRVAL2', value=(data['ra'][osel[0]]*u.deg).value, comment=(''), after='CDELT1')
+    hdr.set('CRPIX2', value=0, comment=(''), after='CDELT1')
+    hdr.set('CUNIT2', value='deg', comment=(''), after='CDELT1')
+    hdr.set('CTYPE2', value='RA---GLS', comment=(''), after='CDELT1')
+    hdr.set('CDELT3', value=0.000000001, comment=(''), after='CDELT2')
+    hdr.set('CRVAL3', value=(data['dec'][osel[0]]*u.deg).value, comment=('CDELT2'))
+    hdr.set('CRPIX3', value=0, comment=(''), after='CDELT2')
+    hdr.set('CUNIT3', value='deg', comment=(''), after='CDELT2')
+    hdr.set('CTYPE3', value='DEC--GLS', comment=(''), after='CDELT2')
+    
     tred = Time(datetime.datetime.now()).fits
     
     # hdr.insert('VLSR', ('PROC_LEV', 0.95, 'pipeline processing level'), after=True)
     # hdr.add_comment('Pipeline Processing', before='PROC_LEV')
     # hdr.insert('PROC_LEV', ('PROCDATE', tred.split('T')[0], 'Date of processing'))
     # hdr.insert('PROCDATE', ('PROCTIME', tred.split('T')[1], 'Time of processing'))
-    hdr['PROC_LEV'] = 1.0
-    hdr['PROCDATE'] = tred.split('T')[0]
-    hdr['PROCTIME'] = tred.split('T')[1]
+    hdr['DLEVEL'] = 1.0
+    hdr['PROCTIME'] = tred
+    
+    hdr.set('', value='', after='BS_ITERM')
+    hdr.set('', value='          Level 0.95 Pipeline Processing', after='BS_ITERM')
+    hdr.set('', value='', after='BS_ITERM')
+    hdr.set('L10PTIME', value=tred, comment=('L1.0 pipeline processing time'))
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L095.fits','_L10.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=odata, header=hdr1)
-    
+
     print('saved file: ', ofile)
     # logger.info('saved file: ', ofile)
     

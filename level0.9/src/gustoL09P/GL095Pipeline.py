@@ -254,7 +254,7 @@ def processL09(params, verbose=True):
         dkey = 'DATA'
         
     data[dkey][osel,:] = spec_OTF.data
-    data['CHANNEL_FLAG'] [osel,:] = spec_OTF.mask
+    data['CHANNEL_FLAG'][osel,:] = spec_OTF.mask
     data['ROW_FLAG'][osel] = rf
     rms[osel] = rmsotf
     basecorrf[osel,:] = basecorr
@@ -272,21 +272,23 @@ def processL09(params, verbose=True):
     # updating header keywords
     hdr['DLEVEL'] = 0.95
     hdr['PROCTIME'] = tred
+    
 #    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
 #    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
     #hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
-    hdr.set('L095PTIME', value=tred, comment=('L0.95 pipeline processing time'))
+    hdr.set('L095PTIM', value=tred, comment=('L0.95 pipeline processing time'), after='PGPIXEN')
+    hdr.set('', value='', after='PGPIXEN')
+    hdr.set('', value='          Level 0.95 Pipeline Processing', after='PGPIXEN')
+    hdr.set('', value='', after='PGPIXEN')
     hdr.set('bs_lam', value=bs_lam, comment='lambda value for ASPLS baseline correction')
     hdr.set('bs_lam2', value=bs_lam2, comment='lambda value for arplsw rms baseline correction')
     hdr.set('bs_ratio', value=bs_ratio, comment='ratio value for arplsw rms baseline correction')
     hdr.set('bs_iterm', value=bs_itermax, comment='max. iterations value for arplsw rms baseline correction')
-    hdr.set('', value='', before='L095PTIME')
-    hdr.set('', value='          Level 0.95 Pipeline Processing', before='L095PTIME')
-    hdr.set('', value='', before='L095PTIME')
     hdr.add_comment('L0.95 processing time: %s'%(tred))
     hdr.add_comment('L0.95 version: %s'%(__version__))
     hdr.add_comment('L0.95 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.95 developer: %s'%(__author__))
+    hdr.set('', value='', after='BS_ITERM')
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L09.fits','_L095.fits'))
