@@ -58,6 +58,8 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
 
     Parameters
     ----------
+    cfi : list 
+            list of configuration parameters provided by pipeline framework
     scanRange : int array
 
     Returns
