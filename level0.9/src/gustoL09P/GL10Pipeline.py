@@ -61,6 +61,7 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
     cfi : list 
             list of configuration parameters provided by pipeline framework
     scanRange : int array
+            array with firat and last scan number
 
     Returns
     -------
