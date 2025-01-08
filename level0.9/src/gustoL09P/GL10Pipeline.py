@@ -153,6 +153,7 @@ def processL10(params, verbose=True):
     Parameters
     ----------
     params : list
+            list of parameters used in process
 
     Returns
     -------
