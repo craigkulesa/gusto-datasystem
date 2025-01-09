@@ -174,7 +174,7 @@ class GL09PipelineSetupClass:
 
         config = configparser.ConfigParser(interpolation=EnvInterpolation())
         config.optionxform = str
-        config.BOOLEAN_STATES = {'True': True, 'False': False}
+        config.BOOLEAN_STATES = {'True': True, 'False': False, 'true': True, 'false': False, ' True ': True, ' False ': False}
 
         # read the configuration file
         config.read(self.configFile)
@@ -205,25 +205,25 @@ class GL09PipelineSetupClass:
         gpars = config["GUSTO_Parameters"]
         gpdict = {}
         for key in gpars.keys():
-            if gpars[key]=='False':
+            if gpars[key].strip()=='False':
                 gpdict[key] = False
-            elif gpars[key]=='True':
+            elif gpars[key].strip()=='True':
                 gpdict[key] = True
             else:
                 gpdict[key] = gpars[key]
         gpars = config["CII_Parameters"]
         for key in gpars.keys():
-            if gpars[key]=='False':
+            if gpars[key].strip()=='False':
                 gpdict[key] = False
-            elif gpars[key]=='True':
+            elif gpars[key].strip()=='True':
                 gpdict[key] = True
             else:
                 gpdict[key] = gpars[key]
         gpars = config["NII_Parameters"]
         for key in gpars.keys():
-            if gpars[key]=='False':
+            if gpars[key].strip()=='False':
                 gpdict[key] = False
-            elif gpars[key]=='True':
+            elif gpars[key].strip()=='True':
                 gpdict[key] = True
             else:
                 gpdict[key] = gpars[key]
@@ -232,9 +232,9 @@ class GL09PipelineSetupClass:
         gpars = config["GUSTO_Processing"]
         gcdict = {}
         for key in gpars.keys():
-            if gpars[key]=='False':
+            if gpars[key].strip()=='False':
                 gcdict[key] = False
-            elif gpars[key]=='True':
+            elif gpars[key].strip()=='True':
                 gcdict[key] = True
             else:
                 gcdict[key] = gpars[key]
@@ -247,8 +247,8 @@ class GL09PipelineSetupClass:
 
         if verbose:
             print('loaded configuration file: %s\n' % (self.configFile))
-            print('self.GL09Pconf: ')
-            pprint(self.GL09Pconf)
+            # print('self.GL09Pconf: ')
+            # pprint(self.GL09Pconf)
             print()
 
         # checking if data directories are in place

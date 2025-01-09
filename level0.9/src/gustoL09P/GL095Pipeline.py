@@ -296,6 +296,7 @@ def processL09(params, verbose=True):
     fits.append(ofile, data=data, header=hdr1)
     
     # if in debug mode, add more extensions
+    print(type(debug), type(datavalid))
     if debug & datavalid:
         col51 = Column(basecorrf, name='basecorr', description='baseline correction')
         col52 = Column(rms, name='rms', description='baseline RMS')

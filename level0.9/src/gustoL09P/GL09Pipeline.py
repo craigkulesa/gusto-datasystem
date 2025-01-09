@@ -140,6 +140,7 @@ def runGL09P(verbose=False):
     if verbose:
         print('\n%s: Reading pipeline configuration file ...\n'%(time.strftime("%c")))
     cfi = gL09P.getConfigInfo(verbose=verbose)
+    print('debug: ', cfi['gprocs']['debug'], type(cfi['gprocs']['debug']))
     if verbose:
         print('\nProcessing settings:')
         pprint(cfi)

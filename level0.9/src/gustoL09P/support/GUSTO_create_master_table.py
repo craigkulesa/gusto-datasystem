@@ -22,6 +22,7 @@ plt.rcParams['font.size'] = 16
 opath = '/rdat/Projects/GUSTO/Data'
 inDir = '/rdat/Projects/GUSTO/Data/level0.9'   #cfi['L08DataDir']
 filter = 'ACS*L09.fits'
+mtfile = os.path.join(opath,'master_table_20250109.csv')
 
 scanRange = [19600, 19700]
 
@@ -54,8 +55,8 @@ for i,ds in enumerate(dsc):
 #          ('Ta_min', '<f8'), ('Ta_max', '<f8'), ('quality', '<i8'), ('specFlag', '<i8'), 
 #          ('file_name', '<U256'), ('delivDate', '<i8'), ('procVers', '<U16')]
 
-with open(os.path.join(opath,'master_table_20250109.csv'), 'w', encoding='utf-8') as f:
-    ostr = 'scanID,line,band,sctype,umxs,ra,dec,LINEFREQ,SYNTFREQ,SYNTMULT,VLSR,IF0,ELEVATON,dfile\n'
+with open(mtfile, 'w', encoding='utf-8') as f:
+    ostr = 'scanID,line,band,sctype,umxs,ra,dec,l,b,LINEFREQ,SYNTFREQ,SYNTMULT,VLSR,IF0,ELEVATON,dfile\n'
     f.write(ostr)
     # f.write("Hello, World!\n")
 
@@ -71,8 +72,8 @@ with open(os.path.join(opath,'master_table_20250109.csv'), 'w', encoding='utf-8'
         
             umixers = np.unique(data1['MIXER'])
             umxs = ' '.join(map(str, np.unique(data1['MIXER'])))
-            ra = data1['RA']
-            dec = data1['DEC']
+            ra = data1['RA'][data1['scan_type']=='OTF']
+            dec = data1['DEC'][data1['scan_type']=='OTF']
             cc0 = SkyCoord(np.median(ra)*u.deg, np.median(dec)*u.deg, frame='icrs')
             l0 = cc0.galactic.l.deg
             b0 = cc0.galactic.b.deg
@@ -95,4 +96,5 @@ with open(os.path.join(opath,'master_table_20250109.csv'), 'w', encoding='utf-8'
             f.write(ostr)
             # print(ostr)
 
-print('saved file: ', os.path.join(opath, 'master_table_20241223.csv'))
+print('saved file: ', mtfile)
+
