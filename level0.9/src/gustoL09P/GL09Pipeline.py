@@ -274,9 +274,10 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     print('Number of cores used for processing: %i\n'%(n_procs))
     
     # get lines for processing
-    lines = cfi['gprocs']['lines'].replace('[','').replace(']','').replace(' ','').split(',')
-    print('Lines: ', lines[0])
-    lines= ['CII', 'NII']
+    #print(cfi['gprocs']['lines'])
+    lines = cfi['gprocs']['lines'].replace('[','').replace(']','').split(' ')
+    # print('Lines: ', lines[0])
+    # lines= ['CII', 'NII']
     
     ignore = [8194, 8338, 9182, 9306, 9314, 9342, 10246, 10250, 10254, 10446, 10606, 
               10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24531, 24803, 24881, 26294, 26296]
@@ -284,7 +285,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     
     for line in lines:
         if verbose:
-            print('Processing line: ', line)
+            print('\nProcessing line: ', line)
         # identify the files for processing
         inDir = cfi['gdirs']['L08DataDir']
         outDir = cfi['gdirs']['L09DataDir']

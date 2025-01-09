@@ -81,16 +81,16 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
     print('Number of cores used for processing: %i\n'%(n_procs))
     
     # get lines for processing
-    lines = cfi['gprocs']['lines'].replace('[','').replace(']','').replace(' ','').split(',')
-    print('Lines: ', lines[0])
-    lines= ['CII', 'NII']
+    lines = cfi['gprocs']['lines'].replace('[','').replace(']','').split(' ')
+    # print('Lines: ', lines[0])
+    # lines= ['CII', 'NII']
     
     ignore = [0]
     
     
     for line in lines:
         if verbose:
-            print(line)
+            print('\nProcessing line: ', line)
         # identify the files for processing
         inDir = cfi['gdirs']['L09DataDir']
         outDir = cfi['gdirs']['L095DataDir']
