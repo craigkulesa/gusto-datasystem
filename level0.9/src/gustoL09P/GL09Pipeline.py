@@ -28,7 +28,7 @@ import astropy.wcs
 import zipfile
 from matplotlib.patches import Rectangle
 from pathlib import Path
-from pprint import pprint
+from pprint import pprint, pformat
 from datetime import datetime
 from astropy.table import QTable, Table, Column
 from astropy import units as u
@@ -110,9 +110,9 @@ def runGL09P(verbose=False):
     parser.add_argument('--loglevel', '-l', type=str,
                         #default='INFO',
                         help='sets the log level of the {tpipe}')
-    parser.add_argument('--verbose', '-v', action='store_true',
+    parser.add_argument('--verbose', '-v', action=argparse.BooleanOptionalAction,
                         help='sets verbosity of the {tpipe}')
-    parser.add_argument('--debug', '-d',
+    parser.add_argument('--debug', '-d', action=argparse.BooleanOptionalAction,
                         help='sets settings for debugging pipeline')
     args = parser.parse_args()
     if verbose:
@@ -123,8 +123,6 @@ def runGL09P(verbose=False):
     # this overrides the verbosity from above in case it is enabled
     if args.verbose is not None:
         verbose = args.verbose
-        
-    # inspect any provided arguments
 
     # initialize the pipeline
     # this also sets all the directories
@@ -140,11 +138,16 @@ def runGL09P(verbose=False):
     if verbose:
         print('\n%s: Reading pipeline configuration file ...\n'%(time.strftime("%c")))
     cfi = gL09P.getConfigInfo(verbose=verbose)
-    print('debug: ', cfi['gprocs']['debug'], type(cfi['gprocs']['debug']))
     if verbose:
         print('\nProcessing settings:')
-        pprint(cfi)
-        
+    pprint(cfi)
+    print()
+    print('debug: ', cfi['gprocs']['debug'], type(cfi['gprocs']['debug']))
+
+    if args.debug is not None:
+        print('args.debug: ', args.debug, type(args.debug))
+        cfi['gprocs']['debug'] = args.debug
+    
     
     # initialize logging:
     logDir = cfi['gdirs']['logDir']
@@ -168,12 +171,7 @@ def runGL09P(verbose=False):
     logger.info('Started logging.')
     logger.info('Pipeline configuration file: %s'%(args.configFile))
     logger.info('Pipeline configuration:')
-    logger.info(cfi)
-
-    #print('debug1: ', args.debug, cfi['gprocs']['debug'])
-    if args.debug is not None:
-        cfi['gprocs']['debug'] = args.debug
-    #print('debug2: ', args.debug, cfi['gprocs']['debug'])
+    logger.info(pformat(cfi))
         
 
     #########################################################

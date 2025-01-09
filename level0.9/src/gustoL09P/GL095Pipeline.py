@@ -120,10 +120,9 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
             
-        print('debug 095: ', debug)
         paramlist = [[a, b, c, e, f, g, d] for a in [line] for b in [inDir] for c in [outDir] for e in [int(cfi['gprocs']['drmethod'])] for f in [debug] for g in [cfi['gprocs']['loglevel']] for d in dfiles]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
-        pprint(paramlist)
+        # pprint(paramlist)
         if verbose:
             print('Number of data files: ', n_ds, len(sdirs))
             #print('Selected data files: ', dfiles)
@@ -162,7 +161,7 @@ def processL09(params, verbose=True):
     #print('loglevel: ', loglevel)
     logger.setLevel(loglevel)
     if debug:
-        logger.info('in debug mode')
+        logger.info('processing in debug mode')
     #print('debug proc 0.95: ', debug)
     
     # define some processing data first (maybe relocat to function later?)
@@ -296,7 +295,6 @@ def processL09(params, verbose=True):
     fits.append(ofile, data=data, header=hdr1)
     
     # if in debug mode, add more extensions
-    print(type(debug), type(datavalid))
     if debug & datavalid:
         col51 = Column(basecorrf, name='basecorr', description='baseline correction')
         col52 = Column(rms, name='rms', description='baseline RMS')
