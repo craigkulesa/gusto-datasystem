@@ -50,6 +50,9 @@ import matplotlib.pyplot as plt
 # primary header zero           primary header is preserved from level 0.8
 #   -- deltas primarily impact how velocity scale information is computed
 
+# 1/10/2025
+# Found errors in Level 1 CLASS format files
+# This script now only uses non-CLASS format fits files
 
 ################################################################################
 def doStuff(self, args):
