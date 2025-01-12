@@ -25,7 +25,6 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import Galactic
 
-from pybaselines import Baseline
 import matplotlib.pyplot as plt
 
 # 10/29/2024 Makes L2 maps
@@ -45,12 +44,15 @@ import matplotlib.pyplot as plt
 # TODO: Use as-is with the 4 Dec level09 commit CLASS format, or accept new 0.9/0.95 FITS format
 # 4 Dec FITS format             new format
 # =================             ==========
-# single file per scanID        singlle file per scanID
+# single file per scanID        single file per scanID
 # single mixer per file         all mixers from band in a single file (2-4)
 # s-r/r with hots only          s-r/r with optional at 0.95 of baseline corr
 # primary header zero           primary header is preserved from level 0.8
 #   -- deltas primarily impact how velocity scale information is computed
 
+# 1/10/2025
+# Found errors in Level 1 CLASS format files
+# This script now only uses non-CLASS format fits files
 
 ################################################################################
 def doStuff(self, args):
@@ -66,94 +68,101 @@ def doStuff(self, args):
    ##
    ## Get Header Data
    ## 
-   header = hdu[1].header
+   header = hdu[0].header
    data   = hdu[1].data
-   spec   = data['DATA']
-   ROW_FLAG  = data['ROW_FLAG']
 
    # compute velocity
-   npix    = len(spec[0]) # 'NPIX' doesn't exist in 0.9 header
+   npix    = header['NPIX']
    IF_pix  = header['CRPIX1']
    IF_val  = header['CRVAL1']
-   IF_del  = 4.887586
+   IF_del  = header['CDELT1']
    IF_freq = (np.arange(npix)-IF_pix)*IF_del+IF_val
-   VLSR    = header['VELO-LSR'] # 'VLSR' doesn't exist in 0.9 header
+   VLSR    = header['VLSR'] # 'VLSR' doesn't exist in 0.9 header
 
    IF_vlsr0= header['IF0']
    line_freq = header['LINEFREQ']
    vlsr    = (IF_vlsr0 - IF_freq)/line_freq*constants.c.value/1.e3 + VLSR # Vlsr in km/s
 
-   # Onyl use some rows
-   #mixer  = data['mixer']
-   #row_mask = np.logical_and(mixer == 5, ROW_FLAG & mask == 0)
+   # Make a mask to only use some rows
+   # Band 2 mixers 2,5 or 8, only use OTF rows
+   mixer     = data['mixer']
+   scan_type = data['scan_type']
+   row_mask  = np.logical_and(mixer == args.ch, scan_type == 'OTF')
 
-   n_OTF  = len(data)
-   x = np.arange(1024)
-
-
-   # Reference Coordinate System
-   crval2 = header['CRVAL2']   # reference RA pixel
-   crval3 = header['CRVAL3']   # reference DEC pixel
+   # Pul spectra and ROW_FLAGS for these masked rows
+   spec      = data['spec'][row_mask]
+   ROW_FLAG  = data['ROW_FLAG'][row_mask]
+   CH_FLAG   = data['CHANNEL_FLAG'][row_mask]
+   n_OTF = np.sum(row_mask == 1)
 
    # Delta Coordinate
-   cdelt2 = hdu[1].data['CDELT2']   # array of RA offsets
-   cdelt3 = hdu[1].data['CDELT3']   # array of DEC offsets
-
+   ra  = data['RA'][row_mask]   # array of RA
+   dec = data['DEC'][row_mask]  # array of DEC
 
    # Instantiate for ra,dec->l,b transform
-   c_ra_dec = SkyCoord(ra=(crval2+cdelt2)*u.degree, dec=(crval3+cdelt3)*u.degree, frame='icrs')
+   c_ra_dec = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
 
-   # Setup baseline fitting and integrated intensity
-   # baseline from -80 km/s to +16 km/s
+   # Setup spectra plotting and integrated intensity ranges
+   # plot spectra from -80 km/s to +16 km/s
    xlow   = np.argmin(np.abs(vlsr - 16))
    xhigh  = np.argmin(np.abs(vlsr - -80))
    # integrated intensity from -15.5 km/s to +4.5 km/s
    iilow  = np.argmin(np.abs(vlsr - 4.5)) - xlow
    iihigh = np.argmin(np.abs(vlsr - -15.5)) - xlow
 
-   base = np.zeros([n_OTF,xhigh-xlow])
-   baseline_fitter = Baseline(x_data=x[xlow:xhigh])
-   y_flat = np.zeros(xhigh-xlow)
-
    # empty arrays to fill
    ii=np.array([])
    l=np.array([])
    b=np.array([])
+   y_flat = np.zeros(xhigh-xlow)
 
    if args.plot:
+       font = {'family': 'serif',
+        'color':  'darkred',
+        'weight': 'normal',
+        'size':   16,
+        }
        plt.clf()
+
    # Main routine run on every Level 1 fits file
    for i in range(n_OTF):
        mask = (1<<26)|(1<<27)   # Mask off ringing rows
        if ((int(ROW_FLAG[i]) & mask) == 0):
           c_l_b = c_ra_dec[i].transform_to(Galactic)    # transform to l,b
 
-          # Baseline fitting
-          spec_to_draw = spec[i,xlow:xhigh] - np.median(spec[i,xlow:xhigh])
-          spec_new = spec_to_draw - base[i,0:(xhigh-xlow)]
-          base2 = baseline_fitter.aspls(spec_new, 1e5)
-          y_flat = spec_new - base2[0]
+          # Do a quick DC offset
+          short_chflag = CH_FLAG[i, xlow:xhigh]
+          filtered_values = spec[i,xlow:xhigh][short_chflag==0]
+          average = np.mean(filtered_values)
+          y_flat = spec[i, xlow:xhigh]-average
 
           # Fill integrated intensity and l,b
           ii = np.append(ii, sum(y_flat[iilow:iihigh]))
-          l  = np.append(l, c_l_b.l.value[0])
-          b  = np.append(b, c_l_b.b.value[0])
+          l  = np.append(l, c_l_b.l.value)
+          b  = np.append(b, c_l_b.b.value)
           if args.plot:
-              plt.plot(vlsr[xlow:xhigh],y_flat)
+              masked_x = np.ma.masked_where(short_chflag==1, vlsr[xlow:xhigh])
+              masked_y = np.ma.masked_where(short_chflag==1, y_flat)
+              plt.plot(masked_x, masked_y)
+
        else:
           pass
 
    if args.plot:
+       plt.text(-70, 70, f'{file[-15:-10]}')
+       plt.text(-55, 70, '{:.3f}'.format(ii.mean()))
+       plt.xlim(-80, 20)
        plt.ylim(-10, 80)
        plt.vlines(4.5, -5, 40)
        plt.vlines(-15.5, -5, 40)
-
-       plt.savefig(f'NGC6334-{self[-16:-11]}.png') 
+       plt.xlabel('VLSR (km/s)', fontdict=font)
+       plt.ylabel('$T_a^\star$', fontdict=font)
+       plt.savefig('NGC6334-{:s}-{:d}.png'.format(self[-15:-10], args.ch)) 
 
    #plt.show(block=False)
    #plt.pause(1)
 
-   print(l.mean())
+   print("{:.3f} {:.1f}".format(l.mean(), ii.mean()))
 
    # Return the (l,b) position and integrated intensity
    data = (l, b, ii)
@@ -215,11 +224,12 @@ config = configparser.ConfigParser()
 parser = argparse.ArgumentParser()
 parser.add_argument("--files", help="\tFile containing scans", default="scans.txt")
 parser.add_argument("--plot", help="\tMake pngs", action=argparse.BooleanOptionalAction, default=False)
+parser.add_argument("--ch", type=int, help="\tMixer Number <2,5,8>pngs", default=5)
 args = parser.parse_args()
 
 # Read config file for Data Paths
 config.read('../../common/config.ini')
-path = config.get('Paths', 'L09_path')
+path = config.get('Paths', 'L095_path')
 
 search_files = get_filenames(path, args.files)
 
