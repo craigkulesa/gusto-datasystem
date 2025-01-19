@@ -567,9 +567,13 @@ def processL08(paramlist):
                 # use the same method as method=2, but now smooth the tsys spectra and the 
                 # reference spectra to reduce the noise in the final spectrum
                 
-                # smoothing
+                # smoothing options
+                # import glidertools.cleaning as gc
                 # filtered = gc.savitzky_golay(data, window_length=5, polyorder=2)
-                
+                # or
+                # from scipy.signal import savgol_filter
+                # filtered = savgol_filter(np.where(np.isnan(data), 0, data), window_length=5, polyorder=2)
+                # filtered[mask] = np.nan
                 
                 
             
