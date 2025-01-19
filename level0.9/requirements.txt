@@ -16,4 +16,5 @@ time
 tqdm
 pandas
 dataclasses
+glidertools
 
