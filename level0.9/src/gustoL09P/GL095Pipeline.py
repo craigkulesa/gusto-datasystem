@@ -205,6 +205,8 @@ def processL09(params, verbose=True):
         return 0
 
     spec_OTF = np.squeeze(spec[osel,:])
+    if osel.size==1:
+        spec_OTF = spec_OTF[np.newaxis, :]
     n_OTF, n_otfpix = spec_OTF.shape 
     
     basecorr = np.zeros(spec_OTF.shape)
