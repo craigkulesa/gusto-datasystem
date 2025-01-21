@@ -507,6 +507,11 @@ def processL08(paramlist):
         hcorr = np.zeros([n_OTF, n_opix])
         spref = np.zeros([n_OTF, n_opix])
         spref2 = np.zeros([n_OTF, n_opix])
+        if method==3:
+            tsyseff_sm = np.zeros([n_OTF, n_opix])
+            hcorr_sm = np.zeros([n_OTF, n_opix])
+            spref_sm = np.zeros([n_OTF, n_opix])
+            spref2_sm = np.zeros([n_OTF, n_opix])
 
         # this call returns the results for all spectra, but we need only everything for the OTF spectra
         # ahgroup is the assignment of hots to all spectra
@@ -562,11 +567,27 @@ def processL08(paramlist):
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
-                #print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), ta2[i0,200:400].min(), ta2[i0,200:400].max()))
+                #print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), 
+                #      ta2[i0,200:400].min(), ta2[i0,200:400].max()))
             elif drmethod==3:
-                # use the same method as method=2, but now smooth the tsys spectra and the 
-                # reference spectra to reduce the noise in the final spectrum
+                # method 2: using HOTS to mitigate drifts
+                # apply the REFHOTS to the refs
+                # ToDo: check if the inttime of refs/hots/otfs matters
+                # calculate the fraction of hot used for the spectrum
+                ht1 = ghtim[hgroup[i0]]
+                if hgroup[i0]+1 <= hgroup.max():
+                    ht2 = ghtim[hgroup[i0]+1]
+                else:
+                    ht2 = ghtim[hgroup[i0]]
+                # ht2 = ghtim[hgroup[i0]+1]
+                hfrac = (stime[i0]-ht1)/(ht2-ht1)
+                # determine the hots for the individual OTF spectra
+                if hgroup[i0]+1 <= hgroup.max():
+                    hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
+                else:
+                    hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0],:]
                 
+                tsyseff_sm[i0,:] = savgol_filter(np.where(np.isnan(tsyseff[i0,:]), 0, tsyseff[i0,:]), window_length=5, polyorder=2) 
                 # smoothing options
                 # import glidertools.cleaning as gc
                 # filtered = gc.savitzky_golay(data, window_length=5, polyorder=2)
@@ -575,7 +596,17 @@ def processL08(paramlist):
                 # filtered = savgol_filter(np.where(np.isnan(data), 0, data), window_length=5, polyorder=2)
                 # filtered[mask] = np.nan
                 
+                # also include scaling the ref to the on to first order with a single scaling factor (averaged over 
+                # the important spectrum range at least from -200 to 200 km/s) to minimize offsets
+                # determine the hots-reduced REF spectra
+                spref[i0,:] = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
+                spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
+                spref_sm[i0,:] = savgol_filter(np.where(np.isnan(spref[i0,:]), 0, spref[i0,:]), window_length=5, polyorder=2)
+                spref2_sm[i0,:] = savgol_filter(np.where(np.isnan(spref2[i0,:]), 0, spref2[i0,:]), window_length=5, polyorder=2)
                 
+                # put everything together. issue: divide by zero -> catch in masks
+                ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:]/hcorr_sm[i0,:] - spref_sm[i0,:])/spref[i0,:]
+                ta2[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:])/spref2_sm[i0,:]
             
             # if type(ta)==type(np.ndarray(0)):
             #     ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
@@ -660,11 +691,18 @@ def processL08(paramlist):
         col2 = Column(ahcorr, name='hcorr', description='effective hot spectrum')
         col3 = Column(aspref, name='spref', description='effective hot for ref spectrum')
         col4 = Column(aspref2, name='spref2', description='ref spectrum')
+        if method==3:
+            col9 = Column(ahcorrsm, name='hcorr_sm', description='effective smoothed hot spectrum')
+            col10 = Column(asprefsm, name='spref_sm', description='effective smoothed hot for ref spectrum')
+            col11 = Column(aspref2sm, name='spref2_sm', description='smoothed ref spectrum')
         col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
         col6 = Column(spec, name='spec', description='original spectra')
         col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
         col8 = Column(var, name='ringvar', description='value to determine if ringing in spectrum')
-        fT = Table([col1, col2, col3, col4, col5, col6, col7, col8])
+        if method==3:
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11])
+        else:
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8])
         fits.append(ofile, data=fT.as_array())
 
         col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')
