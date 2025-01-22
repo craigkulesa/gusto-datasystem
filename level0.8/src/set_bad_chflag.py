@@ -68,6 +68,8 @@ def doStuff(scan, args):
             CHANNEL_FLAG[i][133:136] |= 1<<7    # Iridium 1314 MHz *Variable Bit 7 VARIABLE SPUR
             CHANNEL_FLAG[i][147:152] |= 1<<7    # Iridium 1458 MHz *Variable Bit 7 VARIABLE SPUR
             CHANNEL_FLAG[i][165:168] |= 1<<4    # Iridium 1 1616-1625 MHz Bit 4 SPUR
+            CHANNEL_FLAG[i][0:31]    |= 1<<8    # Out of band 0-300MHz (lower)
+            CHANNEL_FLAG[i][410:511] |= 1<<8    # Out of band 4000-5000MHz (upper)
 
         hdu[0].header.add_history('known bad NII channels flagged')
 
@@ -79,6 +81,8 @@ def doStuff(scan, args):
             CHANNEL_FLAG[i][266:272] |= 1<<7    # Iridium 1314 MHz *Variable Bit 7 VARIABLE SPUR
             CHANNEL_FLAG[i][294:303] |= 1<<7    # Iridium 1458 MHz *Variable Bit 7 VARIABLE SPUR
             CHANNEL_FLAG[i][331:335] |= 1<<4    # Iridium 1 1616-1625 MHz Bit 4 SPUR
+            CHANNEL_FLAG[i][0:62]    |= 1<<8    # Out of band 0-300MHz (lower)
+            CHANNEL_FLAG[i][820:1023]|= 1<<8    # Out of band 4000-5000MHz (upper)
 
         hdu[0].header.add_history('known bad CII channels flagged')
 
