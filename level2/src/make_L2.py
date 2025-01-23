@@ -55,7 +55,14 @@ import matplotlib.pyplot as plt
 # This script now only uses non-CLASS format fits files
 
 ################################################################################
+
+
 def doStuff(self, args):
+
+   global max_ii
+   global max_scanid
+   global num_spec
+
    my_file = Path(self)
    try:
        my_file.resolve(strict=True)
@@ -128,6 +135,7 @@ def doStuff(self, args):
    for i in range(n_OTF):
        mask = (1<<26)|(1<<27)   # Mask off ringing rows
        if ((int(ROW_FLAG[i]) & mask) == 0):
+          num_spec = num_spec+1
           c_l_b = c_ra_dec[i].transform_to(Galactic)    # transform to l,b
 
           # Do a quick DC offset
@@ -138,6 +146,9 @@ def doStuff(self, args):
 
           # Fill integrated intensity and l,b
           ii = np.append(ii, sum(y_flat[iilow:iihigh]))
+          if(ii[len(ii)-1]>max_ii):
+             max_scanid = file[-15:-10]
+             max_ii = ii[len(ii)-1]
           l  = np.append(l, c_l_b.l.value)
           b  = np.append(b, c_l_b.b.value)
           if args.plot:
@@ -149,10 +160,10 @@ def doStuff(self, args):
           pass
 
    if args.plot:
-       plt.text(-70, 70, f'{file[-15:-10]}')
-       plt.text(-55, 70, '{:.3f}'.format(ii.mean()))
+       plt.text(-70, 35, f'{file[-15:-10]}')
+       plt.text(-55, 35, '{:.3f}'.format(ii.mean()))
        plt.xlim(-80, 20)
-       plt.ylim(-10, 80)
+       plt.ylim(-10, 40)
        plt.vlines(4.5, -5, 40)
        plt.vlines(-15.5, -5, 40)
        plt.xlabel('VLSR (km/s)', fontdict=font)
@@ -162,7 +173,7 @@ def doStuff(self, args):
    #plt.show(block=False)
    #plt.pause(1)
 
-   print("{:.3f} {:.1f}".format(l.mean(), ii.mean()))
+   print("{:.3f} {:d}".format(l.mean(), num_spec))
 
    # Return the (l,b) position and integrated intensity
    data = (l, b, ii)
@@ -215,6 +226,13 @@ def get_filenames(directory, scan_file):
 
 ################################################################################
 
+# GLOBALS
+global max_ii
+max_ii = 0
+global max_scanid
+max_scanid = 0
+global num_spec
+num_spec = 0
 
 
 # ConfigParser Object
@@ -297,5 +315,6 @@ image = regrid(glon, glat, Ta, beam)
 hdu = fits.PrimaryHDU(data=image, header=hdr)
 hdu.writeto('my_data_image.fits', overwrite=True)
 
-
+print("script complete\n", "maximum II was at scanID=",max_scanid)
+print("total spectra in map =", num_spec)
 
