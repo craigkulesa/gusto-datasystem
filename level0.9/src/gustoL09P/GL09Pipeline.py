@@ -26,7 +26,7 @@ import itertools
 import multiprocessing
 import astropy.wcs
 import zipfile
-import glidertools.cleaning as gc
+#import glidertools.cleaning as gc
 from matplotlib.patches import Rectangle
 from pathlib import Path
 from pprint import pprint, pformat
@@ -38,6 +38,7 @@ from astropy.time import Time
 from astropy.io import fits
 from multiprocessing.pool import Pool
 from itertools import repeat
+from scipy.signal import savgol_filter
 
 from .GL09PipelineSetupClass import GL09PipelineSetupClass
 #from .GL09PConfigClass import GL09PConfigClass, getValues, getRange
@@ -111,6 +112,9 @@ def runGL09P(verbose=False):
     parser.add_argument('--loglevel', '-l', type=str,
                         #default='INFO',
                         help='sets the log level of the {tpipe}')
+    parser.add_argument('--calmethod', '-m', nargs='?', type=int,
+                        #default='2',
+                        help='select GUSTO spectrum calibration method')
     parser.add_argument('--verbose', '-v', action=argparse.BooleanOptionalAction,
                         help='sets verbosity of the {tpipe}')
     parser.add_argument('--debug', '-d', action=argparse.BooleanOptionalAction,
@@ -148,6 +152,13 @@ def runGL09P(verbose=False):
     if args.debug is not None:
         print('args.debug: ', args.debug, type(args.debug))
         cfi['gprocs']['debug'] = args.debug
+    
+    if args.calmethod is not None:
+        print('args.calmethod: ', args.calmethod, type(args.calmethod), cfi['gprocs']['drmethod'], type(cfi['gprocs']['drmethod']))
+        cfi['gprocs']['drmethod'] = args.calmethod
+    else:
+        cfi['gprocs']['drmethod'] = int(cfi['gprocs']['drmethod'])
+        print('calmethod: ', cfi['gprocs']['drmethod'], type(cfi['gprocs']['drmethod']))
     
     
     # initialize logging:
@@ -267,7 +278,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         # logger = multiprocessing.log_to_stderr()
         # logger.setLevel(multiprocessing.SUBDEBUG)
         logger = logging.getLogger()
-        logger.setLevel()
+        logger.setLevel(cfi['gprocs']['loglevel'])
         n_procs = 1
     else:
         n_procs = multiprocessing.cpu_count() - 2
@@ -425,6 +436,11 @@ def processL08(paramlist):
     afrac = np.zeros([n_spec,2])
     aTa = np.zeros([n_spec,n_pix])
     aTa2 = np.zeros([n_spec,n_pix])
+    if drmethod==3:
+        aTsyseff_sm = np.zeros([n_spec,n_pix])
+        ahcorr_sm = np.zeros([n_spec,n_pix])
+        aspref_sm = np.zeros([n_spec,n_pix])
+        aspref2_sm = np.zeros([n_spec,n_pix])
     aghots = []   # hots
     aghtim = []   # unixtime of hots
     aghtint = []  # integration time of hots
@@ -453,7 +469,7 @@ def processL08(paramlist):
             datavalid = False
             return 0
         
-        tsys, refs, rhots, rtime, htime, Thot, Tsky = getCalSpectra(mix, spec, data, hdr, verbose=True)
+        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs = getCalSpectra(mix, spec, data, hdr, verbose=True)
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
             print('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
@@ -489,7 +505,7 @@ def processL08(paramlist):
             # logger.warning('No OTF spectra available.')
             datavalid = False
             break
-    
+
         spec_OTF = np.squeeze(spec[osel,:])
         stime = data['UNIXTIME'][osel]
         btime = (rtime[0] + htime[0]) / 2. # before OTFs
@@ -507,7 +523,7 @@ def processL08(paramlist):
         hcorr = np.zeros([n_OTF, n_opix])
         spref = np.zeros([n_OTF, n_opix])
         spref2 = np.zeros([n_OTF, n_opix])
-        if method==3:
+        if drmethod==3:
             tsyseff_sm = np.zeros([n_OTF, n_opix])
             hcorr_sm = np.zeros([n_OTF, n_opix])
             spref_sm = np.zeros([n_OTF, n_opix])
@@ -586,6 +602,7 @@ def processL08(paramlist):
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
                 else:
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0],:]
+                hcorr_sm[i0,:] = savgol_filter(np.where(np.isnan(hcorr[i0,:]), 0, hcorr[i0,:]), window_length=5, polyorder=2) 
                 
                 tsyseff_sm[i0,:] = savgol_filter(np.where(np.isnan(tsyseff[i0,:]), 0, tsyseff[i0,:]), window_length=5, polyorder=2) 
                 # smoothing options
@@ -630,6 +647,11 @@ def processL08(paramlist):
         aTa[osel,:] = ta
         aspref2[osel,:] = spref2
         aTa2[osel,:] = ta2
+        if drmethod==3:
+            ahcorr_sm[osel,:] = hcorr_sm
+            aTsyseff_sm[osel,:] = tsyseff_sm
+            aspref_sm[osel,:] = spref_sm
+            aspref2_sm[osel,:] = spref2_sm
     
         keys = data.dtype.names
         if 'spec' in keys:
@@ -647,12 +669,12 @@ def processL08(paramlist):
         if np.any(np.isfinite(spec[i,args])):
             var[i] = (np.nanmax(spec[i,args] - np.nanmin(spec[i,args]))) / np.nanmean(spec[i,args])
             if (np.abs(var[i]) >= vcut)&(data['scan_type'][i]=='OTF'):
-                data['ROW_FLAG'][i] = (1 << 26) # set bit 26
+                data['ROW_FLAG'][i] = (1 << 14) # set bit 26
         else:
             var[i] = 9999
             data['ROW_FLAG'][i] = (1 << 13)   # set bit 13
         if debug:
-            print('%4i  %7.3f  %2i  %6s  %i  %i'%(i, var[i], data1['MIXER'][i], data1['scan_type'][i], data1['row_flag'][i], data['ROW_FLAG'][i]))
+            print('%4i  %7.3f  %2i  %6s  %i  %i'%(i, var[i], data['MIXER'][i], data['scan_type'][i], data['row_flag'][i], data['ROW_FLAG'][i]))
 
     tred = Time(datetime.datetime.now()).fits
     
@@ -666,6 +688,8 @@ def processL08(paramlist):
     hdr.set('L09PTIME', value=tred, comment=('L0.9 pipeline processing time'))
     hdr.set('pgpixst', value=pixel_st, comment='pixel index where good pixels start')
     hdr.set('pgpixen', value=pixel_en, comment='pixel index of upper good pixel range')
+    hdr.set('rhID1', value=rhIDs[0], comment='scan ID for refhot/hot before OTF')
+    hdr.set('rhID2', value=rhIDs[1], comment='scan ID for refhot/hot after OTF')
     hdr.set('', value='', after='VLSR')
     hdr.set('', value='          Level 0.9 Pipeline Processing', after='VLSR')
     hdr.set('', value='', after='VLSR')
@@ -691,16 +715,17 @@ def processL08(paramlist):
         col2 = Column(ahcorr, name='hcorr', description='effective hot spectrum')
         col3 = Column(aspref, name='spref', description='effective hot for ref spectrum')
         col4 = Column(aspref2, name='spref2', description='ref spectrum')
-        if method==3:
-            col9 = Column(ahcorrsm, name='hcorr_sm', description='effective smoothed hot spectrum')
-            col10 = Column(asprefsm, name='spref_sm', description='effective smoothed hot for ref spectrum')
-            col11 = Column(aspref2sm, name='spref2_sm', description='smoothed ref spectrum')
+        if drmethod==3:
+            col9 = Column(ahcorr_sm, name='hcorr_sm', description='effective smoothed hot spectrum')
+            col10 = Column(aspref_sm, name='spref_sm', description='effective smoothed hot for ref spectrum')
+            col11 = Column(aspref2_sm, name='spref2_sm', description='smoothed ref spectrum')
+            col12 = Column(aTsyseff_sm, name='Tsyseff_sm', description='smoothed effective Tsys per OTF spectrum')
         col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
         col6 = Column(spec, name='spec', description='original spectra')
         col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
         col8 = Column(var, name='ringvar', description='value to determine if ringing in spectrum')
-        if method==3:
-            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11])
+        if drmethod==3:
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12])
         else:
             fT = Table([col1, col2, col3, col4, col5, col6, col7, col8])
         fits.append(ofile, data=fT.as_array())

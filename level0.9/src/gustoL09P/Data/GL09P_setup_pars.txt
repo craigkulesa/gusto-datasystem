@@ -43,8 +43,8 @@ args2 = [300, 400]
 # select lines for processing
 # lines = ['CII']
 lines = CII NII
-debug = False
-loglevel = 
+debug = True
+loglevel = INFO
 
 # clean up the L1.0 data and save only good OTF spectra
 l10OTFonly = True

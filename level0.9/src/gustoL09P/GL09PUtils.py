@@ -294,7 +294,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     Tsyss = np.ma.array(Tsyss)
     REFs = np.ma.array(REFs)
     RHOTs = np.ma.array(RHOTs)
-    return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky
+    return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky, rhIDs
 
 
 def getHotInfo(spec, data, mixer, dfile='', verbose=False):
