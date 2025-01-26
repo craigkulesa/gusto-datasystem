@@ -673,8 +673,8 @@ def processL08(paramlist):
         else:
             var[i] = 9999
             data['ROW_FLAG'][i] = (1 << 13)   # set bit 13
-        if debug:
-            print('%4i  %7.3f  %2i  %6s  %i  %i'%(i, var[i], data['MIXER'][i], data['scan_type'][i], data['row_flag'][i], data['ROW_FLAG'][i]))
+        # if debug:
+        #     print('%4i  %7.3f  %2i  %6s  %i  %i'%(i, var[i], data['MIXER'][i], data['scan_type'][i], data['row_flag'][i], data['ROW_FLAG'][i]))
 
     tred = Time(datetime.datetime.now()).fits
     
