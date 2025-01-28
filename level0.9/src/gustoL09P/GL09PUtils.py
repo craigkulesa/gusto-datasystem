@@ -241,7 +241,6 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     stime = data['UNIXTIME']
 
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, verbose=verbose)
-    #if verbose:
     if (len(otfID)<1) | (len(rfsID)<1) | (len(rhsID)<1) | (len(hotID)<1):
         print('Not enough scans types for processing (otf/refs/refhots/hots): ', otfID, rfsID, rhsID, hotID)
         return -999, 0, 0, 0, 0, 0, 0, [0,0]
@@ -268,9 +267,13 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     for rhID in rhIDs:
         # determine yfactor
         rsel = (rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (row_flag==0)
-        hsel = (rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag==0)
+        hsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag==0))
+        # if we have 3 (or more, more than3 is less likely) take only the last 2 since the first one is causing offsets!
+        if hsel.size>2:
+            data['ROW_FLAG'][hsel[0]] = 2<<15
+            hsel = hsel[1:]
         #print(rselbef)
-    
+        
         spec_h =  spec[hsel,:].sum(axis=0)/len(spec[hsel,:])
         spec_r =  spec[rsel,:].sum(axis=0)/len(spec[rsel,:])
         htime = stime[hsel].mean()
@@ -282,7 +285,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
         # estimate Tsys for each Device
         y_factor  = spec_h/spec_r
 
-        tsys = (THOT_avg - Tsky*y_factor[:])/(y_factor[:] - 1.)
+        tsys = np.squeeze((THOT_avg - Tsky*y_factor[:])/(y_factor[:] - 1.))
 
         Thot.append(THOT_avg)
         Tsyss.append(tsys)

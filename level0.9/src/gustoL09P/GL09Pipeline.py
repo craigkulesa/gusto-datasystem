@@ -637,7 +637,6 @@ def processL08(paramlist):
         # primarily passing through the header and the data table
         # and only few variables and the header keys are updated or added
         
-        
         tsyseff_avg[k] = np.nanmean(tsys[:,200:400])
         aTsyseff[osel,:] = tsyseff
         ahcorr[osel,:] = hcorr
