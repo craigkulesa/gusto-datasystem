@@ -43,8 +43,10 @@ args2 = [300, 400]
 # select lines for processing
 # lines = ['CII']
 lines = CII NII
-debug = False
+debug = True
 loglevel = INFO
+# addpixelflag: True: more agressive pixel flagging; False: nothing more
+addpixelflag = True
 
 # clean up the L1.0 data and save only good OTF spectra
 l10OTFonly = True
@@ -60,6 +62,7 @@ GParameterFile = ~/git/gusto-datasystem/level0.9/src/gustoL09/Data/GUSTO_Baselin
 
 
 [CII_Parameters]
+# ACS3 or Band 2
 # line rest frequency
 cii_freq = 1900.5369
 cii_freq_err = 0.0013
@@ -71,6 +74,7 @@ cii_pix = 1024
 
 
 [NII_Parameters]
+# ACS5 or Band 1
 # line rest frequency
 nii_freq = 1461.13141
 nii_freq_err = 0.142

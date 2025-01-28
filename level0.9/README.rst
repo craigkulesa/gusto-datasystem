@@ -33,6 +33,10 @@ For limiting the number of files processed, use (change the scan numbers appropr
 
 - execGL09P -r 9000 9600
 
+All command line switches can be checked with:
+
+- execGL09P -h 
+
 The program uses a parameter setup file including information about where it can find
 the data files and where to put them. The assumed data tree is like:
 

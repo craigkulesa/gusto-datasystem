@@ -34,13 +34,13 @@ import astropy.units as u
 from gustoL09P.GL09PParameters import GL09PParameters
 import numpy as np
 import numpy.ma as ma
-import parsl
-from parsl.app.app import python_app, bash_app
-from parsl.channels import LocalChannel
-from parsl.config import Config
-from parsl.configs.local_threads import config
-from parsl.executors import HighThroughputExecutor
-from parsl.providers import LocalProvider
+# import parsl
+# from parsl.app.app import python_app, bash_app
+# from parsl.channels import LocalChannel
+# from parsl.config import Config
+# from parsl.configs.local_threads import config
+# from parsl.executors import HighThroughputExecutor
+# from parsl.providers import LocalProvider
 
 import logging
 log = logging.getLogger(__name__)

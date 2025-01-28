@@ -13,15 +13,17 @@ import os
 import sys
 from os.path import expanduser, expandvars
 from datetime import datetime
-import pkg_resources
+# import pkg_resources
+import importlib
 from pprint import pprint
 import numpy as np
 #from joblib import Parallel, delayed, cpu_count
 import logging
 log = logging.getLogger(__name__)
 
-ProcFile0 = pkg_resources.resource_filename(
-    'gustoL09P', 'data/CIIconfig.txt')
+# ProcFile0 = pkg_resources.resource_filename(
+#     'gustoL09P', 'data/CIIconfig.txt')
+ProcFile0 = importlib.resources.files('gustoL09P') / 'Data/CIIconfig.txt'
 
 spectralLines = ['CII', 'NII', 'OI']
 
@@ -273,14 +275,18 @@ class GL09PipelineSetupClass:
         return 1
 
     def getConfigInfo(self, verbose=False):
-        # read the configuration file, but parsing is done in another function
+        """ Function reading the configuration file, but parsing is done in another function
+        """
         if verbose:
             print('getConfigInfo: ', self.GL09Pconf)
 
         return self.GL09Pconf
 
     def configFileExists(self):
-        configPath = "/".join(self.configFile.split('/')[:-1])
+        """Function checking if the configuration file exists.
+        """
+        #configPath = "/".join(self.configFile.split('/')[:-1])
+        configPath = os.path.dirname(self.configFile)
 
         if not os.path.isdir(configPath):
             if self.configFile is not None:

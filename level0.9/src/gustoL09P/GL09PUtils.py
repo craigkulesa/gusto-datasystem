@@ -16,13 +16,13 @@ from astropy.io import ascii, fits
 from astropy.utils.exceptions import AstropyWarning
 from scipy.interpolate import krogh_interpolate, barycentric_interpolate
 from pprint import pprint
-import parsl
-from parsl.app.app import python_app, bash_app
-from parsl.configs.local_threads import config
-from parsl.providers import LocalProvider
-from parsl.channels import LocalChannel
-from parsl.config import Config
-from parsl.executors import HighThroughputExecutor
+# import parsl
+# from parsl.app.app import python_app, bash_app
+# from parsl.configs.local_threads import config
+# from parsl.providers import LocalProvider
+# from parsl.channels import LocalChannel
+# from parsl.config import Config
+# from parsl.executors import HighThroughputExecutor
 import sys
 import os
 import re
@@ -667,6 +667,13 @@ def getHotInfo_old(spec, data, mixer, verbose=False):
         print('\nglast: ', glast)
 
     return hgroup, ghots, ghtim, ghtint, glast
+
+    
+def readMaskRanges(mfile):
+    
+    data = np.loadtxt(mfile, delimiter=',').astype(int)
+    
+    return data
 
 
     

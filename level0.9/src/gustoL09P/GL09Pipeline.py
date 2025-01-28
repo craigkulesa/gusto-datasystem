@@ -16,7 +16,7 @@ import numpy.ma as ma
 import time
 import argparse
 import textwrap
-import pkg_resources
+import importlib
 import parsl
 import sys
 import os
@@ -54,8 +54,10 @@ from .GL10Pipeline import *
 spectralLines = ['CII', 'NII', 'OI']
 n_sL = len(spectralLines)
 
-cfg_file0 = pkg_resources.resource_filename('gustoL09P', 'Data/GL09P_setup_pars.txt')
-par_file0 = pkg_resources.resource_filename('gustoL09P', 'Data/GUSTO_BaselineData_draft3.xlsx')
+cfg_file0 = importlib.resources.files('gustoL09P') / 'Data/GL09P_setup_pars.txt'
+par_file0 = importlib.resources.files('gustoL09P') / 'Data/GUSTO_BaselineData_draft3.xlsx'
+pmfileB1 = importlib.resources.files('gustoL09P') / 'Data/ACS5_B1_pixel_masks.txt'
+pmfileB2 = importlib.resources.files('gustoL09P') / 'Data/ACS3_B2_pixel_masks.txt'
 #cii_file0 = pkg_resources.resource_filename('gustoL09P', 'Data/CIIconfig.txt')
 
 tpipe = 'GUSTO L1 Pipeline'
@@ -294,6 +296,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     ignore = [8194, 8338, 9182, 9306, 9314, 9342, 10246, 10250, 10254, 10446, 10606, 
               10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24531, 24803, 24881, 26294, 26296]
     
+    # load ranges for 2nd pixel masking
+    
     
     for line in lines:
         if verbose:
@@ -304,8 +308,10 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         os.makedirs(outDir, exist_ok=True)
         if line=='NII':
             filter = 'ACS5*.fits'
+            mranges = readMaskRanges(pmfileB1)
         else:
             filter = 'ACS3*.fits'
+            mranges = readMaskRanges(pmfileB2)
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
         
@@ -339,7 +345,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         params = {'line': line, 'inDir': inDir, 'outDir': outDir, 
                   'drmethod': int(cfi['gprocs']['drmethod']),
                   'debug': cfi['gprocs']['debug'], 'verbose': verbose,
-                  'vcut': vcut, 'args': args}
+                  'vcut': vcut, 'args': args, 'mranges': mranges,
+                  'addpixelflag': cfi['gprocs']['addpixelflag']}
         paramlist = [[a, b] for a in dfiles for b in [params]]
         # paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
@@ -380,12 +387,12 @@ def processL08(paramlist):
     line, inDir, outDir, drmethod, debug = params['line'], params['inDir'], params['outDir'], params['drmethod'], params['debug']
     verbose = params['verbose']
     vcut = params['vcut']
+    mranges = params['mranges']
+    addpixelflag = params['addpixelflag']
     args = range(int(params['args'][0]), int(params['args'][1]))
     
     # define some additional processing data (maybe relocat to function later?)
     if 'ACS3' in dfile:
-        pfr_ra = np.array(list([[-0.01,0.01],[0.25,0.38],[2.25,2.33]]), dtype=float)
-        pp_ra = np.array([[20,83],[132,138],[200,205],[265,274],[323,340],[399,407],[498,509]], dtype=int)
         # all pixels before and after these values are masked as bad
         pixel_st = 80
         pixel_en = 600
@@ -394,8 +401,6 @@ def processL08(paramlist):
         Tsky = 45  # Kelvin
         rfreq = 1900.5369  # GHz
     else:
-        pfr_ra = np.array(list([[-0.01,0.01],[0.33,0.37],[2.26,2.31],[3.92,3.96]]), dtype=float)
-        pp_ra = np.array([[23,50],[65,71],[100,103],[163,170],[198,206],[300, 511]], dtype=int)
         # all pixels above this value are masked as bad
         # all pixels before and after these values are masked as bad
         pixel_st = 80
@@ -417,9 +422,13 @@ def processL08(paramlist):
     # the values in these pixels will be set to nan outside the good range and 
     # interpolated within the good range later in the pipeline processing after 
     # the baseline fit.
-    # set bit 8: += 128 or 2^(8-1)
-    spec.mask[:,pixel_en:] += bool(128)
-    spec.mask[:,:pixel_st] += bool(128)
+    spec.mask[:,pixel_en:] = np.bitwise_or(spec.mask[:,pixel_en:] ,(1<<7))
+    spec.mask[:,:pixel_st] = np.bitwise_or(spec.mask[:,:pixel_st], (1<<7))
+    if addpixelflag:
+        # more agressive spur flagging
+        for i in range(mranges.shape[0]):
+            # set the spur flag for the mranges
+            spec.mask[:,mranges[i,0]:mranges[i,1]+1] = np.bitwise_or(spec.mask[:,mranges[i,0]:mranges[i,1]+1], (1<<4))
     
     #rowFlag = data['ROW_FLAG']
     
@@ -661,6 +670,9 @@ def processL08(paramlist):
         data[dkey][osel,:] = ta.data
         data['CHANNEL_FLAG'] [osel,:] = ta.mask
 
+    # check if there is ringing in the calibrated spectraWe have to put back the pixel masks
+    data['CHANNEL_FLAG'] = spec.mask
+
     # check if there is ringing in the calibrated spectra
     var = np.zeros(n_spec)
     for i in range(0,n_spec):
@@ -759,4 +771,7 @@ def processL08(paramlist):
         
     return dfile
 
+
+
+    
     
