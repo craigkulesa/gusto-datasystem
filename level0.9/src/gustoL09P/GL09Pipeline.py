@@ -677,13 +677,23 @@ def processL08(paramlist):
     var = np.zeros(n_spec)
     for i in range(0,n_spec):
         #sp = spec[i,:]
-        if np.any(np.isfinite(spec[i,args])):
-            var[i] = (np.nanmax(spec[i,args] - np.nanmin(spec[i,args]))) / np.nanmean(spec[i,args])
-            if (np.abs(var[i]) >= vcut)&(data['scan_type'][i]=='OTF'):
-                data['ROW_FLAG'][i] = (1 << 14) # set bit 26
+        if (data['scan_type'][i] == 'OTF'):
+            if (np.any(np.isfinite(spec[i,args]))):
+                tsp = spec[i,args]
+                xx = np.arange(len(tsp))
+                # remove the linear baseline
+                # fit a line to the data
+                p = np.polyfit(xx, tsp, 1)
+                # remove the line
+                tsp = tsp - np.polyval(p, xx)
+                var[i] = np.abs((np.nanmax(tsp) - np.nanmin(tsp)) / np.nanmean(tsp))
+                if (np.abs(var[i]) >= vcut)&(data['scan_type'][i]=='OTF'):
+                    data['ROW_FLAG'][i] = (1 << 14) # set bit 26
+            else:
+                var[i] = 9999
+                data['ROW_FLAG'][i] = (1 << 13)   # set bit 13
         else:
-            var[i] = 9999
-            data['ROW_FLAG'][i] = (1 << 13)   # set bit 13
+            var[i] = 0.0
         # if debug:
         #     print('%4i  %7.3f  %2i  %6s  %i  %i'%(i, var[i], data['MIXER'][i], data['scan_type'][i], data['row_flag'][i], data['ROW_FLAG'][i]))
 
@@ -701,6 +711,7 @@ def processL08(paramlist):
     hdr.set('pgpixen', value=pixel_en, comment='pixel index of upper good pixel range')
     hdr.set('rhID1', value=rhIDs[0], comment='scan ID for refhot/hot before OTF')
     hdr.set('rhID2', value=rhIDs[1], comment='scan ID for refhot/hot after OTF')
+    hdr.set('', value='')
     hdr.set('', value='', after='VLSR')
     hdr.set('', value='          Level 0.9 Pipeline Processing', after='VLSR')
     hdr.set('', value='', after='VLSR')
@@ -708,7 +719,7 @@ def processL08(paramlist):
     hdr.add_comment('L0.9 version: %s'%(__version__))
     hdr.add_comment('L0.9 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.9 developer: %s'%(__author__))
-    hdr.set('', value='', after='PGPIXEN')
+    hdr.set('', value='', after='rhID2')
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))

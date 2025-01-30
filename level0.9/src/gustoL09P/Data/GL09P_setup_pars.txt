@@ -34,8 +34,8 @@ number_of_cpus = 10
 l09save2fits = True
 l09set_channel_flags = True
 # threshold values for detecting ringing/bad data - subject to tuning!
-vcut1 = 0.12
-vcut2 = 0.12
+vcut1 = 3.0  
+vcut2 = 3.0
 # pixel range for checking ringing
 args1 = [250, 300]
 args2 = [300, 400]
