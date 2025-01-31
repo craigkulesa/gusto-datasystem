@@ -393,6 +393,7 @@ def processL08(paramlist):
     
     # define some additional processing data (maybe relocat to function later?)
     if 'ACS3' in dfile:
+        # line: CII
         # all pixels before and after these values are masked as bad
         pixel_st = 80
         pixel_en = 600
@@ -401,6 +402,7 @@ def processL08(paramlist):
         Tsky = 45  # Kelvin
         rfreq = 1900.5369  # GHz
     else:
+        # line: NII
         # all pixels above this value are masked as bad
         # all pixels before and after these values are masked as bad
         pixel_st = 80
@@ -673,7 +675,7 @@ def processL08(paramlist):
     # check if there is ringing in the calibrated spectraWe have to put back the pixel masks
     data['CHANNEL_FLAG'] = spec.mask
 
-    # check if there is ringing in the calibrated spectra
+    # check if there is ringing in the uncalibrated spectra
     var = np.zeros(n_spec)
     for i in range(0,n_spec):
         #sp = spec[i,:]
@@ -688,7 +690,7 @@ def processL08(paramlist):
                 tsp = tsp - np.polyval(p, xx)
                 var[i] = np.abs((np.nanmax(tsp) - np.nanmin(tsp)) / np.nanmean(tsp))
                 if (np.abs(var[i]) >= vcut)&(data['scan_type'][i]=='OTF'):
-                    data['ROW_FLAG'][i] = (1 << 14) # set bit 26
+                    data['ROW_FLAG'][i] = (1 << 14) # set bit 14
             else:
                 var[i] = 9999
                 data['ROW_FLAG'][i] = (1 << 13)   # set bit 13

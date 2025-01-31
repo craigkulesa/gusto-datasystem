@@ -95,7 +95,7 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
         inDir = cfi['gdirs']['L09DataDir']
         outDir = cfi['gdirs']['L095DataDir']
         os.makedirs(outDir, exist_ok=True)
-        if line=='CII':
+        if line=='NII':
             filter = 'ACS5*.fits'
         else:
             filter = 'ACS3*.fits'
@@ -167,10 +167,12 @@ def processL09(params, verbose=True):
     # define some processing data first (maybe relocat to function later?)
 
     if 'ACS3' in dfile:
+        # line: CII
         pixel_cut = 600
         band = 2
         add = 'B2'
     else:
+        # line: NII
         pixel_cut = 300
         band = 1
         add = 'B1'
