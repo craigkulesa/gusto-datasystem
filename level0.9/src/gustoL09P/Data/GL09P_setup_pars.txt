@@ -34,11 +34,16 @@ number_of_cpus = 10
 l09save2fits = True
 l09set_channel_flags = True
 # threshold values for detecting ringing/bad data - subject to tuning!
-vcut1 = 3.0  
-vcut2 = 3.0
-# pixel range for checking ringing
-args1 = [250, 300]
-args2 = [300, 400]
+vcut1 = 6.0  
+vcut2 = 12.0
+# xiiprange: good pixel range
+# xiivrange: pixel range for checking ringing
+# NII
+niiprange = [80, 300]
+niivrange = [200, 300
+# CII
+ciiprange = [90, 590]
+ciivrange = [500, 590]
 
 # select lines for processing
 # lines = ['CII']

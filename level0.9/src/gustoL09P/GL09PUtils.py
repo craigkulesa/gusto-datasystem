@@ -215,7 +215,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     Parameters
     ----------
     mixer : int
-        mixer number
+        mixer ID
     spec : masked float array
         array containing the latest masked spectra
     data : FITS rec array
@@ -268,7 +268,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
         # determine yfactor
         rsel = (rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (row_flag==0)
         hsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag==0))
-        # if we have 3 (or more, more than3 is less likely) take only the last 2 since the first one is causing offsets!
+        # if we have 3 (or more, more than 3 is less likely) take only the last 2 since the first one is causing offsets!
         if hsel.size>2:
             data['ROW_FLAG'][hsel[0]] = 2<<15
             hsel = hsel[1:]

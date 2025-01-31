@@ -195,12 +195,14 @@ def processL09(params, verbose=True):
     rms = np.zeros(n_spec)
     basecorrf = np.zeros((n_spec,n_pix))
     
-    prange = [int(hdr['pgpixst']), int(hdr['pgpixen'])]
+    prange = [int(hdr['goodpxst']), int(hdr['goodpxen'])]
     
     # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
     osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
     
     if len(osel) <= 0:
+        print('File: ', os.path.join(inDir,dfile))
+        print(data['ROW_FLAG'].flatten())
         print('WARNING: No OTF spectra available.')
         # logger.warning('No OTF spectra available.')
         datavalid = False
@@ -279,10 +281,10 @@ def processL09(params, verbose=True):
 #    hdr.insert('VLSR', ('PROC_LEV', 0.9, 'pipeline processing level'), after=True)
 #    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
     #hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
-    hdr.set('L095PTIM', value=tred, comment=('L0.95 pipeline processing time'), after='PGPIXEN')
-    hdr.set('', value='', after='PGPIXEN')
-    hdr.set('', value='          Level 0.95 Pipeline Processing', after='PGPIXEN')
-    hdr.set('', value='', after='PGPIXEN')
+    hdr.set('L095PTIM', value=tred, comment=('L0.95 pipeline processing time'), after='RHID2')
+    hdr.set('', value='', after='RHID2')
+    hdr.set('', value='          Level 0.95 Pipeline Processing', after='RHID2')
+    hdr.set('', value='', after='RHID2')
     hdr.set('bs_lam', value=bs_lam, comment='lambda value for ASPLS baseline correction')
     hdr.set('bs_lam2', value=bs_lam2, comment='lambda value for arplsw rms baseline correction')
     hdr.set('bs_ratio', value=bs_ratio, comment='ratio value for arplsw rms baseline correction')

@@ -306,6 +306,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         inDir = cfi['gdirs']['L08DataDir']
         outDir = cfi['gdirs']['L09DataDir']
         os.makedirs(outDir, exist_ok=True)
+        
+        # load spikes masking data from files
         if line=='NII':
             filter = 'ACS5*.fits'
             mranges = readMaskRanges(pmfileB1)
@@ -315,8 +317,6 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
         
-        # sdirs = sorted(glob.glob(os.path.join(inDir,filter), root_dir=inDir))
-        #print(glob.glob(os.path.join(inDir,filter)))
         sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
         #print('single result: ', sdirs[0], os.path.split(sdirs[0]))
         dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
@@ -335,22 +335,26 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             
         if line == 'NII':
             vcut = float(cfi['gprocs']['vcut1'])
-            args = getRange(cfi['gprocs']['args1'], dtype=int)
+            pvrange = np.array(getValues(cfi['gprocs']['niivrange']), dtype=int)
+            pxrange = np.array(getValues(cfi['gprocs']['niiprange']), dtype=int)
+            # pxrange = getRange(cfi['gprocs']['niiprange'], dtype=int)
+            # pvrange = getRange(cfi['gprocs']['niivprange'], dtype=int)
         elif line == 'CII':
             vcut = float(cfi['gprocs']['vcut2'])
-            args = getRange(cfi['gprocs']['args2'], dtype=int)
+            pvrange = np.array(getValues(cfi['gprocs']['ciivrange']), dtype=int)
+            pxrange = np.array(getValues(cfi['gprocs']['ciiprange']), dtype=int)
+            # pxrange = getRange(cfi['gprocs']['ciiprange'], dtype=int)
+            # pvrange = getRange(cfi['gprocs']['ciivrange'], dtype=int)
             
-        print('args: ', args, type(args), type(args[0]))
         
         params = {'line': line, 'inDir': inDir, 'outDir': outDir, 
                   'drmethod': int(cfi['gprocs']['drmethod']),
                   'debug': cfi['gprocs']['debug'], 'verbose': verbose,
-                  'vcut': vcut, 'args': args, 'mranges': mranges,
+                  'vcut': vcut, 'pxrange': pxrange, 'mranges': mranges,
+                  'pvrange': pvrange, 
                   'addpixelflag': cfi['gprocs']['addpixelflag']}
         paramlist = [[a, b] for a in dfiles for b in [params]]
-        # paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [int(cfi['gprocs']['drmethod'])] for f in [bool(cfi['gprocs']['debug'])]]
-        # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
-        #print(paramlist)
+
         if verbose:
             print('Number of data files: ', n_ds, len(sdirs))
             print('Selected data files: ', dfiles)
@@ -389,24 +393,22 @@ def processL08(paramlist):
     vcut = params['vcut']
     mranges = params['mranges']
     addpixelflag = params['addpixelflag']
-    args = range(int(params['args'][0]), int(params['args'][1]))
+    # good pixel ranges
+    pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
+    # ringing check ranges
+    pvrange = (int(params['pvrange'][0]), int(params['pvrange'][1]))
     
     # define some additional processing data (maybe relocat to function later?)
     if 'ACS3' in dfile:
         # line: CII
         # all pixels before and after these values are masked as bad
-        pixel_st = 80
-        pixel_en = 600
         band = 2
         add = 'B2'
         Tsky = 45  # Kelvin
         rfreq = 1900.5369  # GHz
     else:
         # line: NII
-        # all pixels above this value are masked as bad
         # all pixels before and after these values are masked as bad
-        pixel_st = 80
-        pixel_en = 300
         band = 1
         add = 'B1'
         Tsky = 33.5  # Kelvin
@@ -424,8 +426,8 @@ def processL08(paramlist):
     # the values in these pixels will be set to nan outside the good range and 
     # interpolated within the good range later in the pipeline processing after 
     # the baseline fit.
-    spec.mask[:,pixel_en:] = np.bitwise_or(spec.mask[:,pixel_en:] ,(1<<7))
-    spec.mask[:,:pixel_st] = np.bitwise_or(spec.mask[:,:pixel_st], (1<<7))
+    spec.mask[:,pxrange[1]:] = np.bitwise_or(spec.mask[:,pxrange[1]:] ,(1<<7))
+    spec.mask[:,:pxrange[0]+1] = np.bitwise_or(spec.mask[:,:pxrange[0]+1], (1<<7))
     if addpixelflag:
         # more agressive spur flagging
         for i in range(mranges.shape[0]):
@@ -458,6 +460,7 @@ def processL08(paramlist):
     aghmix = []   # mixer of hots
     atsys = []
     atsmix = []
+    datavalid = np.ones(3, dtype=bool)
 
     for k, mix in enumerate(umixers):
         # first check crudely if we have enough data of various scan_types
@@ -477,7 +480,7 @@ def processL08(paramlist):
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
             print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
             data['ROW_FLAG'][msel] = 4   # flagged as missing data
-            datavalid = False
+            datavalid[k] = False
             return 0
         
         tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs = getCalSpectra(mix, spec, data, hdr, verbose=True)
@@ -486,7 +489,7 @@ def processL08(paramlist):
             print('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.info('Tsys: ', tsys)
-            datavalid = False
+            datavalid[k] = False
             break
         #print('<Tsys>: ', np.nanmean(tsys))
         tsys.fill_value = 0.0
@@ -514,8 +517,8 @@ def processL08(paramlist):
         else:
             print('WARNING: No OTF spectra available for mixer: ', mix)
             # logger.warning('No OTF spectra available.')
-            datavalid = False
-            break
+            datavalid[k] = False
+            continue
 
         spec_OTF = np.squeeze(spec[osel,:])
         stime = data['UNIXTIME'][osel]
@@ -555,7 +558,11 @@ def processL08(paramlist):
             aghtim.append(ghtim)
             aghtint.append(ghtint)
             aghmix.append(np.zeros(n_ghots)+mix)
+        else:
+            print('No hots available...')
+            print(aghots)
         
+
         atsys.append(tsys)
         atsmix.append(mix)
         
@@ -648,7 +655,7 @@ def processL08(paramlist):
         # primarily passing through the header and the data table
         # and only few variables and the header keys are updated or added
         
-        tsyseff_avg[k] = np.nanmean(tsys[:,200:400])
+        tsyseff_avg[k] = np.nanmean(tsys[:,int(pxrange[0]):int(pxrange[1])+1])
         aTsyseff[osel,:] = tsyseff
         ahcorr[osel,:] = hcorr
         aspref[osel,:] = spref
@@ -672,6 +679,9 @@ def processL08(paramlist):
         data[dkey][osel,:] = ta.data
         data['CHANNEL_FLAG'] [osel,:] = ta.mask
 
+    # analize datavalid
+    validdata = datavalid[0] | datavalid[1] | datavalid[2]
+    
     # check if there is ringing in the calibrated spectraWe have to put back the pixel masks
     data['CHANNEL_FLAG'] = spec.mask
 
@@ -680,8 +690,8 @@ def processL08(paramlist):
     for i in range(0,n_spec):
         #sp = spec[i,:]
         if (data['scan_type'][i] == 'OTF'):
-            if (np.any(np.isfinite(spec[i,args]))):
-                tsp = spec[i,args]
+            if (np.any(np.isfinite(spec[i,pvrange[0]:pvrange[1]+1]))):
+                tsp = spec[i,pvrange[0]:pvrange[1]+1]
                 xx = np.arange(len(tsp))
                 # remove the linear baseline
                 # fit a line to the data
@@ -689,7 +699,7 @@ def processL08(paramlist):
                 # remove the line
                 tsp = tsp - np.polyval(p, xx)
                 var[i] = np.abs((np.nanmax(tsp) - np.nanmin(tsp)) / np.nanmean(tsp))
-                if (np.abs(var[i]) >= vcut)&(data['scan_type'][i]=='OTF'):
+                if (np.abs(var[i]) >= vcut):
                     data['ROW_FLAG'][i] = (1 << 14) # set bit 14
             else:
                 var[i] = 9999
@@ -699,6 +709,7 @@ def processL08(paramlist):
         # if debug:
         #     print('%4i  %7.3f  %2i  %6s  %i  %i'%(i, var[i], data['MIXER'][i], data['scan_type'][i], data['row_flag'][i], data['ROW_FLAG'][i]))
 
+    
     tred = Time(datetime.datetime.now()).fits
     
     # updating header keywords
@@ -709,10 +720,13 @@ def processL08(paramlist):
 #    hdr.add_comment('Level 0.9 Pipeline Processing', before='PROC_LEV')
     #hdr.add_comment('Level 0.9 Pipeline Processing', after='VLSR')
     hdr.set('L09PTIME', value=tred, comment=('L0.9 pipeline processing time'))
-    hdr.set('pgpixst', value=pixel_st, comment='pixel index where good pixels start')
-    hdr.set('pgpixen', value=pixel_en, comment='pixel index of upper good pixel range')
+    hdr.set('goodpxst', value=pxrange[0], comment='pixel index where good pixels start')
+    hdr.set('goodpxen', value=pxrange[1], comment='pixel index where good pixel stop')
+    hdr.set('ringpxst', value=pvrange[0], comment='start pixel index for ringing test')
+    hdr.set('ringpxen', value=pvrange[1], comment='end pixel index for ringing test')
     hdr.set('rhID1', value=rhIDs[0], comment='scan ID for refhot/hot before OTF')
     hdr.set('rhID2', value=rhIDs[1], comment='scan ID for refhot/hot after OTF')
+    hdr.set('procmeth', value=drmethod, comment='data reduction processing method applied')
     hdr.set('', value='')
     hdr.set('', value='', after='VLSR')
     hdr.set('', value='          Level 0.9 Pipeline Processing', after='VLSR')
@@ -721,7 +735,7 @@ def processL08(paramlist):
     hdr.add_comment('L0.9 version: %s'%(__version__))
     hdr.add_comment('L0.9 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.9 developer: %s'%(__author__))
-    hdr.set('', value='', after='rhID2')
+    hdr.set('', value='', after='procmeth')
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
@@ -729,7 +743,7 @@ def processL08(paramlist):
     fits.append(ofile, data=data, header=hdr1)
     
     # if in debug mode, add more extensions
-    if debug & datavalid:
+    if debug & validdata:
         # data needed
         # Tsys1, Tsys2, fraca, fracb, Tsyseff, hcorr, spref
         # we have spectra/data for each otf spectrum: Tsyseff, hcorr, spref, fraca, fracb
@@ -747,13 +761,16 @@ def processL08(paramlist):
         col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
         col6 = Column(spec, name='spec', description='original spectra')
         col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
-        col8 = Column(var, name='ringvar', description='value to determine if ringing in spectrum')
+        col8 = Column(var, name='ringvar', description='value for determining if ringing in spectrum')
         if drmethod==3:
             fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12])
         else:
             fT = Table([col1, col2, col3, col4, col5, col6, col7, col8])
+        hdre1 = fits.Header()
+        hdre1.set('vcut', value=vcut, comment='ringing treshold used with ringvar')
         fits.append(ofile, data=fT.as_array())
-
+        
+        print('aghots: ', len(aghots))
         col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')
         col22 = Column(np.hstack(aghtim), name='htime', description='utime of avg. hots')
         col23 = Column(np.hstack(aghmix), name='hmixer', description='mixer of avg. hots')
