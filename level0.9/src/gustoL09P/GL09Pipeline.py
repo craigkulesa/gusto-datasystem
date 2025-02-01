@@ -486,11 +486,11 @@ def processL08(paramlist):
         tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs = getCalSpectra(mix, spec, data, hdr, verbose=True)
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
-            print('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
+            print('No Tsys available! Stop processing %i of dfile %s'%(mix, dfile), tsys)
             # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.info('Tsys: ', tsys)
             datavalid[k] = False
-            break
+            continue
         #print('<Tsys>: ', np.nanmean(tsys))
         tsys.fill_value = 0.0
         #print('tsys shape: ', tsys.shape)
@@ -517,7 +517,14 @@ def processL08(paramlist):
         else:
             print('WARNING: No OTF spectra available for mixer: ', mix)
             # logger.warning('No OTF spectra available.')
+            print('failed processing OTFs')
+            print('OTFs: ', otfID)
+            print('REFs: ', rfsID)
+            print('REFHOTs: ', rhsID)
+            print('HOTs: ', hotID)
+            print('mixer: ', mix)
             datavalid[k] = False
+            data['ROW_FLAG'][msel] = 1<<19   # flagged as missing data
             continue
 
         spec_OTF = np.squeeze(spec[osel,:])
@@ -560,7 +567,8 @@ def processL08(paramlist):
             aghmix.append(np.zeros(n_ghots)+mix)
         else:
             print('No hots available...')
-            print(aghots)
+            data['ROW_FLAG'][msel] = 1<<19   # flagged as missing data
+            continue
         
 
         atsys.append(tsys)
@@ -681,6 +689,11 @@ def processL08(paramlist):
 
     # analize datavalid
     validdata = datavalid[0] | datavalid[1] | datavalid[2]
+    print('validdata: ', datavalid[0], datavalid[1], datavalid[2])
+    
+    if validdata == False:
+        print('Not enough data available for saving. ')
+        return 0
     
     # check if there is ringing in the calibrated spectraWe have to put back the pixel masks
     data['CHANNEL_FLAG'] = spec.mask

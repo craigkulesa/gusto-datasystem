@@ -35,7 +35,7 @@ l09save2fits = True
 l09set_channel_flags = True
 # threshold values for detecting ringing/bad data - subject to tuning!
 vcut1 = 6.0  
-vcut2 = 12.0
+vcut2 = 6.0
 # xiiprange: good pixel range
 # xiivrange: pixel range for checking ringing
 # NII
