@@ -2,9 +2,11 @@
 #
 import os
 import sys
+import pdb
 import glob
 import math
 import random
+import warnings
 import numpy as np
 import argparse
 import configparser
@@ -26,6 +28,11 @@ from astropy.coordinates import SkyCoord
 from astropy.coordinates import Galactic
 
 import matplotlib.pyplot as plt
+
+# If np.mean() warns about taking the mean of an empty slice
+# this probably means that ch_flag!=0 for all spec[].  
+# The try-except block below will engage the debugger if that happens.
+warnings.filterwarnings("error", message="Mean of empty slice"))
 
 # 10/29/2024 Makes L2 maps
 # Little script to look at Volker's L0.9 data 
@@ -141,7 +148,11 @@ def doStuff(self, args):
           # Do a quick DC offset
           short_chflag = CH_FLAG[i, xlow:xhigh]
           filtered_values = spec[i,xlow:xhigh][short_chflag==0]
-          average = np.mean(filtered_values)
+          try:
+             average = np.nanmean(filtered_values)
+          except Warning as w:
+             pdb.set_trace()
+
           y_flat = spec[i, xlow:xhigh]-average
 
           # Fill integrated intensity and l,b
@@ -151,10 +162,6 @@ def doStuff(self, args):
              max_ii = ii[len(ii)-1]
           l  = np.append(l, c_l_b.l.value)
           b  = np.append(b, c_l_b.b.value)
-          if args.plot:
-              masked_x = np.ma.masked_where(short_chflag==1, vlsr[xlow:xhigh])
-              masked_y = np.ma.masked_where(short_chflag==1, y_flat)
-              plt.plot(masked_x, masked_y)
 
        else:
           pass
@@ -258,7 +265,7 @@ Ta_list = []
 
 for file in search_files:
     # get glon, glat, and calibrated spectra from each OTF file
-    print("trying OTF file: ", file, end="   ")
+    print("trying OTF file: ", os.path.basename(file), end="   ")
 
     result = doStuff(file, args)
 
