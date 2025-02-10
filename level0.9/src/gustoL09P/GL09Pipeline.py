@@ -4,8 +4,8 @@ This is the GUSTO L09 Pipeline.
 """
 
 __date__ = '9/19/2024'
-__updated__ = '20241223'
-__version__ = '0.3.1'
+__updated__ = '20250210'
+__version__ = '0.3.2'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
 from joblib import Parallel, delayed
@@ -426,14 +426,21 @@ def processL08(paramlist):
     # the values in these pixels will be set to nan outside the good range and 
     # interpolated within the good range later in the pipeline processing after 
     # the baseline fit.
-    spec.mask[:,pxrange[1]:] = np.bitwise_or(spec.mask[:,pxrange[1]:] ,(1<<7))
-    spec.mask[:,:pxrange[0]+1] = np.bitwise_or(spec.mask[:,:pxrange[0]+1], (1<<7))
+    # The channel_flag cannot be set in the mask array, but must be set directly:
+    # spec.mask[:,pxrange[1]:] = np.bitwise_or(spec.mask[:,pxrange[1]:] ,(1<<7))
+    # spec.mask[:,:pxrange[0]+1] = np.bitwise_or(spec.mask[:,:pxrange[0]+1], (1<<7))
+    
+    data['CHANNEL_FLAG'][:,pxrange[1]:] = np.bitwise_or(data['CHANNEL_FLAG'][:,pxrange[1]:] ,(1<<7))
+    data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<7))
+    spec.mask = data['CHANNEL_FLAG']
+    
     if addpixelflag:
         # more agressive spur flagging
         for i in range(mranges.shape[0]):
             # set the spur flag for the mranges
-            spec.mask[:,mranges[i,0]:mranges[i,1]+1] = np.bitwise_or(spec.mask[:,mranges[i,0]:mranges[i,1]+1], (1<<4))
-    
+            data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] ,(1<<7))
+            spec.mask = data['CHANNEL_FLAG']
+
     #rowFlag = data['ROW_FLAG']
     
     n_spec, n_pix = spec.shape
@@ -685,7 +692,7 @@ def processL08(paramlist):
             dkey = 'DATA'
             
         data[dkey][osel,:] = ta.data
-        data['CHANNEL_FLAG'] [osel,:] = ta.mask
+        #data['CHANNEL_FLAG'] [osel,:] = ta.mask
 
     # analize datavalid
     validdata = datavalid[0] | datavalid[1] | datavalid[2]
@@ -694,9 +701,6 @@ def processL08(paramlist):
     if validdata == False:
         print('Not enough data available for saving. ')
         return 0
-    
-    # check if there is ringing in the calibrated spectraWe have to put back the pixel masks
-    data['CHANNEL_FLAG'] = spec.mask
 
     # check if there is ringing in the uncalibrated spectra
     var = np.zeros(n_spec)
