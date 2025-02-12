@@ -419,6 +419,7 @@ def processL08(paramlist):
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
     print('Loading file: ', dfile)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
+    spec_org = spec.copy()
     # we perform a global setting of the data mask to avoid math problems
     # like division by zero below for Tsys and the calibration
     # this defines the global good pixel (or channel) range of the spectra
@@ -556,6 +557,7 @@ def processL08(paramlist):
             hcorr_sm = np.zeros([n_OTF, n_opix])
             spref_sm = np.zeros([n_OTF, n_opix])
             spref2_sm = np.zeros([n_OTF, n_opix])
+            scl = np.ones([n_OTF, n_opix])
 
         # this call returns the results for all spectra, but we need only everything for the OTF spectra
         # ahgroup is the assignment of hots to all spectra
@@ -655,8 +657,11 @@ def processL08(paramlist):
                 spref2_sm[i0,:] = savgol_filter(np.where(np.isnan(spref2[i0,:]), 0, spref2[i0,:]), window_length=5, polyorder=2)
                 
                 # put everything together. issue: divide by zero -> catch in masks
-                ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:]/hcorr_sm[i0,:] - spref_sm[i0,:])/spref[i0,:]
-                ta2[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:])/spref2_sm[i0,:]
+                scl[i0,:] = spec_OTF[i0,:] / (spref_sm[i0,:]*hcorr_sm[i0,:])
+                # ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:]/hcorr_sm[i0,:] - spref_sm[i0,:])/spref_sm[i0,:]
+                ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:]*hcorr_sm[i0,:])/(spref_sm[i0,:]*hcorr_sm[i0,:])
+                # ta2[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:])/spref2_sm[i0,:]
+                ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
             
             # if type(ta)==type(np.ndarray(0)):
             #     ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
@@ -705,7 +710,6 @@ def processL08(paramlist):
     # check if there is ringing in the uncalibrated spectra
     var = np.zeros(n_spec)
     for i in range(0,n_spec):
-        #sp = spec[i,:]
         if (data['scan_type'][i] == 'OTF'):
             if (np.any(np.isfinite(spec[i,pvrange[0]:pvrange[1]+1]))):
                 tsp = spec[i,pvrange[0]:pvrange[1]+1]
@@ -776,7 +780,7 @@ def processL08(paramlist):
             col11 = Column(aspref2_sm, name='spref2_sm', description='smoothed ref spectrum')
             col12 = Column(aTsyseff_sm, name='Tsyseff_sm', description='smoothed effective Tsys per OTF spectrum')
         col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
-        col6 = Column(spec, name='spec', description='original spectra')
+        col6 = Column(spec_org, name='spec', description='original spectra')
         col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
         col8 = Column(var, name='ringvar', description='value for determining if ringing in spectrum')
         if drmethod==3:
