@@ -50,7 +50,7 @@ def makeSequences(input, output):
                     else:
                         endID = int(scanID)
                         seqNum+=1
-                        print(seqNum, f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
+                        print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
                         startID = endID  # make this REF the starting ref for the next seq                
                 if(mode == 'SPIRAL' or mode == 'BASIC'):  # skip these and throw out the sequence
                     newSeq = True
@@ -62,12 +62,12 @@ def makeSequences(input, output):
                             endID = int(scanID)
                             seqType = obsType
                             seqNum+=1
-                            print(seqNum, f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
+                            print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
                         elif(obsType == 'SRC' and mode == 'ABS_OBS'):
                             endID = int(scanID)-1
                             seqType = 'APS'
                             seqNum+=1
-                            print(seqNum, f"{startID:05d}", f"{endID:05d}", oldseqType, oldobj, file=seqFile)
+                            print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", oldseqType, oldobj, file=seqFile)
                 oldscanID = scanID
                 oldobj = obj
                 oldseqType = seqType
@@ -76,7 +76,7 @@ def makeSequences(input, output):
         endID = int(scanID)
         seqType = obsType
         seqNum+=1
-        print(seqNum, f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
+        print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
 
         
 def makeFileGlob(startID, endID, bandNum, dirDataIn):
