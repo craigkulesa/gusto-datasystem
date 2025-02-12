@@ -45,4 +45,7 @@ where the arguments are:
        -s sets the scanID range for the processing
        -i sets the input data path (which should contain the calibration files, level0.5 input data folders, and udp folder)
        -o sets the output data root folder (for the level 0.7 data)
- 
+
+## TEST DATA (generated 2/12/2025) ##
+- [Level 0.5 data (54 MB)](http://soral.as.arizona.edu/GUSTO/calibration/level05_20250212_test.tar.xz)
+- [Level 0.7 data (54 MB)](http://soral.as.arizona.edu/GUSTO/calibration/level07_20250212_test.tar.xz)
