@@ -5,8 +5,8 @@
 #define PI 3.14159
 #define DEBUG 0
 #define REF 0.025
-#define CIIFREQ 1900.537
-#define NIIFREQ 1461.131
+#define CIIFREQ 1900536.9
+#define NIIFREQ 1461132.0
 
 struct coeffs c;
 int CALID = -1, lastBand = 0, lastScanID = 0;
@@ -124,18 +124,18 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_write_key(fptr, TSTRING, "DLEVEL",    "0.5",      "data level",      &status);
             get_proctime(proctime);
             fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time",  &status);
-            fits_write_key(fptr, TINT,    "SEQFLAG",   &seqflag,       "SEQUENCE FLAG",    &status);
+            fits_write_key(fptr, TINT,    "SEQ_FLAG",   &seqflag,       "SEQUENCE FLAG",    &status);
 
 
             // Define the column parameters
             char *ttype[] ={"MIXER", "NINT", "UNIXTIME", "NBYTES", "CORRTIME", "INTTIME", "ROW_FLAG", "Ihigh", \
 			    "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", \
-		            "subScan", "scan_type", "THOT", "RA", "DEC", "filename", "PSat", "Imon", "Gmon",   \
+		            "subScan", "scan_type", "RA", "DEC", "filename", "PSat", "Vmon", "Imon", "Gmon", \
 			    "DATA", "CHANNEL_FLAG"};
 
             char *tunit[] ={" ", " ", "sec", " ", " ", "sec", " ", "counts", "counts", "counts",   \
 			    "counts", " ", " ", "Volts", "Volts", "Volts", "Volts", " ", " ", " ", \
-		            "Kelvin", "degrees", "degrees", "text", "Amps", "uA", "Amps", " ", " "};
+		            "degrees", "degrees", "text", "Amps", "mV", "uA", "Amps", " ", " "};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
             char *tform[29];
@@ -159,12 +159,12 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             tform[17] = "1J"; //int	scanID
             tform[18] = "1J"; //int	subScan
             tform[19] = "6A"; //char    scan type
-            tform[20] = "1E"; //float	THOT
-            tform[21] = "1E"; //float	RA
-            tform[22] = "1E"; //float	DEC
-	    tform[23] = "48A";//char    filename
-            tform[24] = "1E"; //float	PSat
-            tform[25] = "1E"; //float	Imon
+            tform[20] = "1E"; //float	RA
+            tform[21] = "1E"; //float	DEC
+	    tform[22] = "48A";//char    filename
+            tform[23] = "1E"; //float	PSat
+            tform[24] = "1E"; //float	Vmon
+	    tform[25] = "1E"; //float	Imon
 	    tform[26] = "1E"; //float   Gmon
 	    // Various indices and keywords in the per row header that depend on Band #
             if (fits_header->unit==6){ //ACS5 B1
@@ -224,24 +224,20 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TINT32BIT,  5, nrows+1, 1, 1, &fits_header->corrtime, &status);
     fits_write_col(fptr, TFLOAT,     6, nrows+1, 1, 1, &fits_header->inttime,  &status);
     fits_write_col(fptr, TINT32BIT,  7, nrows+1, 1, 1, &fits_header->row_flag, &status);
-
     fits_write_col(fptr, TINT32BIT,  8, nrows+1, 1, 1, &fits_header->Ihi,      &status);
     fits_write_col(fptr, TINT32BIT,  9, nrows+1, 1, 1, &fits_header->Qhi,      &status);
     fits_write_col(fptr, TINT32BIT, 10, nrows+1, 1, 1, &fits_header->Ilo,      &status);
     fits_write_col(fptr, TINT32BIT, 11, nrows+1, 1, 1, &fits_header->Qlo,      &status);
     fits_write_col(fptr, TINT32BIT, 12, nrows+1, 1, 1, &fits_header->Ierr,     &status);
     fits_write_col(fptr, TINT32BIT, 13, nrows+1, 1, 1, &fits_header->Qerr,     &status);
-
     fits_write_col(fptr, TFLOAT,    14, nrows+1, 1, 1, &fits_header->VIhi,     &status);
     fits_write_col(fptr, TFLOAT,    15, nrows+1, 1, 1, &fits_header->VQhi,     &status);
     fits_write_col(fptr, TFLOAT,    16, nrows+1, 1, 1, &fits_header->VIlo,     &status);
     fits_write_col(fptr, TFLOAT,    17, nrows+1, 1, 1, &fits_header->VQlo,     &status);
-									       
     fits_write_col(fptr, TINT32BIT, 18, nrows+1, 1, 1, &fits_header->scanID,   &status);
     fits_write_col(fptr, TINT32BIT, 19, nrows+1, 1, 1, &fits_header->subScan,  &status);
     fits_write_col(fptr, TSTRING,   20, nrows+1, 1, 1, &fits_header->type,     &status);
-
-    fits_write_col(fptr, TSTRING,   24, nrows+1, 1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   23, nrows+1, 1, 1, &fits_header->filename, &status);
 
     // Write the spectra as a single 2*N column
     if (fits_write_col(fptr, TDOUBLE, 28, nrows+1, 1, 1 * array_length, array, &status)) {
@@ -656,9 +652,4 @@ void callback(char *filein){
    free(prefix);
    free(fullpath);
 }
-
-
-
-
-
 
