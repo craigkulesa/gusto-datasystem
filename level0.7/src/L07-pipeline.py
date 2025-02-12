@@ -301,8 +301,8 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
                 header['HKSCANID'] = (int(point['scanID']), 'scanID of slow housekeeping data')
             header[hktemp_names[i-1]] = (C2K+point['temp'],  hktemp_descs[i-1])
 
-    lotemp_names = ("UNUSED","B1_SYNTH","UNUSED","UNUSED", "B1M5_AMP","UNUSED","UNUSED","UNUSED","B1_PWR_1","B1_PWR_2", "B1_PWR_3","B1_PWR_4","B2_UCTRL","B2MLTDRV","UNUSED","UNUSED", "UNUSED","B2AVA183","B1M5MULT","B2M5_AMP","B2_PWR_1","B2_PWR_2", "B2_PWR_3","B2_PWR_4")
-    lotemp_descs = ("UNUSED",   "B1 LO Synthesizer",  "B1 LO Pwr Box 3",  "B1 LO Pwr Box 4", "UNUSED", "UNUSED", "B1 LO Spacek amplifier Ch5", "UNUSED", "UNUSED", "UNUSED", "B1 LO Pwr Box 1",  "B1 LO Pwr Box 2", "B2 MK66FX uCTRL", "B2 Mult Driver",  "B2 LO Pwr 3",  "B2 LO Pwr 4",  "UNUSED",  "UNUSED",  "UNUSED", "B2 LO X-band Amplifier",  "B1 LO final tripler Ch5",  "B2 LO Spacek amplifier Ch5",  "B2 LO Pwr Box 1", "B2 LO Pwr Box 2")
+    lotemp_names = ("UNUSED","B1_SYNTH","UNUSED","UNUSED", "B1M5_AMP","UNUSED","UNUSED","UNUSED","B1_PWR_1","B1_PWR_2","B1_PWR_3","B1_PWR_4","B2_UCTRL","B2MLTDRV","UNUSED","UNUSED", "UNUSED","B2AVA183","B1M5MULT","B2M5_AMP","B2_PWR_1","B2_PWR_2", "B2_PWR_3","B2_PWR_4")
+    lotemp_descs = ("UNUSED", "B1 LO Synthesizer", "UNUSED", "UNUSED", "B1 LO Spacek amplifier Ch5", "UNUSED", "UNUSED", "UNUSED", "B1 LO Pwr Box 1",  "B1 LO Pwr Box 2", "B1 LO Pwr Box 3", "B1 LO Pwr Box 4", "B2 MK66FX uCTRL", "B2 Mult Driver", "UNUSED", "UNUSED", "UNUSED", "B2 LO X-band Amplifier",  "B1 LO final tripler Ch5",  "B2 LO Spacek amplifier Ch5",  "B2 LO Pwr Box 1", "B2 LO Pwr Box 2", "B2 LO Pwr 3", "B2 LO Pwr 4")
     results=getInflux(min(UNIXTIME), max(UNIXTIME), "B1_AD590_")
     if results.items() == []:
         print("Nothing returned!")
@@ -312,7 +312,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
         points = results.get_points(measurement=qStr)
         for point in points:
             if lotemp_names[i] != "UNUSED":
-                header[lotemp_names[i-1]] = (C2K+point['temp'],  lotemp_descs[i])
+                header[lotemp_names[i]] = (C2K+point['temp'],  lotemp_descs[i])
 
     results=getInflux(min(UNIXTIME), max(UNIXTIME), "B2_AD590_")
     if results.items() == []:
@@ -442,9 +442,9 @@ if __name__ == '__main__':
 
     if not os.path.exists(dirDataOut):
         os.makedirs(dirDataOut)
-        print(f"Directory '{dirDataOut}' created.")
+        print(f"Directory {dirDataOut} created.")
     else:
-        print(f"Reusing directory '{dirDataOut}")
+        print(f"Reusing directory {dirDataOut}")
         if options.erase:
             clear_folder(dirDataOut)
 
