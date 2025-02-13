@@ -499,7 +499,8 @@ def processL08(paramlist):
             # logger.info('Tsys: ', tsys)
             datavalid[k] = False
             continue
-        #print('<Tsys>: ', np.nanmean(tsys))
+        tsys_mean = np.nanmean(tsys[:,pxrange[0]:pxrange[1]])
+        print('<Tsys>: ', tsys_mean)
         tsys.fill_value = 0.0
         #print('tsys shape: ', tsys.shape)
         #print(list(tsys))
@@ -747,6 +748,7 @@ def processL08(paramlist):
     hdr.set('ringpxen', value=pvrange[1], comment='end pixel index for ringing test')
     hdr.set('rhID1', value=rhIDs[0], comment='scan ID for refhot/hot before OTF')
     hdr.set('rhID2', value=rhIDs[1], comment='scan ID for refhot/hot after OTF')
+    hdr.set('Tsysmean', value=tsys_mean, comment='mean Tsys over goodpx')
     hdr.set('procmeth', value=drmethod, comment='data reduction processing method applied')
     hdr.set('', value='')
     hdr.set('', value='', after='VLSR')
