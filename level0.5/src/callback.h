@@ -64,7 +64,6 @@ typedef struct s_header {
 	int		scanID;
 	int		subScan;
 	int		CALID;
-	float		THOT;
 	float		RA;
 	float		DEC;
 	float		LO;
@@ -73,6 +72,7 @@ typedef struct s_header {
 	char		*type;
 	char		*filename;
 	float           *psat;
+  	float           *vmon;
 	float           *imon;
 	float           *gmon;
 } s_header;

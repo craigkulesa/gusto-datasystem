@@ -22,7 +22,7 @@ C2K = 273.15
 CDELT = [5000.0/511.0, 5000.0/1023.0] 
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
-
+__version__ = '20250212'
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -78,7 +78,7 @@ def makeSequences(input, output):
         seqNum+=1
         print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
 
-        
+ 
 def makeFileGlob(startID, endID, bandNum, dirDataIn):
     fileList = []
     for scanID in range(startID, endID+1):
@@ -160,6 +160,14 @@ def getIFinfo(startTime):
     return info
 
 
+# check if this is a known bad scanID given a tuple of bad ranges
+def isKnownBad(number, ranges):
+    for start, end in ranges:
+        if start <= number <= end:
+            return True
+    return False
+
+
 def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, listREF):
     with fits.open(input_files[0]) as hdul1:
         nrows1 = hdul1[1].data.shape[0]
@@ -179,12 +187,9 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     # The level 0.7 data is now merged! Now we modify table and header contents
     # first, let's get interpolated RA, DEC for every row
     UNIXTIME = data['UNIXTIME']
-    RA = data['RA']
-    DEC = data['DEC']
     (udpTime, udpRA, udpDEC) = (pointingStream[:,0], pointingStream[:,5], pointingStream[:,6])
-    for i in range(nrows):  # interpolate for RA and DEC
-        RA[i] = RAD2DEG*np.interp(UNIXTIME[i], udpTime, udpRA)
-        DEC[i] = RAD2DEG*np.interp(UNIXTIME[i], udpTime, udpDEC)
+    data['RA'] = [RAD2DEG*np.interp(t, udpTime, udpRA) for t in UNIXTIME]
+    data['DEC'] = [RAD2DEG*np.interp(t, udpTime, udpDEC) for t in UNIXTIME]
 
     # Now let's update the "fast" housekeeping telemetry in the binary table
     MIXER = data['MIXER']
@@ -257,7 +262,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     # Now we can loop through all the rows and assign the closest HK in time.
     # While we are here, update data types and row flags.
     index=0
-    imonRange = (30.0, 40.0)
+    imonRange = (31.0, 41.0)
     for item in TYPE:
         if item == 'HOT' and SCANID[index] in listREF:
             TYPE[index] = 'REFHOT'
@@ -267,8 +272,12 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
         VMON[index] = vmon[closest][pIdx[bandNum-1][MIXER[index]]]-0.35
         IMON[index] = imon[closest][pIdx[bandNum-1][MIXER[index]]]
         GMON[index] = gmon[closest][pIdx[bandNum-1][MIXER[index]]]
+        if isKnownBad(SCANID[index], flagdefs.badScanIDs):
+            ROWFLAG[index] |= flagdefs.RowFlags.IGNORE_OBSLOG
         if IMON[index] < min(imonRange) or IMON[index] > max(imonRange):
             ROWFLAG[index] |= flagdefs.RowFlags.MIXER_MISPUMPED
+            if IMON[index] > 60:
+                ROWFLAG[index] |= flagdefs.RowFlags.MIXER_UNPUMPED
         index += 1
     
     
@@ -356,6 +365,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     now = datetime.now()
     header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
     header['DLEVEL'] = 0.7
+    header['VERSION'] = __version__
     header['SEQ_FLAG'] = seqFlag
 
     # now write it out

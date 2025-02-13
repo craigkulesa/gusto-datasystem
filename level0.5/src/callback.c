@@ -76,13 +76,14 @@ void get_proctime(char *proctime) {
 }
 
 
-void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array) {
+void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array, char *DACflag) {
     fitsfile *fptr;  // FITS file pointer
     int status = 0;  // CFITSIO status value MUST be initialized to zero!
     int array_length, band, npix, seqflag = 0;
     long nrows;
     char extname[] = "DATA_TABLE", proctime[256], line[4];
-    float linefreq;
+    char version[] = "20250212";
+    float linefreq, dlevel=0.5;
     
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
     if (fits_open_file(&fptr, filename, READWRITE, &status)) {
@@ -115,15 +116,17 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             }
 
 	    // Create some Primary header keyword value pairs and fill them from the current fits_header struct
-            fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
+            fits_write_key(fptr, TINT,    "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
             fits_write_key(fptr, TSTRING, "TELESCOP",  "GUSTO",   "Observatory Name", &status);
             fits_write_key(fptr, TSTRING, "LINE",      &line,     "Line Name", &status);
             fits_write_key(fptr, TFLOAT,  "LINEFREQ",  &linefreq, "Line freq in GHz", &status);
             fits_write_key(fptr, TINT,    "BAND",      &band,     "GUSTO band #",     &status);
             fits_write_key(fptr, TINT,    "NPIX",      &npix,     "N spec pixels",    &status);
-            fits_write_key(fptr, TSTRING, "DLEVEL",    "0.5",      "data level",      &status);
+	    fits_write_key(fptr, TSTRING, "DACFLAG",   DACflag,   "flag for ACS DACs", &status);
+            fits_write_key(fptr, TFLOAT,  "DLEVEL",    &dlevel,    "data level",      &status);
             get_proctime(proctime);
             fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time",  &status);
+	    fits_write_key(fptr, TSTRING, "VERSION",   version,   "version number",   &status);
             fits_write_key(fptr, TINT,    "SEQ_FLAG",   &seqflag,       "SEQUENCE FLAG",    &status);
 
 
@@ -275,6 +278,7 @@ void callback(char *filein){
    strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
 
    char *datafile;	// datafile is filename with no path - used in fits header
+   char DACflag[16];
    datafile = strrchr(fullpath, '/');
    if (datafile != NULL) {
 	   datafile++;
@@ -434,8 +438,7 @@ void callback(char *filein){
            (corr.corrtime*256.)/(FS_FREQ*1000000.)<0.1 || (corr.corrtime*256.)/(FS_FREQ*1000000.)>10.0 )
       {
          printf("######################## ERROR ###########################\n");
-         printf("#                Error, data is no good!                 #\n");
-         printf("#                        Exiting!                        #\n");
+         printf("#                  Data are no good!                     #\n");
          printf("######################## ERROR ###########################\n");
          printf("CORRTIME was %.6f\n", (corr.corrtime*256.)/(FS_FREQ*1000000.));
 	 error = TRUE;
@@ -448,6 +451,7 @@ void callback(char *filein){
 	CALID = getDACVfromInflux(band, scanIDregex);
 	lastScanID = scanID;  // we now have data for this scanID 
 	lastBand = band;      // and band
+	snprintf(DACflag, sizeof(DACflag), "OK");
       }
 	// just copy from vector into floats
       VIhi = dacV[DEV-1][0];
@@ -457,30 +461,26 @@ void callback(char *filein){
 
 	// this section unfuck-ifys special cases when ICE was off by one
       if (VQlo==0.){
+	snprintf(DACflag, sizeof(DACflag), "FIXED");
 	VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
 	VQhi = dacV[DEV-1][0];
 	VIlo = dacV[DEV-1][1];
 	VQlo = dacV[DEV-1][2];
       }
       
-      if (VIhi==0.){ //Still no values?  bail and don't make spectra
-	printf("######################## ERROR ###########################\n");
-	printf("#                  Error, no DAC values!                 #\n");
-	printf("#                        Exiting!                        #\n");
-	printf("######################## ERROR ###########################\n");
-	break;
+      if (VIhi==0. || VIhi > 2.5 || VIhi < 2.0){ //Still no reasonable values?  Guess but flag it
+	VIhi = VQhi = 2.10;
+	VIlo = VQlo = 1.90;
+	snprintf(DACflag, sizeof(DACflag), "EFFED");
+	printf("######################## WARN ###########################\n");
+	printf("#                no valid DAC values!                   #\n");
+	printf("######################## WARN ###########################\n");
       }
+      
       if (DEBUG)
 	printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
-      
-      if (NBYTES==8256)
-         N = 512;
-      else if (NBYTES==6208)
-         N = 384;
-      else if (NBYTES==4160)
-         N = 256;
-      else if (NBYTES==2112)
-         N = 128;
+
+      N = round(((float)NBYTES-64.)/16.);
       int specA = (int) N/128 - 1;
 
       //We don't know the lag # until we open the file, so malloc now
@@ -604,7 +604,7 @@ void callback(char *filein){
 	 sprintf(fitsfile, "./build/B1/ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
       if (DEBUG)
          printf("%s\n", fitsfile);
-      append_to_fits_table(fitsfile, fits_header, array); 
+      append_to_fits_table(fitsfile, fits_header, array, DACflag); 
 
       // Free items before next spectra within this file
       // All of these objects are malloced at the start of every spectrum
