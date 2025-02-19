@@ -22,7 +22,7 @@ C2K = 273.15
 CDELT = [5000.0/511.0, 5000.0/1023.0] 
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
-__version__ = '20250212'
+__version__ = '20250217'
 
 def flatten(xss):
     return [x for xs in xss for x in xs]

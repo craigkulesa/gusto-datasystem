@@ -8,6 +8,10 @@
 #include <curl/curl.h>
 #include <fitsio.h>
 
+// make sure these are consistent with later flagdefs.py in ./common
+#define DAC_CAL_FIXED 25
+#define DAC_CAL_EFFED 31
+
 // function to process correlator lag file
 void callback(char *filein);
 

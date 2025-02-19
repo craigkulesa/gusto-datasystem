@@ -18,12 +18,13 @@ class RowFlags(IntFlag):
     BAD_BASELINE = auto()
     UNABLE_TO_PROCESS = auto()
     IGNORE_OBSLOG = auto()
+    DAC_CAL_FIXED = 1 << 25
     RINGING_BIT0 = 1 << 26
     RINGING_BIT1 = 1 << 27
     QUALITY_BIT0 = 1 << 28
     QUALITY_BIT1 = 1 << 29
     QUALITY_BIT2 = 1 << 30
-
+    DAC_CAL_EFFED = 1 << 31
 
 class ChanFlags(IntFlag):
     BADCHAN = auto()
