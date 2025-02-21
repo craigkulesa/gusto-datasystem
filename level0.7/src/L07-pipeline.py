@@ -123,27 +123,35 @@ def makeUDP(startID, stopID, dir):
     output = []
     for file in range(startID, 1+stopID):
         filename = dir+'udp_'+str(file).zfill(5)+'.dat'
-        stream = open(filename, "rb")
-
-        while True:
-            chunk = stream.read(BUFSIZE)
-            if not chunk:
-                break 
-            data=struct.unpack('<2I5f2I15d',chunk)
-            output.append(list(data))  # convert tuple to list to modify the time
-        stream.close()
-
+        try:
+            with open(filename, "rb") as stream:
+                while True:
+                    chunk = stream.read(BUFSIZE)
+                    if not chunk:
+                        break 
+                    data=struct.unpack('<2I5f2I15d',chunk)
+                    output.append(list(data))  # convert tuple to list to modify the time
+        except Exception as error:
+            print(error)
+            return np.array([0])
     for entry in output:  # convert integer timespec to floating point unixtime
         entry[0] = entry[0]+entry[1]/1.0e9
     return np.array(output)
 
 
-def getInflux(startTime, endTime, queryStr):
-    startTime = int((startTime-600)*1.0e+09)
+def getInflux(startTime, endTime, queryStr, seqFlag):
+    startTime = int((startTime-900)*1.0e+09)
     endTime = int(endTime*1.0e+09)
     client = InfluxDBClient(host='localhost', port=8086, database='gustoDBlp')
     query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC LIMIT 1"
-    return client.query(query)
+    results = client.query(query)
+    if results.items() == []:  # try again with a longer timebase.  This should be very rare
+        print("WARNING:  Nothing from influx query", queryStr, "returned.")
+        if queryStr == 'B2_AD590_' or queryStr == 'B1_AD590_':
+            seqFlag |= flagdefs.SeqFlags.MAYBE_HUNG_LO
+        else:
+            seqFlag |= flagdefs.SeqFlags.MISSING_HK
+    return results, seqFlag
 
 
 def getIFinfo(startTime):
@@ -154,9 +162,8 @@ def getIFinfo(startTime):
 
     for index,value in enumerate(data['time']):
         if value > startTime:
-            idx = index-1
             break
-    info = (data['IF0'][idx], data['VLSR'][idx], data['object'][idx], data['LO1'][idx], data['LO2'][idx])
+    info = (data['IF0'][index-1], data['VLSR'][index-1], data['object'][index-1], data['LO1'][index-1], data['LO2'][index-1])
     return info
 
 
@@ -183,14 +190,15 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
                     data[col.name].extend(hdul2[1].data[col.name])
                     
     nrows = len(data[columns[0].name])
-
+    
     # The level 0.7 data is now merged! Now we modify table and header contents
     # first, let's get interpolated RA, DEC for every row
     UNIXTIME = data['UNIXTIME']
-    (udpTime, udpRA, udpDEC) = (pointingStream[:,0], pointingStream[:,5], pointingStream[:,6])
-    data['RA'] = [RAD2DEG*np.interp(t, udpTime, udpRA) for t in UNIXTIME]
-    data['DEC'] = [RAD2DEG*np.interp(t, udpTime, udpDEC) for t in UNIXTIME]
-
+    if len(pointingStream) > 1:
+        (udpTime, udpRA, udpDEC) = (pointingStream[:,0], pointingStream[:,5], pointingStream[:,6])
+        data['RA'] = [RAD2DEG*np.interp(t, udpTime, udpRA) for t in UNIXTIME]
+        data['DEC'] = [RAD2DEG*np.interp(t, udpTime, udpDEC) for t in UNIXTIME]
+        
     # Now let's update the "fast" housekeeping telemetry in the binary table
     MIXER = data['MIXER']
     TYPE = data['scan_type']
@@ -225,13 +233,13 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
             vmon.append(curTime)
             imon.append(curTime)
             gmon.append(curTime)
-            results=getInflux(curTime-fuzz, curTime+fuzz, 'PSatI_B'+str(bandNum)+'M')
+            results,seqFlag = getInflux(curTime-fuzz, curTime+fuzz, 'PSatI_B'+str(bandNum)+'M', seqFlag)
             for i in pList[bandNum-1]:
                 qStr = 'PSatI_B'+str(bandNum)+'M'+str(i)
                 points = results.get_points(measurement=qStr)
                 for point in points:
                     psat.append(point['cur'])
-            results=getInflux(curTime-fuzz, curTime+fuzz, 'bias')
+            results,seqFlag = getInflux(curTime-fuzz, curTime+fuzz, 'bias', seqFlag)
             for i in pList[bandNum-1]:
                 qStr = 'biasVltB'+str(bandNum)+'M'+str(i)
                 points = results.get_points(measurement=qStr)
@@ -241,7 +249,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
                 points = results.get_points(measurement=qStr)
                 for point in points:
                     imon.append(point['cur'])
-            results=getInflux(curTime-fuzz, curTime+fuzz, 'B'+str(bandNum)+'_GMONI_')
+            results,seqFlag = getInflux(curTime-fuzz, curTime+fuzz, 'B'+str(bandNum)+'_GMONI_', seqFlag)
             for i in pList[bandNum-1]:
                 qStr = 'B'+str(bandNum)+'_GMONI_'+str(i)
                 points = results.get_points(measurement=qStr)
@@ -250,15 +258,20 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
             newHOT=False
         index += 1
 
+    skipHKinsert = False
     psat = np.array(psat)
-    psat = psat.reshape(int(psat.shape[0]/5.0), 5)
     vmon = np.array(vmon)
-    vmon = vmon.reshape(int(vmon.shape[0]/5.0), 5)
     imon = np.array(imon)
-    imon = imon.reshape(int(imon.shape[0]/5.0), 5)
     gmon = np.array(gmon)
-    gmon = gmon.reshape(int(gmon.shape[0]/5.0), 5)
-    
+    try:
+        psat = psat.reshape(int(psat.shape[0]/5.0), 5)
+        vmon = vmon.reshape(int(vmon.shape[0]/5.0), 5)
+        imon = imon.reshape(int(imon.shape[0]/5.0), 5)
+        gmon = gmon.reshape(int(gmon.shape[0]/5.0), 5)
+    except Exception as e:
+        skipHKinsert = True
+        print("WARNING: Missing fast HK, some columns will have zeroed bias data")
+        
     # Now we can loop through all the rows and assign the closest HK in time.
     # While we are here, update data types and row flags.
     index=0
@@ -267,16 +280,17 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
         if item == 'HOT' and SCANID[index] in listREF:
             TYPE[index] = 'REFHOT'
         curTime = UNIXTIME[index]
-        closest = np.argmin(np.abs(psat[:,0] - curTime))
-        PSAT[index] = psat[closest][pIdx[bandNum-1][MIXER[index]]]
-        VMON[index] = vmon[closest][pIdx[bandNum-1][MIXER[index]]]-0.35
-        IMON[index] = imon[closest][pIdx[bandNum-1][MIXER[index]]]
-        GMON[index] = gmon[closest][pIdx[bandNum-1][MIXER[index]]]
+        if skipHKinsert == False:
+            closest = np.argmin(np.abs(psat[:,0] - curTime))
+            PSAT[index] = psat[closest][pIdx[bandNum-1][MIXER[index]]]
+            VMON[index] = vmon[closest][pIdx[bandNum-1][MIXER[index]]]-0.35
+            IMON[index] = imon[closest][pIdx[bandNum-1][MIXER[index]]]
+            GMON[index] = gmon[closest][pIdx[bandNum-1][MIXER[index]]]
         if isKnownBad(SCANID[index], flagdefs.badScanIDs):
             ROWFLAG[index] |= flagdefs.RowFlags.IGNORE_OBSLOG
         if IMON[index] < min(imonRange) or IMON[index] > max(imonRange):
             ROWFLAG[index] |= flagdefs.RowFlags.MIXER_MISPUMPED
-            if IMON[index] > 60:
+            if IMON[index] > 60 or IMON[index] < 0.0:
                 ROWFLAG[index] |= flagdefs.RowFlags.MIXER_UNPUMPED
         index += 1
     
@@ -297,11 +311,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
                    "Calibration load temp", "OVCS AVC Cryocooler CTRL temp",
                    "Cooling Loop Supply temp",  "Cradle 1 temp", "Equilibar Reference temp",
                    "Secondary temp")
-    results=getInflux(min(UNIXTIME), max(UNIXTIME), "HK_TEMP")
-    if results.items() == []:
-        print("Nothing returned!")
-
-
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), "HK_TEMP", seqFlag)
     for i in range(1,17):
         qStr = "HK_TEMP"+str(i)
         points = results.get_points(measurement=qStr)
@@ -312,10 +322,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
 
     lotemp_names = ("UNUSED","B1_SYNTH","UNUSED","UNUSED", "B1M5_AMP","UNUSED","UNUSED","UNUSED","B1_PWR_1","B1_PWR_2","B1_PWR_3","B1_PWR_4","B2_UCTRL","B2MLTDRV","UNUSED","UNUSED", "UNUSED","B2AVA183","B1M5MULT","B2M5_AMP","B2_PWR_1","B2_PWR_2", "B2_PWR_3","B2_PWR_4")
     lotemp_descs = ("UNUSED", "B1 LO Synthesizer", "UNUSED", "UNUSED", "B1 LO Spacek amplifier Ch5", "UNUSED", "UNUSED", "UNUSED", "B1 LO Pwr Box 1",  "B1 LO Pwr Box 2", "B1 LO Pwr Box 3", "B1 LO Pwr Box 4", "B2 MK66FX uCTRL", "B2 Mult Driver", "UNUSED", "UNUSED", "UNUSED", "B2 LO X-band Amplifier",  "B1 LO final tripler Ch5",  "B2 LO Spacek amplifier Ch5",  "B2 LO Pwr Box 1", "B2 LO Pwr Box 2", "B2 LO Pwr 3", "B2 LO Pwr 4")
-    results=getInflux(min(UNIXTIME), max(UNIXTIME), "B1_AD590_")
-    if results.items() == []:
-        print("Nothing returned!")
-
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), "B1_AD590_", seqFlag)
     for i in range(0,12):
         qStr = "B1_AD590_"+str(i)
         points = results.get_points(measurement=qStr)
@@ -323,10 +330,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
             if lotemp_names[i] != "UNUSED":
                 header[lotemp_names[i]] = (C2K+point['temp'],  lotemp_descs[i])
 
-    results=getInflux(min(UNIXTIME), max(UNIXTIME), "B2_AD590_")
-    if results.items() == []:
-        print("Nothing returned!")
-
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), "B2_AD590_", seqFlag)
     for i in range(12,24):
         qStr = "B2_AD590_"+str(i-12)
         points = results.get_points(measurement=qStr)
@@ -339,9 +343,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
                   "temp mixers (K)", "temp outer shield (K)", "temp outer vapor shield (K)",
                   "temp QCL (K)", "temp liquid-He tank (K)")
 
-    results=getInflux(min(UNIXTIME), max(UNIXTIME), "DT670")
-    if results.items() == []:
-        print("Nothing returned!")
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), "DT670", seqFlag)
     i=0
     for name in cryo_names:
         qStr = 'DT670_'+name
@@ -350,9 +352,10 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
             header['T_'+cryo_names[i]] = (point['cryo'], cryo_descs[i])
         i += 1
 
-    header['GON_ALT'] = (np.mean(pointingStream[:,2]), 'Gondola Altitude (m)')
-    header['GON_LON'] = (RAD2DEG*np.mean(pointingStream[:,3]), 'Gondola Longitude (deg)')
-    header['GON_LAT'] = (RAD2DEG*np.mean(pointingStream[:,4]), 'Gondola Latitude (deg)')
+    if len(pointingStream) > 1:
+        header['GON_ALT'] = (np.mean(pointingStream[:,2]), 'Gondola Altitude (m)')
+        header['GON_LON'] = (RAD2DEG*np.mean(pointingStream[:,3]), 'Gondola Longitude (deg)')
+        header['GON_LAT'] = (RAD2DEG*np.mean(pointingStream[:,4]), 'Gondola Latitude (deg)')
 
     info = getIFinfo(np.mean(UNIXTIME))
     header['OBJECT'] = (info[2], 'Name of the target object')

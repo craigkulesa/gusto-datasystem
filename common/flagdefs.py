@@ -3,9 +3,7 @@ from enum import IntFlag, auto
 class RowFlags(IntFlag):
     BAD_DATA = auto()
     BAD_DATA_LEN = auto()
-    MISSING_ACS = auto()
     NO_HK = auto()
-    HK_MISALIGNED = auto()
     BAD_PHASE = auto()
     MISSING_INT = auto()
     MIXER_MISPUMPED = auto()
@@ -17,14 +15,14 @@ class RowFlags(IntFlag):
     ALL_NAN = auto()
     BAD_BASELINE = auto()
     UNABLE_TO_PROCESS = auto()
-    IGNORE_OBSLOG = auto()
+    LO_SYNTH_UNLOCKED = auto()
     DAC_CAL_FIXED = 1 << 25
     RINGING_BIT0 = 1 << 26
     RINGING_BIT1 = 1 << 27
     QUALITY_BIT0 = 1 << 28
     QUALITY_BIT1 = 1 << 29
     QUALITY_BIT2 = 1 << 30
-    DAC_CAL_EFFED = 1 << 31
+    DAC_CAL_FAKED = 1 << 31
 
 class ChanFlags(IntFlag):
     BADCHAN = auto()
@@ -40,6 +38,8 @@ class ChanFlags(IntFlag):
     IGNORE = 1 << 15
 
 class SeqFlags(IntFlag):
+    MISSING_HK = auto()
+    MAYBE_HUNG_LO = auto()
     MISSING_HOT = auto()
     MISSING_REF = auto()
     NOREFS = auto()
