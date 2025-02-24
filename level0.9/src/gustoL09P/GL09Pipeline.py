@@ -352,12 +352,14 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                   'debug': cfi['gprocs']['debug'], 'verbose': verbose,
                   'vcut': vcut, 'pxrange': pxrange, 'mranges': mranges,
                   'pvrange': pvrange, 
-                  'addpixelflag': cfi['gprocs']['addpixelflag']}
+                  'addpixelflag': cfi['gprocs']['addpixelflag'],
+                  'checkringflag': cfi['gprocs']['checkringflag']}
         paramlist = [[a, b] for a in dfiles for b in [params]]
 
         if verbose:
             print('Number of data files: ', n_ds, len(sdirs))
             print('Selected data files: ', dfiles)
+            print('checkringflag:', cfi['gprocs']['checkringflag'])
         
         
         # setup multiprocessing loop here to process each file in list
@@ -393,6 +395,7 @@ def processL08(paramlist):
     vcut = params['vcut']
     mranges = params['mranges']
     addpixelflag = params['addpixelflag']
+    checkringflag = params['checkringflag']
     # good pixel ranges
     pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
     # ringing check ranges
@@ -441,8 +444,6 @@ def processL08(paramlist):
             # set the spur flag for the mranges
             data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] ,(1<<7))
             spec.mask = data['CHANNEL_FLAG']
-
-    #rowFlag = data['ROW_FLAG']
     
     n_spec, n_pix = spec.shape
     
@@ -452,6 +453,7 @@ def processL08(paramlist):
     tsyseff_avg = np.zeros(umixers.size)
     aTsyseff = np.zeros([n_spec,n_pix])
     ahcorr = np.zeros([n_spec,n_pix])
+    ascorr = np.zeros([n_spec,n_pix])
     aspref = np.zeros([n_spec,n_pix])
     aspref2 = np.zeros([n_spec,n_pix])
     afrac = np.zeros([n_spec,2])
@@ -487,7 +489,7 @@ def processL08(paramlist):
             print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
             print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
-            data['ROW_FLAG'][msel] = 4   # flagged as missing data
+            data['ROW_FLAG'][msel] |= 4   # flagged as missing data
             datavalid[k] = False
             return 0
         
@@ -500,7 +502,7 @@ def processL08(paramlist):
             datavalid[k] = False
             continue
         tsys_mean = np.nanmean(tsys[:,pxrange[0]:pxrange[1]])
-        print('<Tsys>: ', tsys_mean)
+        print('<Tsys_%i>: %.2f'%(mix, tsys_mean))
         tsys.fill_value = 0.0
         #print('tsys shape: ', tsys.shape)
         #print(list(tsys))
@@ -533,7 +535,7 @@ def processL08(paramlist):
             print('HOTs: ', hotID)
             print('mixer: ', mix)
             datavalid[k] = False
-            data['ROW_FLAG'][msel] = 1<<19   # flagged as missing data
+            data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
             continue
 
         spec_OTF = np.squeeze(spec[osel,:])
@@ -551,6 +553,7 @@ def processL08(paramlist):
         ta2.mask = spec.mask
         tsyseff = np.zeros([n_OTF, n_opix])
         hcorr = np.zeros([n_OTF, n_opix])
+        scorr = np.zeros([n_OTF, n_opix])
         spref = np.zeros([n_OTF, n_opix])
         spref2 = np.zeros([n_OTF, n_opix])
         if drmethod==3:
@@ -577,12 +580,15 @@ def processL08(paramlist):
             aghmix.append(np.zeros(n_ghots)+mix)
         else:
             print('No hots available...')
-            data['ROW_FLAG'][msel] = 1<<19   # flagged as missing data
+            data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
             continue
         
 
         atsys.append(tsys)
         atsmix.append(mix)
+        
+        # for debugging, add file indicator of method for drmethod=3
+        fadd = ''
         
     
         # create the calibrated spectra
@@ -613,15 +619,18 @@ def processL08(paramlist):
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0],:]
                 # hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
                 # determine the hots-reduced REF spectra
-                spref[i0,:] = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
+                # spref[i0,:] = (fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]) * hcorr[i0,:]
+                scorr[i0,:] = hcorr[i0,:] / (fracb[i0] * rhots[0,:] + fraca[i0] * rhots[1,:])
+                spref[i0,:] = (fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]) * scorr[i0,:]
                 spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
                 
                 # put everything together. issue: divide by zero -> catch in masks
-                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
+                ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref[i0,:]
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
                 #print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), 
                 #      ta2[i0,200:400].min(), ta2[i0,200:400].max()))
             elif drmethod==3:
+                fadd = '_m3'
                 # method 2: using HOTS to mitigate drifts
                 # apply the REFHOTS to the refs
                 # ToDo: check if the inttime of refs/hots/otfs matters
@@ -638,9 +647,16 @@ def processL08(paramlist):
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
                 else:
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0],:]
-                hcorr_sm[i0,:] = savgol_filter(np.where(np.isnan(hcorr[i0,:]), 0, hcorr[i0,:]), window_length=5, polyorder=2) 
+                    
+                # before hcorr can be smoothed, it has to be interpolated
+                #hcorr_sm[i0,:] = savgol_filter(np.where(np.isnan(hcorr[i0,:]), 0, hcorr[i0,:]), window_length=5, polyorder=2)
+                cflag = data['CHANNEL_FLAG'][i0,:]
+                hcorr_sm[i0,:] = smoothSpectrum(hcorr[i0,:], cflag, window_length=5, polyorder=2)
                 
-                tsyseff_sm[i0,:] = savgol_filter(np.where(np.isnan(tsyseff[i0,:]), 0, tsyseff[i0,:]), window_length=5, polyorder=2) 
+                # before tsys_eff can be smoothed, it has to be interpolated
+                #tsyseff_sm[i0,:] = savgol_filter(np.where(np.isnan(tsyseff[i0,:]), 0, tsyseff[i0,:]), window_length=5, polyorder=2)
+                tsyseff_sm[i0,:] = smoothSpectrum(tsyseff[i0,:], cflag, window_length=5, polyorder=2)
+                
                 # smoothing options
                 # import glidertools.cleaning as gc
                 # filtered = gc.savitzky_golay(data, window_length=5, polyorder=2)
@@ -652,10 +668,13 @@ def processL08(paramlist):
                 # also include scaling the ref to the on to first order with a single scaling factor (averaged over 
                 # the important spectrum range at least from -200 to 200 km/s) to minimize offsets
                 # determine the hots-reduced REF spectra
+                
                 spref[i0,:] = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
                 spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
-                spref_sm[i0,:] = savgol_filter(np.where(np.isnan(spref[i0,:]), 0, spref[i0,:]), window_length=5, polyorder=2)
-                spref2_sm[i0,:] = savgol_filter(np.where(np.isnan(spref2[i0,:]), 0, spref2[i0,:]), window_length=5, polyorder=2)
+                # spref_sm[i0,:] = savgol_filter(np.where(np.isnan(spref[i0,:]), 0, spref[i0,:]), window_length=5, polyorder=2)
+                # spref2_sm[i0,:] = savgol_filter(np.where(np.isnan(spref2[i0,:]), 0, spref2[i0,:]), window_length=5, polyorder=2)
+                spref_sm[i0,:] = smoothSpectrum(spref_sm[i0,:], cflag, window_length=5, polyorder=2)
+                spref2_sm[i0,:] = smoothSpectrum(spref2_sm[i0,:], cflag, window_length=5, polyorder=2)
                 
                 # put everything together. issue: divide by zero -> catch in masks
                 scl[i0,:] = spec_OTF[i0,:] / (spref_sm[i0,:]*hcorr_sm[i0,:])
@@ -679,6 +698,7 @@ def processL08(paramlist):
         tsyseff_avg[k] = np.nanmean(tsys[:,int(pxrange[0]):int(pxrange[1])+1])
         aTsyseff[osel,:] = tsyseff
         ahcorr[osel,:] = hcorr
+        ascorr[osel,:] = scorr
         aspref[osel,:] = spref
         afrac[osel,0] = fraca
         afrac[osel,1] = fracb
@@ -722,10 +742,12 @@ def processL08(paramlist):
                 tsp = tsp - np.polyval(p, xx)
                 var[i] = np.abs((np.nanmax(tsp) - np.nanmin(tsp)) / np.nanmean(tsp))
                 if (np.abs(var[i]) >= vcut):
-                    data['ROW_FLAG'][i] = (1 << 14) # set bit 14
+                    if checkringflag:
+                        data['ROW_FLAG'][i] |= (1 << 14) # set bit 14
             else:
                 var[i] = 9999
-                data['ROW_FLAG'][i] = (1 << 13)   # set bit 13
+                if checkringflag:
+                    data['ROW_FLAG'][i] |= (1 << 13)   # set bit 13
         else:
             var[i] = 0.0
         # if debug:
@@ -761,7 +783,10 @@ def processL08(paramlist):
     hdr.set('', value='', after='procmeth')
     
     os.makedirs(outDir, exist_ok=True)
-    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
+    if drmethod==3:
+        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
+    else:
+        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=data, header=hdr1)
     
@@ -776,19 +801,20 @@ def processL08(paramlist):
         col2 = Column(ahcorr, name='hcorr', description='effective hot spectrum')
         col3 = Column(aspref, name='spref', description='effective hot for ref spectrum')
         col4 = Column(aspref2, name='spref2', description='ref spectrum')
+        col5 = Column(ascorr, name='scorr', description='effective hot spectrum correction')
         if drmethod==3:
-            col9 = Column(ahcorr_sm, name='hcorr_sm', description='effective smoothed hot spectrum')
-            col10 = Column(aspref_sm, name='spref_sm', description='effective smoothed hot for ref spectrum')
-            col11 = Column(aspref2_sm, name='spref2_sm', description='smoothed ref spectrum')
-            col12 = Column(aTsyseff_sm, name='Tsyseff_sm', description='smoothed effective Tsys per OTF spectrum')
-        col5 = Column(afrac, name='frac', description='fraction of Tsys1/2')
-        col6 = Column(spec_org, name='spec', description='original spectra')
-        col7 = Column(aTa2, name='tant', description='spectrum without hot correction')
-        col8 = Column(var, name='ringvar', description='value for determining if ringing in spectrum')
+            col10 = Column(ahcorr_sm, name='hcorr_sm', description='effective smoothed hot spectrum')
+            col11 = Column(aspref_sm, name='spref_sm', description='effective smoothed hot for ref spectrum')
+            col12 = Column(aspref2_sm, name='spref2_sm', description='smoothed ref spectrum')
+            col13 = Column(aTsyseff_sm, name='Tsyseff_sm', description='smoothed effective Tsys per OTF spectrum')
+        col6 = Column(afrac, name='frac', description='fraction of Tsys1/2')
+        col7 = Column(spec_org, name='spec', description='original spectra')
+        col8 = Column(aTa2, name='tant', description='spectrum without hot correction')
+        col9 = Column(var, name='ringvar', description='value for determining if ringing in spectrum')
         if drmethod==3:
-            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12])
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13])
         else:
-            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8])
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9])
         hdre1 = fits.Header()
         hdre1.set('vcut', value=vcut, comment='ringing treshold used with ringvar')
         fits.append(ofile, data=fT.as_array())

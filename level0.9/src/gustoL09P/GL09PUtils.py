@@ -32,6 +32,7 @@ import warnings
 import pkg_resources
 from astropy.io import fits
 from tqdm import tqdm
+from scipy.signal import savgol_filter
 import logging
 log = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ def getRange(icpar, dtype='float', endpoint=True):
 
 
 def getValues(icpar, dtype='float'):
-    """Function converting str data to numpy float array.
+    """Function converting str data arrays to numpy float array.
         
     Parameters
     ----------
@@ -670,10 +671,63 @@ def getHotInfo_old(spec, data, mixer, verbose=False):
 
     
 def readMaskRanges(mfile):
+    r"""Function .
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
+    Examples
+    --------
+    """
     
     data = np.loadtxt(mfile, delimiter=',').astype(int)
     
     return data
 
 
+def smoothSpectrum(spec, cflag, window_length=5, polyorder=2):
+    r"""Function smoothing spectrum. Before smoothing the spectrum, missing data or nan's are 
+    replaced by interpolated values to avoid edge effects.
+
+    Parameters
+    ----------
+    spec : 1D numpy array
+            single spectrum to be smoothed
+    cflag : 1D numpy array
+            channel flag or mask of values to be interpolated for smoothing
+    window_length : float
+            window length for interpolating 
+            (must be larger than gap of missing or masked data)
+    polyorder : float
+            polynomial order for interpolation
+
+    Returns
+    -------
+
+    Examples
+    --------
+    """
+    # good pixels
+    pargs = np.argwhere(cflag == 0).flatten()
+    # masked pixels
+    margs = np.argwhere(cflag > 0).flatten()
+
+    if (pargs.size>0) & (margs.size>0):
+        spec_int = spec.copy()
+        spec_int[margs] = np.interp(margs, pargs, spec[pargs])
+
+    elif (pargs.size>0) & (margs.size==0):
+        spec_int = spec
+    else:
+        # should never end here since something wrong with spectrum!
+        print(margs.size, pargs.size)
+   
+    # Savgol smoothing
+    # spec_sm = savgol_filter(np.where(np.isnan(spec_int), 0, spec_int), window_length=window_length, polyorder=polyorder) 
+    spec_sm = savgol_filter(spec_int, window_length=window_length, polyorder=polyorder)
+    
+    return spec_sm
     

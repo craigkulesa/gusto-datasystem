@@ -33,9 +33,13 @@ number_of_cpus = 10
 # list of processing parameters for individual pipelines
 l09save2fits = True
 l09set_channel_flags = True
+
 # threshold values for detecting ringing/bad data - subject to tuning!
+# the vcuts are different for lines, but the same for all mixers of each line
+checkringflag = False
 vcut1 = 6.0  
 vcut2 = 6.0
+
 # xiiprange: good pixel range
 # xiivrange: pixel range for checking ringing
 # NII
