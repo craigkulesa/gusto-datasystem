@@ -11,6 +11,7 @@ import os.path
 import numpy as np
 import configargparse
 import argparse
+import subprocess
 sys.path.append("../../common/")
 import flagdefs
 
@@ -23,12 +24,21 @@ CDELT = [5000.0/511.0, 5000.0/1023.0]
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
 __version__ = '20250224'
+commit_info = ''
 
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
 
 
+def runGitLog():
+    try:
+        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 0.7 commit %h by %an %ad', '--', './L07-pipeline.py'], capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return f"Error: {e}"
+
+    
 def makeSequences(input, output):
     print("Making new sequences file")
     newSeq = True
@@ -183,7 +193,7 @@ def isKnownBad(number, ranges):
     return False
 
 
-# slice and rearrange an influx query into table with time and mixer data in columns
+# split and rearrange an influx query into a table with time and mixer data in columns
 def splitConcatenate(array, dim=4):
     array = np.array(array)
     chunks = np.array_split(array, dim)
@@ -369,6 +379,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     header['DLEVEL'] = 0.7
     header['VERSION'] = __version__
     header['SEQ_FLAG'] = seqFlag
+    header['COMMENT'] = commit_info
     print("Sequence flag is", seqFlag)
     # now write it out
     hdu = fits.BinTableHDU.from_columns(columns, nrows=nrows)
@@ -427,7 +438,6 @@ def processSequence(options, line):
         print("seq", seqID, "NOT OK, flag is", seqFlag)
 
 
-
 if __name__ == '__main__':
     p = configargparse.ArgParser(default_config_files=['./L07-config', '~/.L07-config'])
     p.add('-c', '--config', required=False, is_config_file=True, help='config file path')
@@ -445,6 +455,7 @@ if __name__ == '__main__':
     bandNum=int(options.band)        
     dirDataOut = options.outpath + 'level0.7/'
     input = options.outpath + sequencesFile
+    commit_info = runGitLog()  # lookup git commit info only once
     
     if not os.path.exists(input):
         makeSequences(options.inpath+"dataLog.txt", options.outpath + sequencesFile)
