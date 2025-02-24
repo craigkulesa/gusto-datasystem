@@ -22,7 +22,8 @@ C2K = 273.15
 CDELT = [5000.0/511.0, 5000.0/1023.0] 
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
-__version__ = '20250217'
+__version__ = '20250224'
+
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -368,7 +369,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     header['DLEVEL'] = 0.7
     header['VERSION'] = __version__
     header['SEQ_FLAG'] = seqFlag
-
+    print("Sequence flag is", seqFlag)
     # now write it out
     hdu = fits.BinTableHDU.from_columns(columns, nrows=nrows)
     for colname in columns.names:
@@ -411,14 +412,13 @@ def processSequence(options, line):
     stop = int(options.scanid[1])
     dirUDP = options.inpath + 'udp/'
     dirDataIn = options.inpath + 'level0.5/'
-    dirDataOut = options.outpath + 'level0.7/' + bandPrefix[bandNum-1]
+    dirDataOut = options.outpath + 'level0.7/'
 
     (seqID, startID, endID, obsType, catName) = line[0:5]
     print("Processing sequence", seqID, "from", startID, "-", endID)
     fileList = makeFileGlob(int(startID), int(endID), bandNum, dirDataIn)
     seqFlag,listREF = checkSequence(fileList)
     if(seqFlag < flagdefs.SeqFlags.NOREFS):  # acceptable, process it
-        print("seq ", seqID, " OK, flag is ", seqFlag)            
         pointingStream = makeUDP(int(startID), int(endID), dirUDP)
         output_file = dirDataOut+outputPrefix[bandNum-1]+seqID+'_'+startID+'.fits'
         processFITS(fileList, output_file, bandNum, pointingStream, seqFlag, listREF)
@@ -443,7 +443,7 @@ if __name__ == '__main__':
     print(p.format_values())    # useful for logging where different settings came from
 
     bandNum=int(options.band)        
-    dirDataOut = options.outpath + 'level0.7/' + bandPrefix[bandNum-1]    
+    dirDataOut = options.outpath + 'level0.7/'
     input = options.outpath + sequencesFile
     
     if not os.path.exists(input):
