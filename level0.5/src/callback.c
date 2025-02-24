@@ -11,6 +11,8 @@
 struct coeffs c;
 int CALID = -1, lastBand = 0, lastScanID = 0;
 float dacV[4][4]; // DEV and then 0=VIhi, 1=VQhi, 2=VIlo, 3=VQlo
+extern char commit_info[256];
+
 
 // perform the polynomial fit to the QC correction
 // using the coefficients loaded from coeffs.txt at runtime
@@ -75,31 +77,11 @@ void get_proctime(char *proctime) {
    snprintf(proctime, BUFSIZ, "%s", date);
 }
 
-void get_git_commit_info(const char *filename, char *commit_info) {
-    char command[BUFSIZ];
-    FILE *fp;
-    char hash[BUFSIZ];
-
-    // Construct the command to get the commit hash
-    snprintf(command, sizeof(command), "git log -1 --format=%%cd --date=format-local:'%%Y-%%m-%%d %%H:%%M:%%S %%Z' --pretty=format:\"Commit %%h by %%an %%ad\" -- %s", filename);
-    fp = popen(command, "r");
-    if (fp == NULL) {
-        perror("popen");
-        exit(EXIT_FAILURE);
-    }
-    fgets(hash, sizeof(hash), fp);
-    pclose(fp);
-    hash[strcspn(hash, "\n")] = 0; // Remove trailing newline
-
-    // Combine hash and date into the commit_info string
-    snprintf(commit_info, BUFSIZ+sizeof(filename), "%s %s", filename, hash);
-}
-
 void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array) {
     fitsfile *fptr;  // FITS file pointer
     int array_length, band, npix, seqflag = 0, status = 0; // CFITSIO status must be initialized
     long nrows;
-    char extname[] = "DATA_TABLE", proctime[256], commit_info[256], line[4], version[] = "20250224";
+    char extname[] = "DATA_TABLE", proctime[256], comment[256], line[4], version[] = "20250224";
     float linefreq, dlevel=0.5;
     
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
@@ -143,12 +125,11 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             fits_write_key(fptr, TINT,    "SEQ_FLAG",   &seqflag,       "SEQUENCE FLAG",    &status);
 
 	    // Create some Primary header comments and fill them
-	    sprintf(commit_info, "See github.com/craigkulesa/gusto-datasystem");
-	    if (fits_write_comment(fptr, commit_info, &status)) {
+	    sprintf(comment, "See github.com/craigkulesa/gusto-datasystem");
+	    if (fits_write_comment(fptr, comment, &status)) {
 	        fits_report_error(stderr, status);
 		return;
-	    }
-	    get_git_commit_info("./src/callback.c", commit_info);
+	    }	    
 	    if (fits_write_comment(fptr, commit_info, &status)) {
 	        fits_report_error(stderr, status);
 		return;

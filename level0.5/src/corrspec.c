@@ -2,6 +2,7 @@
 #include "callback.h"
 
 extern struct coeffs c;
+char commit_info[256];
 
 // load up the QC coefficients from file and store as struct coeffs c
 int readQCfile()
@@ -17,12 +18,34 @@ int readQCfile()
 
 struct Spectrum spec[4];
 
+void get_git_commit_info(const char *filename, char *commit_info) {
+    char command[BUFSIZ];
+    FILE *fp;
+    char hash[BUFSIZ];
+
+    // Construct the command to get the commit hash
+    snprintf(command, sizeof(command), "git log -1 --format=%%cd --date=format-local:'%%Y-%%m-%%d %%H:%%M:%%S %%Z' --pretty=format:\"Commit %%h by %%an %%ad\" -- %s", filename);
+    fp = popen(command, "r");
+    if (fp == NULL) {
+        perror("popen");
+        exit(EXIT_FAILURE);
+    }
+    fgets(hash, sizeof(hash), fp);
+    pclose(fp);
+    hash[strcspn(hash, "\n")] = 0; // Remove trailing newline
+
+    // Combine hash and date into the commit_info string
+    snprintf(commit_info, BUFSIZ+sizeof(filename), "%s %s", filename, hash);
+}
+
 int main(int argc, char **argv) {
    // Set up SIGSEGV handler
    FILE *fp;
    char fileName[128];
 
    c.len = readQCfile();
+   // get git versioning once at start
+   get_git_commit_info("./src/callback.c", commit_info);
    
    // Setup all possible FFTW array lengths
    for(int i=0; i<4; i++){
