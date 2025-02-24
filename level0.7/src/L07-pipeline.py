@@ -91,18 +91,19 @@ def checkSequence(fileList):
     REF=0
     OTF=1
     HOT=2
-    typeStr = ['REF', 'OTF', 'HOT']
+    APS=3
+    typeStr = ['REF', 'OTF', 'HOT', 'SRC']
     type = []
     scanID = []
     isHOTREF = []
-    num = [0,0,0]
+    num = [0,0,0,0]
     
     for x in fileList:
         scanID.append(int(x[-10:-5]))
         type.append(x[-14:-11])
         if x[-14:-11] == 'REF':  
             isHOTREF.append(int(x[-10:-5]))  # add this scanID to list
-    for y in range(0,3):
+    for y in range(0,4):
         num[y] = type.count(typeStr[y])
 
     if(num[REF] < 2):
@@ -110,7 +111,7 @@ def checkSequence(fileList):
         if(num[REF] == 0):
             print("ERROR: no REFs found")
             seqFlag |= flagdefs.SeqFlags.NOREFS
-    if(num[OTF] == 0):
+    if(num[OTF] == 0 and num[APS] == 0):
         print("ERROR: no data!")
         seqFlag |= flagdefs.SeqFlags.NODATA
     if(num[HOT] != num[REF] + num[OTF]):
@@ -133,19 +134,25 @@ def makeUDP(startID, stopID, dir):
                     output.append(list(data))  # convert tuple to list to modify the time
         except Exception as error:
             print(error)
-            return np.array([0])
     for entry in output:  # convert integer timespec to floating point unixtime
         entry[0] = entry[0]+entry[1]/1.0e9
+    if len(output) == 0:
+        print("ERROR: No UDP data available for this sequence")
+        return np.array([0])
     return np.array(output)
 
 
-def getInflux(startTime, endTime, queryStr, seqFlag):
-    startTime = int((startTime-900)*1.0e+09)
+def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=900):
+    startTime = int((startTime-lookBack)*1.0e+09)
     endTime = int(endTime*1.0e+09)
     client = InfluxDBClient(host='localhost', port=8086, database='gustoDBlp')
-    query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC LIMIT 1"
-    results = client.query(query)
-    if results.items() == []:  # try again with a longer timebase.  This should be very rare
+    if getAll == False:
+        query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC LIMIT 1"
+        results = client.query(query)
+    else:
+        query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC"
+        results = client.query(query, epoch='ms')
+    if results.items() == []:  
         print("WARNING:  Nothing from influx query", queryStr, "returned.")
         if queryStr == 'B2_AD590_' or queryStr == 'B1_AD590_':
             seqFlag |= flagdefs.SeqFlags.MAYBE_HUNG_LO
@@ -173,6 +180,16 @@ def isKnownBad(number, ranges):
         if start <= number <= end:
             return True
     return False
+
+
+# slice and rearrange an influx query into table with time and mixer data in columns
+def splitConcatenate(array, dim=4):
+    array = np.array(array)
+    chunks = np.array_split(array, dim)
+    newarray = np.concatenate(chunks, axis=1)
+    chop = list(range(2, newarray.shape[1], 2))
+    newarray = np.delete(newarray, chop, axis=1)
+    return newarray
 
 
 def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, listREF):
@@ -210,68 +227,46 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     SCANID = data['scanID']
     pList = ((2,3,4,6), (2,3,5,8))
     pIdx = (0,0,1,2,3,0,4,0,0,0), (0,0,1,2,0,3,0,0,4,0)
-    prevItem = None
-    newHOT = False
     index = 0
     psat = []
     vmon = []
     imon = []
     gmon = []
-    fuzz = 15.0
-    # because the data are not in order, we need to make an array of HK data first
-    for item in TYPE:
-        curTime = UNIXTIME[index]
-        if item == 'HOT' and prevItem != 'HOT':
-            newHOT=True
-            hotTime = curTime
-        elif item == 'HOT' and prevItem == 'HOT' and curTime-hotTime > 30:
-            newHOT=True
-            hotTime = curTime
-        prevItem = item
-        if newHOT:
-            psat.append(curTime)
-            vmon.append(curTime)
-            imon.append(curTime)
-            gmon.append(curTime)
-            results,seqFlag = getInflux(curTime-fuzz, curTime+fuzz, 'PSatI_B'+str(bandNum)+'M', seqFlag)
-            for i in pList[bandNum-1]:
-                qStr = 'PSatI_B'+str(bandNum)+'M'+str(i)
-                points = results.get_points(measurement=qStr)
-                for point in points:
-                    psat.append(point['cur'])
-            results,seqFlag = getInflux(curTime-fuzz, curTime+fuzz, 'bias', seqFlag)
-            for i in pList[bandNum-1]:
-                qStr = 'biasVltB'+str(bandNum)+'M'+str(i)
-                points = results.get_points(measurement=qStr)
-                for point in points:
-                    vmon.append(point['volts'])
-                qStr = 'biasCurB'+str(bandNum)+'M'+str(i)
-                points = results.get_points(measurement=qStr)
-                for point in points:
-                    imon.append(point['cur'])
-            results,seqFlag = getInflux(curTime-fuzz, curTime+fuzz, 'B'+str(bandNum)+'_GMONI_', seqFlag)
-            for i in pList[bandNum-1]:
-                qStr = 'B'+str(bandNum)+'_GMONI_'+str(i)
-                points = results.get_points(measurement=qStr)
-                for point in points:
-                    gmon.append(point['cur'])
-            newHOT=False
-        index += 1
+
+    # because the data are not in time order, we need to make an array of HK data first
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), 'PSatI_B'+str(bandNum)+'M', seqFlag, getAll=True)
+    for i in pList[bandNum-1]:
+        qStr = 'PSatI_B'+str(bandNum)+'M'+str(i)
+        points = results.get_points(measurement=qStr)
+        for point in points:
+            psat.append((float(point['time']/1000.0), point['cur']))
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), 'bias', seqFlag, getAll=True)
+    for i in pList[bandNum-1]:
+        qStr = 'biasVltB'+str(bandNum)+'M'+str(i)
+        points = results.get_points(measurement=qStr)
+        for point in points:
+            vmon.append((float(point['time']/1000.0), point['volts']))
+        qStr = 'biasCurB'+str(bandNum)+'M'+str(i)
+        points = results.get_points(measurement=qStr)
+        for point in points:
+            imon.append((float(point['time']/1000.0), point['cur']))
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME),'B'+str(bandNum)+'_GMONI_', seqFlag, getAll=True)
+    for i in pList[bandNum-1]:
+        qStr = 'B'+str(bandNum)+'_GMONI_'+str(i)
+        points = results.get_points(measurement=qStr)
+        for point in points:
+            gmon.append((float(point['time']/1000.0), point['cur']))
 
     skipHKinsert = False
-    psat = np.array(psat)
-    vmon = np.array(vmon)
-    imon = np.array(imon)
-    gmon = np.array(gmon)
     try:
-        psat = psat.reshape(int(psat.shape[0]/5.0), 5)
-        vmon = vmon.reshape(int(vmon.shape[0]/5.0), 5)
-        imon = imon.reshape(int(imon.shape[0]/5.0), 5)
-        gmon = gmon.reshape(int(gmon.shape[0]/5.0), 5)
+        psat = splitConcatenate(psat)
+        vmon = splitConcatenate(vmon)
+        imon = splitConcatenate(imon)
+        gmon = splitConcatenate(gmon)
     except Exception as e:
         skipHKinsert = True
-        print("WARNING: Missing fast HK, some columns will have zeroed bias data")
-        
+        print("WARNING: ", e, "Missing fast HK, some columns will have zeroed bias data")
+
     # Now we can loop through all the rows and assign the closest HK in time.
     # While we are here, update data types and row flags.
     index=0
@@ -283,11 +278,14 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
         if skipHKinsert == False:
             closest = np.argmin(np.abs(psat[:,0] - curTime))
             PSAT[index] = psat[closest][pIdx[bandNum-1][MIXER[index]]]
+            closest = np.argmin(np.abs(vmon[:,0] - curTime))
             VMON[index] = vmon[closest][pIdx[bandNum-1][MIXER[index]]]-0.35
+            closest = np.argmin(np.abs(imon[:,0] - curTime))
             IMON[index] = imon[closest][pIdx[bandNum-1][MIXER[index]]]
+            closest = np.argmin(np.abs(gmon[:,0] - curTime))
             GMON[index] = gmon[closest][pIdx[bandNum-1][MIXER[index]]]
         if isKnownBad(SCANID[index], flagdefs.badScanIDs):
-            ROWFLAG[index] |= flagdefs.RowFlags.IGNORE_OBSLOG
+            ROWFLAG[index] |= flagdefs.RowFlags.LO_SYNTH_UNLOCKED
         if IMON[index] < min(imonRange) or IMON[index] > max(imonRange):
             ROWFLAG[index] |= flagdefs.RowFlags.MIXER_MISPUMPED
             if IMON[index] > 60 or IMON[index] < 0.0:
