@@ -45,5 +45,4 @@ class SeqFlags(IntFlag):
     NOREFS = auto()
     NODATA = auto()
     
-
-badScanIDs = [(1, 1000), (1001, 1002)]
+B2Unlocked = [(13756, 14114)]

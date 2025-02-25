@@ -295,7 +295,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
             IMON[index] = imon[closest][pIdx[bandNum-1][MIXER[index]]]
             closest = np.argmin(np.abs(gmon[:,0] - curTime))
             GMON[index] = gmon[closest][pIdx[bandNum-1][MIXER[index]]]
-        if isKnownBad(SCANID[index], flagdefs.badScanIDs):
+        if bandNum == 2 and isKnownBad(SCANID[index], flagdefs.B2Unlocked):
             ROWFLAG[index] |= flagdefs.RowFlags.LO_SYNTH_UNLOCKED
         if IMON[index] < min(imonRange) or IMON[index] > max(imonRange):
             ROWFLAG[index] |= flagdefs.RowFlags.MIXER_MISPUMPED

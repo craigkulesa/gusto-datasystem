@@ -1,5 +1,5 @@
 band = 2
-cpus = 4
+cpus = 2
 inpath = /home/ckulesa/data/GUSTO/
 outpath = /home/ckulesa/data/GUSTO/
 scanid = [9523, 9523]
