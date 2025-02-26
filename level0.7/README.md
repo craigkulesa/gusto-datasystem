@@ -49,3 +49,9 @@ where the arguments are:
 ## TEST DATA (generated 2/12/2025) ##
 - [Level 0.5 data (54 MB)](http://soral.as.arizona.edu/GUSTO/calibration/level05_20250212_test.tar.xz)
 - [Level 0.7 data (54 MB)](http://soral.as.arizona.edu/GUSTO/calibration/level07_20250212_test.tar.xz)
+
+
+## Data snapshot for Level 0.5 and Level 0.7 (2/25/2025) ##
+- [Level 0.5 data snapshot from 20250217 version](http://soral.as.arizona.edu/GUSTO/data/level0.5/) (organized by scanID)
+- [Level 0.7 data snapshot from 20250225 version](http://soral.as.arizona.edu/GUSTO/data/level0.7/) (organized by sequence ID), [see README](http://soral.as.arizona.edu/GUSTO/data/level0.7/README.txt)
+  
