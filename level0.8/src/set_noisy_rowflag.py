@@ -88,7 +88,7 @@ def doStuff(scan, args, ta_std, fitnes, tsys, resgood, resbad):
     scan_type = data['scan_type']
     mixer     = data['MIXER']
     unixtime  = data['UNIXTIME']
-    THOT      = data['THOT']
+    THOT      = header['THOT']
     ROW_FLAG  = data['ROW_FLAG']
 
     if(line=='NII'):
