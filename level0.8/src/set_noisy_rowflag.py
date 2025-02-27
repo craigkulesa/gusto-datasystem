@@ -84,7 +84,7 @@ def doStuff(scan, args, ta_std, fitnes, tsys, resgood, resbad):
 
     # READ DATA_TABLE
     data   = hdu[1].data
-    spec   = data['spec'] 
+    spec   = data['DATA'] 
     scan_type = data['scan_type']
     mixer     = data['MIXER']
     unixtime  = data['UNIXTIME']
