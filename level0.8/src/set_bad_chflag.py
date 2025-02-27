@@ -24,7 +24,7 @@ def doStuff(scan, args):
     line   = header['LINE']
     # read data_table
     data   = hdu[1].data
-    spec   = data['spec'] 
+    spec   = data['DATA'] 
     nrow   = len(spec)
     CHANNEL_FLAG = data['CHANNEL_FLAG']
 
