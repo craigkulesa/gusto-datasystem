@@ -1,11 +1,11 @@
 This folder contains source code for the level 0.8 pipeline, first-round deSpur.
 
 example usage of setting channel flags:
-python3 set_bad_ch_flags.py "ACS*_1450*"
+python3 set_bad_ch_flags.py --file "CII*"
 
-Will operate on Bands 1 and 2, from ScanID 14500 - 14509
+Will operate on CII data
 
-Any fits file matching the name ACS3_1450*.fits
+Any fits file matching the name CII*.fits
 
 Will skip files that already have the "set bad channel flag" in HISTORY
 
