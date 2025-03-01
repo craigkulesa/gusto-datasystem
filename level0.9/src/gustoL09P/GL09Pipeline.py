@@ -293,8 +293,12 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     # print('Lines: ', lines[0])
     # lines= ['CII', 'NII']
     
-    ignore = [8194, 8338, 9182, 9306, 9314, 9342, 10246, 10250, 10254, 10446, 10606, 
-              10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24531, 24803, 24881, 26294, 26296]
+    # these are the old values for the Oct 24 data sets
+    # ignore = [8194, 8338, 9182, 9306, 9314, 9342, 10246, 10250, 10254, 10446, 10606, 
+    #           10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24531, 24803, 24881, 26294, 26296]
+    
+    # these are for the Feb 25 data sets
+    ignore = []
     
     # load ranges for 2nd pixel masking
     
@@ -309,17 +313,17 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
         
         # load spikes masking data from files
         if line=='NII':
-            filter = 'ACS5*.fits'
+            filter = 'NII*.fits'
             mranges = readMaskRanges(pmfileB1)
         else:
-            filter = 'ACS3*.fits'
+            filter = 'CII*.fits'
             mranges = readMaskRanges(pmfileB2)
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
         
         sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
         #print('single result: ', sdirs[0], os.path.split(sdirs[0]))
-        dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
+        dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
         
         sdirs.sort(key=lambda sdirs: dsc)
         

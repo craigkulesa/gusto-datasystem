@@ -179,10 +179,10 @@ def getSpecScanTypes(mixer, spec, data, hdr, verbose=False):
     scanID = data['scanID']
     # ra     = data['RA']
     # dec    = data['DEC']
-    THOT   = data['THOT']
+    # Thot   = float(hdr['THOT'])
     scan_type = data['scan_type']
     row_flag = data['ROW_FLAG']      # spectra mask (one entry per spectrum)
-    ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
+    # ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
 
     rfsel = (mixer == mixers) & (scan_type == 'REF') & (row_flag==0)
     rfsID = np.unique(scanID[rfsel])
@@ -235,7 +235,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
 
     mixers  = data['MIXER']
     scanID = data['scanID']
-    THOT   = data['THOT']
+    Thot   = float(hdr['THOT'])
     scan_type = data['scan_type']
     row_flag = data['ROW_FLAG']      # spectra mask (one entry per spectrum)
     ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
@@ -264,7 +264,6 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     ttimes = []
     rtimes = []
     htimes = []
-    Thot = []
     for rhID in rhIDs:
         # determine yfactor
         rsel = (rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (row_flag==0)
@@ -280,15 +279,12 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
         htime = stime[hsel].mean()
         rtime = stime[rsel].mean()
         #print(list(spec[,:]))
-        
-        THOT_avg = THOT[hsel].sum(axis=0)/len(THOT[hsel])
-        
+                
         # estimate Tsys for each Device
         y_factor  = spec_h/spec_r
 
-        tsys = np.squeeze((THOT_avg - Tsky*y_factor[:])/(y_factor[:] - 1.))
+        tsys = np.squeeze((Thot - Tsky*y_factor[:])/(y_factor[:] - 1.))
 
-        Thot.append(THOT_avg)
         Tsyss.append(tsys)
         REFs.append(spec_r)
         RHOTs.append(spec_h)
