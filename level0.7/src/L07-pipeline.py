@@ -108,6 +108,8 @@ def checkSequence(fileList):
     scanID = []
     isHOTREF = []
     num = [0,0,0,0]
+    foundUpperREF = False
+    foundLowerREF = False
     
     for x in fileList:
         scanID.append(int(x[-10:-5]))
@@ -117,11 +119,26 @@ def checkSequence(fileList):
     for y in range(0,4):
         num[y] = type.count(typeStr[y])
 
-    if(num[REF] < 2):
-        seqFlag |= flagdefs.SeqFlags.MISSING_REF
-        if(num[REF] == 0):
-            print("ERROR: no REFs found")
-            seqFlag |= flagdefs.SeqFlags.NOREFS
+    if(num[REF] == 0):
+        print("ERROR: no REFs found")
+        seqFlag |= flagdefs.SeqFlags.NOREFS
+    elif(num[REF] > 0 and num[REF] < 2):
+        index = type.index('OTF')
+        OTFscanID = scanID[index]
+        refList= [i for i,e in enumerate(type) if e == 'REF']
+        for item in refList:
+            if scanID[item] < OTFscanID:
+                foundLowerREF = True
+            elif scanID[item] > OTFscanID:
+                foundUpperREF = True
+        if foundLowerREF == False:
+            seqFlag |= flagdefs.SeqFlags.MISSING_LEADING_REF
+            print("MISSING_LEADING_REF")
+        elif foundUpperREF == False:
+            seqFlag |= flagdefs.SeqFlags.MISSING_TRAILING_REF
+            print("MISSING_TRAILING_REF")
+        else:
+            print("ERROR: inconsistent REF count")
     if(num[OTF] == 0 and num[APS] == 0):
         print("ERROR: no data!")
         seqFlag |= flagdefs.SeqFlags.NODATA
