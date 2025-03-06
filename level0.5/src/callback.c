@@ -203,7 +203,10 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
         array_length=512;
     else if (fits_header->unit==4)
         array_length=1024;
-
+    else {
+        printf("ERROR: invalid ACS correlator specified\n");
+        return;
+    }
     // Move to the named HDU (where the table is stored)
     if (fits_movnam_hdu(fptr, BINARY_TBL, extname, 0, &status)) {
         fits_report_error(stderr, status);  // Print any error message

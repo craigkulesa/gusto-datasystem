@@ -13,6 +13,8 @@
 
 // function to process correlator lag file
 void callback(char *, char *);
+// inverse error function
+double erfinv (double);
 
 // structure to hold QC correction coefficients
 struct coeffs {
