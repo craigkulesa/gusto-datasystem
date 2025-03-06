@@ -23,7 +23,7 @@ C2K = 273.15
 CDELT = [5000.0/511.0, 5000.0/1023.0] 
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
-__version__ = '20250224'
+__version__ = '20250306'
 commit_info = ''
 
 
@@ -155,7 +155,7 @@ def makeUDP(startID, stopID, dir):
 
 def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=900):
     startTime = int((startTime-lookBack)*1.0e+09)
-    endTime = int(endTime*1.0e+09)
+    endTime = int((endTime+lookBack/20)*1.0e+09)
     client = InfluxDBClient(host='localhost', port=8086, database='gustoDBlp')
     if getAll == False:
         query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC LIMIT 1"
@@ -196,18 +196,21 @@ def isKnownBad(number, ranges):
 # split and rearrange an influx query into a table with time and mixer data in columns
 def splitConcatenate(array, dim=4):
     array = np.array(array)
-    chunks = np.array_split(array, dim)
+    chunks = np.split(array, dim)
     newarray = np.concatenate(chunks, axis=1)
     chop = list(range(2, newarray.shape[1], 2))
     newarray = np.delete(newarray, chop, axis=1)
     return newarray
 
 
-def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, listREF):
+def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, listREF, catName):
     with fits.open(input_files[0]) as hdul1:
         nrows1 = hdul1[1].data.shape[0]
         columns = hdul1[1].columns
         header = hdul1[0].header
+        if header['DLEVEL'] != 0.5:
+            print("ERROR: Input data is not at level 0.5.  Exiting.")
+            return
         data = {col.name: [] for col in columns}
         for col in columns:
           data[col.name].extend(hdul1[1].data[col.name])
@@ -276,7 +279,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
         gmon = splitConcatenate(gmon)
     except Exception as e:
         skipHKinsert = True
-        print("WARNING: ", e, "Missing fast HK, some columns will have zeroed bias data")
+        print("WARNING: ", e, "Some columns will have zeroed bias data.")
 
     # Now we can loop through all the rows and assign the closest HK in time.
     # While we are here, update data types and row flags.
@@ -367,7 +370,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
         header['GON_LAT'] = (RAD2DEG*np.mean(pointingStream[:,4]), 'Gondola Latitude (deg)')
 
     info = getIFinfo(np.mean(UNIXTIME))
-    header['OBJECT'] = (info[2], 'Name of the target object')
+    header['OBJECT'] = (catName, 'Name of the target object')
     header['IF0'] = (info[0], 'IF Frequency (MHz) of catalog velocity')
     header['SYNTFREQ'] = (info[bandNum+2], 'Synthesizer frequency (MHz)')
     header['SYNTMULT'] = (MULT[bandNum-1], 'Synthesizer multiplier')
@@ -382,7 +385,7 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     header['COMMENT'] = commit_info
     print("Sequence flag is", seqFlag)
     # now write it out
-    hdu = fits.BinTableHDU.from_columns(columns, nrows=nrows)
+    hdu = fits.BinTableHDU.from_columns(columns, nrows=nrows, name="DATA_TABLE")
     for colname in columns.names:
         hdu.data[colname][:] = data[colname]
 
@@ -432,10 +435,10 @@ def processSequence(options, line):
     if(seqFlag < flagdefs.SeqFlags.NOREFS):  # acceptable, process it
         pointingStream = makeUDP(int(startID), int(endID), dirUDP)
         output_file = dirDataOut+outputPrefix[bandNum-1]+seqID+'_'+startID+'.fits'
-        processFITS(fileList, output_file, bandNum, pointingStream, seqFlag, listREF)
+        processFITS(fileList, output_file, bandNum, pointingStream, seqFlag, listREF, catName)
     else:
         # skip it because seqFlag says it's unusable
-        print("seq", seqID, "NOT OK, flag is", seqFlag)
+        print("Sequence", seqID, "NOT OK, flag is", seqFlag)
 
 
 if __name__ == '__main__':
@@ -450,17 +453,17 @@ if __name__ == '__main__':
     options = p.parse_args()
     
     print(options)
-    print(p.format_values())    # useful for logging where different settings came from
+    print(p.format_values())    # show where different settings came from
 
     bandNum=int(options.band)        
     dirDataOut = options.outpath + 'level0.7/'
     input = options.outpath + sequencesFile
     commit_info = runGitLog()  # lookup git commit info only once
     
-    if not os.path.exists(input):
+    if not os.path.exists(input) or os.path.getsize(input) == 0:
         makeSequences(options.inpath+"dataLog.txt", options.outpath + sequencesFile)
     else:
-        print("Sequences file exists, skipping step...")
+        print("Sequences file seemingly exists, skipping step...")
 
     if not os.path.exists(dirDataOut):
         os.makedirs(dirDataOut)
