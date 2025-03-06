@@ -81,7 +81,7 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fitsfile *fptr;  // FITS file pointer
     int array_length, band, npix, seqflag = 0, status = 0; // CFITSIO status must be initialized
     long nrows;
-    char extname[] = "DATA_TABLE", proctime[256], comment[256], line[4], version[] = "20250224";
+    char extname[] = "DATA_TABLE", proctime[256], comment[256], line[4], version[] = "20250306";
     float linefreq, dlevel=0.5;
     
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
@@ -275,7 +275,7 @@ void printDateTimeFromEpoch(time_t ts)
 }
 
 // Callback function to process the file
-void callback(char *filein){
+void callback(char *filein, char *dirOut){
    char *fullpath= malloc(128*sizeof(char));
    strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
    char *datafile; // filename with no path, for header
@@ -586,9 +586,9 @@ void callback(char *filein){
 
       char fitsfile[32];
       if(UNIT == 4) // band 2
-	 sprintf(fitsfile, "./build/B2/ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
+	 sprintf(fitsfile, "%s/B2/ACS%d_%s_%05d.fits", dirOut, UNIT-1, prefix, scanID);
       else if (UNIT == 6) // band 1
-	 sprintf(fitsfile, "./build/B1/ACS%d_%s_%05d.fits", UNIT-1, prefix, scanID);
+	 sprintf(fitsfile, "%s/B1/ACS%d_%s_%05d.fits", dirOut, UNIT-1, prefix, scanID);
       if (DEBUG)
          printf("%s\n", fitsfile);
       append_to_fits_table(fitsfile, fits_header, array); 

@@ -2,18 +2,17 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <it/math.h>
 #include <fftw3.h>
 #include <stdbool.h>
 #include <curl/curl.h>
 #include <fitsio.h>
 
-// make sure these are consistent with later flagdefs.py in ./common
+// make sure these are consistent with flagdefs.py in ../common for Level 0.7+
 #define DAC_CAL_FIXED 25
 #define DAC_CAL_EFFED 31
 
 // function to process correlator lag file
-void callback(char *filein);
+void callback(char *, char *);
 
 // structure to hold QC correction coefficients
 struct coeffs {
