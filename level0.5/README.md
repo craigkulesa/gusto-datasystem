@@ -17,6 +17,6 @@
 7. Generate a file list in the level0.5 directory in the pipeline tree and then run the pipeline shell script wrapper on it:
    
        ls -1 ../to/lags/*.dat > filelist.txt
-       ./run_level05.sh -c -j 4 -f filelist.txt -o /home/obs/data/GUSTO/level0.5
+       ./run_level05.sh -e -j 4 -f filelist.txt -o /home/obs/data/GUSTO/level0.5
    
 where `-j` specifies the number of CPUs to process the data (1 is default), `-f` specifies the file list, `-e` erases the destination folder prior to processing (to keep from appending data to existing files), and `-o` sets the output directory base, creating it if it doesn't exist.
