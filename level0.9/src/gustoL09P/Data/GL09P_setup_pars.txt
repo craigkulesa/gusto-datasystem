@@ -57,6 +57,9 @@ loglevel = INFO
 # addpixelflag: True: more agressive pixel flagging; False: nothing more
 addpixelflag = True
 
+# rowflag cutoff value: the value is used such that rowflag <= value is good.
+rowflagcutoff: 0
+
 # clean up the L1.0 data and save only good OTF spectra
 l10OTFonly = True
 

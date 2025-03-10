@@ -51,7 +51,7 @@ from .GL10Pipeline import *
 
 #logger = logging.getLogger(__name__)
 
-spectralLines = ['CII', 'NII', 'OI']
+spectralLines = ['CII', 'NII']
 n_sL = len(spectralLines)
 
 cfg_file0 = importlib.resources.files('gustoL09P') / 'Data/GL09P_setup_pars.txt'
@@ -90,7 +90,7 @@ def runGL09P(verbose=False):
     execGL09P
     """
     parser = argparse.ArgumentParser(
-        prog='gustoL1',
+        prog='execGL09P',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''\
             GUSTO Level 1 Pipeline CLI
@@ -105,6 +105,9 @@ def runGL09P(verbose=False):
     parser.add_argument('--startLevel', '-s', nargs='?', type=str,
                         default='0.8',
                         help='GUSTO Data Level the pipeline should start processing (default=0.8); \npossible entries are 0.8, 0.9 and 0.95')
+    parser.add_argument('--lines', nargs='?', type=str,
+                        default='CII',
+                        help='Line to be processed: either CII or NII, if both lines are desired, do not use this option but the config file')
     parser.add_argument('--endLevel', '-e', nargs='?', type=str,
                         default='0.9',
                         help='GUSTO Data Level produced by pipeline (default=1.0); possible entries are 0.9 and 1.0')
@@ -154,6 +157,10 @@ def runGL09P(verbose=False):
     if args.debug is not None:
         print('args.debug: ', args.debug, type(args.debug))
         cfi['gprocs']['debug'] = args.debug
+
+    if args.lines is not None:
+        print('args.lines: ', args.lines)
+        cfi['gprocs']['lines'] = [args.lines]
     
     if args.calmethod is not None:
         print('args.calmethod: ', args.calmethod, type(args.calmethod), cfi['gprocs']['drmethod'], type(cfi['gprocs']['drmethod']))
@@ -288,9 +295,12 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     print('Number of cores used for processing: %i\n'%(n_procs))
     
     # get lines for processing
-    #print(cfi['gprocs']['lines'])
-    lines = cfi['gprocs']['lines'].replace('[','').replace(']','').split(' ')
-    # print('Lines: ', lines[0])
+    print(cfi['gprocs']['lines'], type(cfi['gprocs']['lines']), type([0]), type(cfi['gprocs']['lines'])!=type([0]))
+    if type(cfi['gprocs']['lines'])!=type([0]):
+        lines = cfi['gprocs']['lines'].replace('[','').replace(']','').split(' ')
+    else:
+        lines = cfi['gprocs']['lines']
+    print('Lines: ', lines)
     # lines= ['CII', 'NII']
     
     # these are the old values for the Oct 24 data sets
@@ -355,7 +365,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                   'drmethod': int(cfi['gprocs']['drmethod']),
                   'debug': cfi['gprocs']['debug'], 'verbose': verbose,
                   'vcut': vcut, 'pxrange': pxrange, 'mranges': mranges,
-                  'pvrange': pvrange, 
+                  'pvrange': pvrange, 'rowflagcutoff': int(cfi['gprocs']['rowflagcutoff']),
                   'addpixelflag': cfi['gprocs']['addpixelflag'],
                   'checkringflag': cfi['gprocs']['checkringflag']}
         paramlist = [[a, b] for a in dfiles for b in [params]]
@@ -400,13 +410,14 @@ def processL08(paramlist):
     mranges = params['mranges']
     addpixelflag = params['addpixelflag']
     checkringflag = params['checkringflag']
+    rowflagcutoff = params['rowflagcutoff']
     # good pixel ranges
     pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
     # ringing check ranges
     pvrange = (int(params['pvrange'][0]), int(params['pvrange'][1]))
     
     # define some additional processing data (maybe relocat to function later?)
-    if 'ACS3' in dfile:
+    if 'CII' in dfile:
         # line: CII
         # all pixels before and after these values are masked as bad
         band = 2
@@ -453,6 +464,7 @@ def processL08(paramlist):
     
     # for now, process all mixers
     umixers = np.unique(data['MIXER'])
+    n_umix = umixers.size
     
     tsyseff_avg = np.zeros(umixers.size)
     aTsyseff = np.zeros([n_spec,n_pix])
@@ -474,30 +486,36 @@ def processL08(paramlist):
     aghmix = []   # mixer of hots
     atsys = []
     atsmix = []
-    datavalid = np.ones(3, dtype=bool)
+    datavalid = np.ones(n_umix, dtype=bool)
+    rfsflag = 0
 
     for k, mix in enumerate(umixers):
         # first check crudely if we have enough data of various scan_types
         msel = np.argwhere(data['MIXER']==mix)
-        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr)
+        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagcutoff=rowflagcutoff)
         check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==0)
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagcutoff)
         if not check:
             print('mix, dfile')
+            print('check: ', check)
             print('specs: ', spec.shape)
-            print('REFs: ', np.argwhere(data['scan_type']=='REF').size)
-            print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size)
-            print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size)
-            print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size)
+            print('REFs: ', np.argwhere(data['scan_type']=='REF').size, (np.argwhere(data['scan_type']=='REF').size > 3))
+            print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size, (np.argwhere(data['scan_type']=='HOT').size > 3))
+            print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size, (np.argwhere(data['scan_type']=='REFHOT').size > 3))
+            print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size, (np.argwhere(data['scan_type']=='OTF').size > 5))
+            print('other: ', (otfID.size>0), (rfsID.size>0), (rhsID.size>0), (hotID.size>0))
+            print('IDs: ', otfID, rfsID, rhsID, hotID)
+            print('rowflagcutoff: ', rowflagcutoff, np.any(data['ROW_FLAG'][msel]<=rowflagcutoff))
             print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
             data['ROW_FLAG'][msel] |= 4   # flagged as missing data
             datavalid[k] = False
             return 0
         
-        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs = getCalSpectra(mix, spec, data, hdr, verbose=True)
+        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags = getCalSpectra(mix, spec, data, hdr, verbose=True)
+        rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
             print('No Tsys available! Stop processing %i of dfile %s'%(mix, dfile), tsys)
@@ -514,14 +532,14 @@ def processL08(paramlist):
         #pxs = np.arange(n_pix)
         
         
-        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, verbose=verbose)
-        
+        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagcutoff=rowflagcutoff, verbose=verbose)
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
-        osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & (hotID.size>=1) & 
+        # 3/8/25: changed this check to exclude the requirement for HOTs since we have sequences without HOT measurements!
+        osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & #(hotID.size>=1) & 
                            (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & 
-                           (data['ROW_FLAG'][mix]==0)).flatten()
+                           (data['ROW_FLAG']==0)).flatten()
         #print('otfID.size: ', otfID.size)
-        if len(osel) > 0:
+        if len(osel) > 2:
             # print('processing OTFs')
             # print('OTFs: ', otfID)
             # print('REFs: ', rfsID)
@@ -532,12 +550,18 @@ def processL08(paramlist):
         else:
             print('WARNING: No OTF spectra available for mixer: ', mix)
             # logger.warning('No OTF spectra available.')
-            print('failed processing OTFs')
-            print('OTFs: ', otfID)
-            print('REFs: ', rfsID)
-            print('REFHOTs: ', rhsID)
-            print('HOTs: ', hotID)
-            print('mixer: ', mix)
+            # print('failed processing OTFs')
+            # print('scanID: ', (otfID == data['scanID']), '\nrfsID: ', (rfsID.size>=1), '\nrhsID: ', (rhsID.size>=1), '\notfID: ', (otfID.size>=1), 
+            #                '\nmix: ', (mix == data['MIXER']), '\nscan type: ', (data['scan_type'] == 'OTF'), '\nrowflag: ', (data['ROW_FLAG'][mix]==0))
+            # print('rowflag: ', (data['ROW_FLAG']))
+            # print(osel)
+            # print('OTFs: ', otfID)
+            # print('REFs: ', rfsID)
+            # print('REFHOTs: ', rhsID)
+            # print('HOTs: ', hotID)
+            # print('rfsflag: ', rfsflag)
+            # print('mixer: ', mix)
+            #print(k, mix, umixers)
             datavalid[k] = False
             data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
             continue
@@ -549,6 +573,8 @@ def processL08(paramlist):
         fracb = (stime - btime) / (atime - btime)
         fraca = (atime - stime) / (atime - btime)
         
+        print(spec_OTF.shape,flush=True)
+        print()
         n_OTF, n_opix = spec_OTF.shape
         # antenna temperature is a masked array
         ta = ma.zeros([n_OTF, n_opix])
@@ -572,7 +598,11 @@ def processL08(paramlist):
         # aghots are the grouped hots
         # aghtim is the unixtime associated with the grouped hots
         # aglast is a flag indicating that there is a hot at the end of the OTF strip
-        ahgroup, ghots, ghtim, ghtint, glast, htflag = getHotInfo(spec, data, mix, dfile=dfile, verbose=True)
+        ahgroup, ghots, ghtim, ghtint, glast, htflag = getHotInfo(spec, data, mix, dfile=dfile, rowflagcutoff=rowflagcutoff, verbose=True)
+        if type(ahgroup)==type(0):
+            print('Encountered problem with HOT groups. Flaging rows.')
+            data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
+            continue
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
         gsz = ghots.shape
@@ -725,8 +755,8 @@ def processL08(paramlist):
         #data['CHANNEL_FLAG'] [osel,:] = ta.mask
 
     # analize datavalid
-    validdata = datavalid[0] | datavalid[1] | datavalid[2]
-    print('validdata: ', datavalid[0], datavalid[1], datavalid[2])
+    validdata = np.any(datavalid)
+    #print('validdata: ', datavalid)
     
     if validdata == False:
         print('Not enough data available for saving. ')
@@ -772,8 +802,9 @@ def processL08(paramlist):
     hdr.set('goodpxen', value=pxrange[1], comment='pixel index where good pixel stop')
     hdr.set('ringpxst', value=pvrange[0], comment='start pixel index for ringing test')
     hdr.set('ringpxen', value=pvrange[1], comment='end pixel index for ringing test')
-    hdr.set('rhID1', value=rhIDs[0], comment='scan ID for refhot/hot before OTF')
-    hdr.set('rhID2', value=rhIDs[1], comment='scan ID for refhot/hot after OTF')
+    hdr.set('RFSFLAG', value=rfsflag, comment='flag indicating which REFS are available')
+    hdr.set('rhID1', value=rhIDs[0], comment='scan ID for REFHOT/REF before OTF')
+    hdr.set('rhID2', value=rhIDs[1], comment='scan ID for REFHOT/REF after OTF')
     hdr.set('Tsysmean', value=tsys_mean, comment='mean Tsys over goodpx')
     hdr.set('procmeth', value=drmethod, comment='data reduction processing method applied')
     hdr.set('', value='')
@@ -824,12 +855,16 @@ def processL08(paramlist):
         fits.append(ofile, data=fT.as_array())
         
         print('aghots: ', len(aghots))
-        col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')
-        col22 = Column(np.hstack(aghtim), name='htime', description='utime of avg. hots')
-        col23 = Column(np.hstack(aghmix), name='hmixer', description='mixer of avg. hots')
-        col24 = Column(np.hstack(aghtint), name='htint', description='integration time of avg. hots')
-        fgh = Table([col21, col22, col23, col24])
-        fgh.write(ofile, append=True)
+        if len(aghots) > 0:
+            col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')
+            col22 = Column(np.hstack(aghtim), name='htime', description='utime of avg. hots')
+            col23 = Column(np.hstack(aghmix), name='hmixer', description='mixer of avg. hots')
+            col24 = Column(np.hstack(aghtint), name='htint', description='integration time of avg. hots')
+            fgh = Table([col21, col22, col23, col24])
+            fgh.write(ofile, append=True)
+        else:
+            fgh = Table()
+            fgh.write(ofile, append=True)
 
         col31 = Column(np.array(atsys), name='Tsys', description='Tsys before/after OTF')
         col32 = Column(np.array(atsmix), name='tsmix', description='mixer of Tsys')
