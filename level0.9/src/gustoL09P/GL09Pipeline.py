@@ -308,7 +308,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     #           10854, 11006, 11026, 11074, 11102, 11106, 11126, 11134, 24531, 24803, 24881, 26294, 26296]
     
     # these are for the Feb 25 data sets
-    ignore = []
+    ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
     
     # load ranges for 2nd pixel masking
     
