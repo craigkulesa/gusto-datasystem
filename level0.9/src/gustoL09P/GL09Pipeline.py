@@ -497,7 +497,7 @@ def processL08(paramlist):
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagcutoff)
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]<=rowflagcutoff)
         if not check:
             print('mix, dfile')
             print('check: ', check)
