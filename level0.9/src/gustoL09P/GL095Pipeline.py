@@ -81,7 +81,13 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
     print('Number of cores used for processing: %i\n'%(n_procs))
     
     # get lines for processing
-    lines = cfi['gprocs']['lines'].replace('[','').replace(']','').split(' ')
+    print(cfi['gprocs']['lines'], type(cfi['gprocs']['lines']), type([0]), type(cfi['gprocs']['lines'])!=type([0]))
+    if type(cfi['gprocs']['lines'])!=type([0]):
+        lines = cfi['gprocs']['lines'].replace('[','').replace(']','').split(' ')
+    else:
+        lines = cfi['gprocs']['lines']
+    print('Lines: ', lines)
+
     # print('Lines: ', lines[0])
     # lines= ['CII', 'NII']
     
@@ -96,9 +102,9 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
         outDir = cfi['gdirs']['L095DataDir']
         os.makedirs(outDir, exist_ok=True)
         if line=='NII':
-            filter = 'ACS5*.fits'
+            filter = 'NII*.fits'
         else:
-            filter = 'ACS3*.fits'
+            filter = 'CII*.fits'
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
         
@@ -106,7 +112,7 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
         #print(glob.glob(os.path.join(inDir,filter)))
         sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
         #print('single result: ', sdirs[0], os.path.split(sdirs[0]))
-        dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
+        dsc = [int(os.path.split(sdir)[2].split('_')[1].split('.')[0]) for sdir in sdirs]
         
         sdirs.sort(key=lambda sdirs: dsc)
         
