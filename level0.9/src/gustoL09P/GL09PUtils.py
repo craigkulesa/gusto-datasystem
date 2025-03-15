@@ -157,7 +157,7 @@ def simpleDespikeSpectra(spec0, data, hdr, pwidth=10, verbose=False, interpflag=
     return spec
 
 
-def getSpecScanTypes(mixer, spec, data, hdr, rowflagcutoff=0, verbose=False):
+def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     """Function calculating the calibration spectrum for a single mixer.
 
 
@@ -184,19 +184,19 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagcutoff=0, verbose=False):
     row_flag = data['ROW_FLAG']      # spectra mask (one entry per spectrum)
     # ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
 
-    rfsel = (mixer == mixers) & (scan_type == 'REF') & (row_flag<=rowflagcutoff)
+    rfsel = (mixer == mixers) & (scan_type == 'REF') & (row_flag<=rowflagfilter)
     rfsID = np.unique(scanID[rfsel])
-    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag<=rowflagcutoff)
+    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag<=rowflagfilter)
     rhsID = np.unique(scanID[rhsel])
-    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag<=rowflagcutoff)
+    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag<=rowflagfilter)
     rhsID = np.unique(scanID[rhsel])
 
     # identify the HOT spectra
-    htsel = (mixer == mixers) & (scan_type == 'HOT') & (row_flag<=rowflagcutoff)
+    htsel = (mixer == mixers) & (scan_type == 'HOT') & (row_flag<=rowflagfilter)
     hotID = np.unique(scanID[htsel])
 
     # identify the OTF spectra
-    otsel = (mixer == mixers) & (scan_type == 'OTF') & (row_flag<=rowflagcutoff)
+    otsel = (mixer == mixers) & (scan_type == 'OTF') & (row_flag<=rowflagfilter)
     otfID = np.unique(scanID[otsel])
     if len(otfID) > 1:
         otfID = otfID[1:]
@@ -317,7 +317,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky, rhIDs, rfsflag
 
 
-def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagcutoff=0):
+def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagfilter=0):
     """Function analyzing and processing HOT spectra in an 
     OTF strip.
     There are caveats in the current data (tbc) including that there are duplicate
@@ -376,10 +376,10 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagcutoff=0):
     # added check for REFHOT duplicates at beginning and at end of sequence
     # there should only be one REFHOT at the beginning and one at
     # the end
-    rhscans = data['scanID'][(data['scan_type']=='REFHOT')&(data['ROW_FLAG']<=rowflagcutoff)&(data['MIXER']==mixer)]
-    rfscans = data['scanID'][(data['scan_type']=='REF')&(data['ROW_FLAG']<=rowflagcutoff)&(data['MIXER']==mixer)]
-    otscans = data['scanID'][(data['scan_type']=='OTF')&(data['ROW_FLAG']<=rowflagcutoff)&(data['MIXER']==mixer)]
-    htscans = data['scanID'][(data['scan_type']=='HOT')&(data['ROW_FLAG']<=rowflagcutoff)&(data['MIXER']==mixer)]
+    rhscans = data['scanID'][(data['scan_type']=='REFHOT')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
+    rfscans = data['scanID'][(data['scan_type']=='REF')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
+    otscans = data['scanID'][(data['scan_type']=='OTF')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
+    htscans = data['scanID'][(data['scan_type']=='HOT')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
     urhs = np.unique(rhscans)
     urfs = np.unique(rfscans)
     uots = np.unique(otscans)
@@ -513,13 +513,13 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagcutoff=0):
         #     print('mixer/# groups: ', mx, maxgrp)
     
         for j in range(maxgrp):
-            sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']<=rowflagcutoff) & (uflag==1)
+            sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']<=rowflagfilter) & (uflag==1)
             ghots[j,:] = np.mean(spec[sel,:], axis=0)
             ghtim[j] = np.mean(unixtime[sel])
             ghtint[j] = np.sum(tint[sel])
     
         # final check if the last OTF is followed by a HOT/REFHOT
-        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (data['ROW_FLAG']<=rowflagcutoff))
+        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (data['ROW_FLAG']<=rowflagfilter))
         if np.max(data['UNIXTIME'][sel])<ghtim[-1]:
             glast = True
         
@@ -529,7 +529,7 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagcutoff=0):
 
 
 # old version of getHotInfo - not working correctly
-def getHotInfo_old(spec, data, mixer, rowflagcutoff=0, verbose=False):
+def getHotInfo_old(spec, data, mixer, rowflagfilter=0, verbose=False):
     """Function analyzing and processing HOT spectra in an 
     OTF strip.
 
@@ -640,13 +640,13 @@ def getHotInfo_old(spec, data, mixer, rowflagcutoff=0, verbose=False):
             print('mixer/# groups: ', mx, maxgrp)
     
         for j in range(maxgrp):
-            sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']<=rowflagcutoff)
+            sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']<=rowflagfilter)
             ghots[j,:] = np.mean(spec[sel,:], axis=0)
             ghtim[j] = np.mean(unixtime[sel])
             ghtint[j] = np.sum(tint[sel])
     
         # final check if the last OTF is followed by a HOT/REFHOT
-        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (data['ROW_FLAG']<=rowflagcutoff))
+        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (data['ROW_FLAG']<=rowflagfilter))
         if np.max(data['UNIXTIME'][sel])<ghtim[-1]:
             glast = True
         
@@ -717,3 +717,43 @@ def smoothSpectrum(spec, cflag, window_length=5, polyorder=2):
     
     return spec_sm
     
+    
+
+def checkRowflag(rowflagvalue, rowflagfilter=0):
+    r"""Function checking bitflags from spectra to a bitmask of allowed bits.
+
+    Parameters
+    ----------
+    rowflagvalue : numpy int array
+                rowflag (bitmask) of spectra
+    rowflagfilter : int
+                allowed rowflags (bitmask)
+
+    Returns
+    -------
+    boolean array of True/False values
+
+    Examples
+    --------
+    import enum
+    import numpy as np
+    
+    rowflagfilter = RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_UNPUMPED
+    print('rowflagfilter input: ', rowflagfilter, 'contained flags: ', enum.show_flag_values(rowflagfilter))
+    
+    rowflagvalue = 255
+    rowflagvalue = [80, 255, 4096, 4]
+    
+    # enum.show_flag_values(rowflagvalue) works only on single values
+    flag_values = [enum.show_flag_values(rfv) for rfv in rowflagvalue]
+    print('rowflagvalue input: ', rowflagvalue, 'contained flags: ', flag_values)
+    print()
+    
+    print('checkRowflag: ', checkRowflag(rowflagvalue))
+
+
+    """
+    if type(rowflagvalue) == type(0):
+        rowflagvalue = np.array([rowflagvalue])
+    negfilt = ~rowflagfilter#.__invert__()
+    return [True if negfilt.__and__(rfvalue) else False for rfvalue in rowflagvalue]

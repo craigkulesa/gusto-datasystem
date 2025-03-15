@@ -497,11 +497,7 @@ def processL08(paramlist):
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-<<<<<<< Upstream, based on origin/level09
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]<=rowflagcutoff)
-=======
                 (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagfilter)
->>>>>>> 0928bd8 updates
         if not check:
             print('mix, dfile')
             print('check: ', check)
@@ -602,7 +598,7 @@ def processL08(paramlist):
         # aghots are the grouped hots
         # aghtim is the unixtime associated with the grouped hots
         # aglast is a flag indicating that there is a hot at the end of the OTF strip
-        ahgroup, ghots, ghtim, ghtint, glast, htflag = getHotInfo(spec, data, mix, dfile=dfile, rowflagcutoff=rowflagcutoff, verbose=True)
+        ahgroup, ghots, ghtim, ghtint, glast, htflag = getHotInfo(spec, data, mix, dfile=dfile, rowflagfilter=rowflagfilter, verbose=True)
         if type(ahgroup)==type(0):
             print('Encountered problem with HOT groups. Flaging rows.')
             data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
