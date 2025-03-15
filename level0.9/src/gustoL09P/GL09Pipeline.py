@@ -365,7 +365,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                   'drmethod': int(cfi['gprocs']['drmethod']),
                   'debug': cfi['gprocs']['debug'], 'verbose': verbose,
                   'vcut': vcut, 'pxrange': pxrange, 'mranges': mranges,
-                  'pvrange': pvrange, 'rowflagcutoff': int(cfi['gprocs']['rowflagcutoff']),
+                  'pvrange': pvrange, 'rowflagfilter': int(cfi['gprocs']['rowflagfilter']),
                   'addpixelflag': cfi['gprocs']['addpixelflag'],
                   'checkringflag': cfi['gprocs']['checkringflag']}
         paramlist = [[a, b] for a in dfiles for b in [params]]
@@ -410,7 +410,7 @@ def processL08(paramlist):
     mranges = params['mranges']
     addpixelflag = params['addpixelflag']
     checkringflag = params['checkringflag']
-    rowflagcutoff = params['rowflagcutoff']
+    rowflagfilter = params['rowflagfilter']
     # good pixel ranges
     pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
     # ringing check ranges
@@ -492,12 +492,16 @@ def processL08(paramlist):
     for k, mix in enumerate(umixers):
         # first check crudely if we have enough data of various scan_types
         msel = np.argwhere(data['MIXER']==mix)
-        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagcutoff=rowflagcutoff)
+        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter)
         check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
+<<<<<<< Upstream, based on origin/level09
                 (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]<=rowflagcutoff)
+=======
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagfilter)
+>>>>>>> 0928bd8 updates
         if not check:
             print('mix, dfile')
             print('check: ', check)
@@ -508,7 +512,7 @@ def processL08(paramlist):
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size, (np.argwhere(data['scan_type']=='OTF').size > 5))
             print('other: ', (otfID.size>0), (rfsID.size>0), (rhsID.size>0), (hotID.size>0))
             print('IDs: ', otfID, rfsID, rhsID, hotID)
-            print('rowflagcutoff: ', rowflagcutoff, np.any(data['ROW_FLAG'][msel]<=rowflagcutoff))
+            print('rowflagfilter: ', rowflagfilter, np.any(data['ROW_FLAG'][msel]<=rowflagfilter))
             print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
             data['ROW_FLAG'][msel] |= 4   # flagged as missing data
             datavalid[k] = False
@@ -532,7 +536,7 @@ def processL08(paramlist):
         #pxs = np.arange(n_pix)
         
         
-        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagcutoff=rowflagcutoff, verbose=verbose)
+        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
         # 3/8/25: changed this check to exclude the requirement for HOTs since we have sequences without HOT measurements!
         osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & #(hotID.size>=1) & 
@@ -802,6 +806,7 @@ def processL08(paramlist):
     hdr.set('goodpxen', value=pxrange[1], comment='pixel index where good pixel stop')
     hdr.set('ringpxst', value=pvrange[0], comment='start pixel index for ringing test')
     hdr.set('ringpxen', value=pvrange[1], comment='end pixel index for ringing test')
+    hdr.set('rwflfilt', value=rowflagfilter, comment='applied rowflag filter for useful spectra')
     hdr.set('RFSFLAG', value=rfsflag, comment='flag indicating which REFS are available')
     hdr.set('rhID1', value=rhIDs[0], comment='scan ID for REFHOT/REF before OTF')
     hdr.set('rhID2', value=rhIDs[1], comment='scan ID for REFHOT/REF after OTF')
