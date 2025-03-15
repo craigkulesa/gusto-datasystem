@@ -2,6 +2,7 @@
 #include "callback.h"
 
 extern struct coeffs c;
+char commit_info[256];
 
 // load up the QC coefficients from file and store as struct coeffs c
 int readQCfile()
@@ -17,16 +18,36 @@ int readQCfile()
 
 struct Spectrum spec[4];
 
-int main(int argc, char **argv) {
+void get_git_commit_info(const char *filename, char *commit_info) {
+    char command[BUFSIZ];
+    FILE *fp;
+    char hash[BUFSIZ];
 
+    // Construct the command to get the commit hash
+    snprintf(command, sizeof(command), "git log -1 --format=%%cd --date=format-local:'%%Y-%%m-%%d %%H:%%M:%%S %%Z' --pretty=format:\"Commit %%h by %%an %%ad\" -- %s", filename);
+    fp = popen(command, "r");
+    if (fp == NULL) {
+        perror("popen");
+        exit(EXIT_FAILURE);
+    }
+    fgets(hash, sizeof(hash), fp);
+    pclose(fp);
+    hash[strcspn(hash, "\n")] = 0; // Remove trailing newline
+
+    // Combine hash and date into the commit_info string
+    snprintf(commit_info, BUFSIZ+sizeof(filename), "%s %s", filename, hash);
+}
+
+int main(int argc, char **argv) {
    // Set up SIGSEGV handler
    FILE *fp;
    char fileName[128];
 
    c.len = readQCfile();
-
+   // get git versioning once at start
+   get_git_commit_info("./src/callback.c", commit_info);
+   
    // Setup all possible FFTW array lengths
-   printf("readying fft\n");
    for(int i=0; i<4; i++){
      int N=(i+1)*128;
      spec[i].in  = (fftw_complex *) fftw_malloc((4*N) *  sizeof(fftw_complex));
@@ -34,7 +55,6 @@ int main(int argc, char **argv) {
      spec[i].p = fftw_plan_dft_1d((4*N-1), spec[i].in, spec[i].out, FFTW_FORWARD, FFTW_PATIENT|FFTW_PRESERVE_INPUT);
    }
    fftw_import_system_wisdom();
-   printf("ready to start\n");
 
    fp = fopen(argv[1], "r");
    while(fscanf(fp,"%s", fileName) != EOF)

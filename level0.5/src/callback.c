@@ -5,12 +5,14 @@
 #define PI 3.14159
 #define DEBUG 0
 #define REF 0.025
-#define CIIFREQ 1900.537
-#define NIIFREQ 1461.131
+#define CIIFREQ 1900536.9
+#define NIIFREQ 1461132.0
 
 struct coeffs c;
 int CALID = -1, lastBand = 0, lastScanID = 0;
 float dacV[4][4]; // DEV and then 0=VIhi, 1=VQhi, 2=VIlo, 3=VQlo
+extern char commit_info[256];
+
 
 // perform the polynomial fit to the QC correction
 // using the coefficients loaded from coeffs.txt at runtime
@@ -75,14 +77,12 @@ void get_proctime(char *proctime) {
    snprintf(proctime, BUFSIZ, "%s", date);
 }
 
-
 void append_to_fits_table(const char *filename, struct s_header *fits_header, double *array) {
     fitsfile *fptr;  // FITS file pointer
-    int status = 0;  // CFITSIO status value MUST be initialized to zero!
-    int array_length, band, npix, seqflag = 0;
+    int array_length, band, npix, seqflag = 0, status = 0; // CFITSIO status must be initialized
     long nrows;
-    char extname[] = "DATA_TABLE", proctime[256], line[4];
-    float linefreq;
+    char extname[] = "DATA_TABLE", proctime[256], comment[256], line[4], version[] = "20250224";
+    float linefreq, dlevel=0.5;
     
     // Try to open the FITS file in read/write mode. If it doesn't exist, create a new one.
     if (fits_open_file(&fptr, filename, READWRITE, &status)) {
@@ -92,13 +92,11 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
                 fits_report_error(stderr, status);  // Print any error message
                 return;
             }
-
             // Create a primary array image (needed before any extensions can be created)
             if (fits_create_img(fptr, BYTE_IMG, 0, NULL, &status)) {
                 fits_report_error(stderr, status);  // Print any error message
                 return;
             }
-
             // Construct the primary FITS HEADER
 	    // Various indices and keywords in the primary header that depend on Band #
             if (fits_header->unit == 6){ //ACS5 B1
@@ -113,29 +111,39 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 	       npix = 1024;
 	       linefreq = CIIFREQ;
             }
-
-	    // Create some Primary header keyword value pairs and fill them from the current fits_header struct
-            fits_write_key(fptr, TINT,      "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
+	    // Create primary header keyword value pairs and fill them from the fits_header struct
+            fits_write_key(fptr, TINT,    "CALID",   &fits_header->CALID,  "ID of correlator calibration", &status);
             fits_write_key(fptr, TSTRING, "TELESCOP",  "GUSTO",   "Observatory Name", &status);
             fits_write_key(fptr, TSTRING, "LINE",      &line,     "Line Name", &status);
             fits_write_key(fptr, TFLOAT,  "LINEFREQ",  &linefreq, "Line freq in GHz", &status);
             fits_write_key(fptr, TINT,    "BAND",      &band,     "GUSTO band #",     &status);
             fits_write_key(fptr, TINT,    "NPIX",      &npix,     "N spec pixels",    &status);
-            fits_write_key(fptr, TSTRING, "DLEVEL",    "0.5",      "data level",      &status);
+            fits_write_key(fptr, TFLOAT,  "DLEVEL",    &dlevel,    "data level",      &status);
             get_proctime(proctime);
             fits_write_key(fptr, TSTRING, "Proctime",  proctime,  "processing time",  &status);
-            fits_write_key(fptr, TINT,    "SEQFLAG",   &seqflag,       "SEQUENCE FLAG",    &status);
+	    fits_write_key(fptr, TSTRING, "VERSION",   version,   "version number",   &status);
+            fits_write_key(fptr, TINT,    "SEQ_FLAG",   &seqflag,       "SEQUENCE FLAG",    &status);
 
+	    // Create some Primary header comments and fill them
+	    sprintf(comment, "See github.com/craigkulesa/gusto-datasystem");
+	    if (fits_write_comment(fptr, comment, &status)) {
+	        fits_report_error(stderr, status);
+		return;
+	    }	    
+	    if (fits_write_comment(fptr, commit_info, &status)) {
+	        fits_report_error(stderr, status);
+		return;
+	    }
 
             // Define the column parameters
             char *ttype[] ={"MIXER", "NINT", "UNIXTIME", "NBYTES", "CORRTIME", "INTTIME", "ROW_FLAG", "Ihigh", \
 			    "Qhigh", "Ilow", "Qlow", "Ierr", "Qerr", "VIhi", "VQhi", "VIlo", "VQlo", "scanID", \
-		            "subScan", "scan_type", "THOT", "RA", "DEC", "filename", "PSat", "Imon", "Gmon",   \
+		            "subScan", "scan_type", "RA", "DEC", "filename", "PSat", "Vmon", "Imon", "Gmon", \
 			    "DATA", "CHANNEL_FLAG"};
 
             char *tunit[] ={" ", " ", "sec", " ", " ", "sec", " ", "counts", "counts", "counts",   \
 			    "counts", " ", " ", "Volts", "Volts", "Volts", "Volts", " ", " ", " ", \
-		            "Kelvin", "degrees", "degrees", "text", "Amps", "uA", "Amps", " ", " "};
+		            "degrees", "degrees", "text", "Amps", "mV", "uA", "Amps", " ", " "};
 
 	    // All header values are signed 32-bit except UNIXTIME which is uint64_t
             char *tform[29];
@@ -159,12 +167,12 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
             tform[17] = "1J"; //int	scanID
             tform[18] = "1J"; //int	subScan
             tform[19] = "6A"; //char    scan type
-            tform[20] = "1E"; //float	THOT
-            tform[21] = "1E"; //float	RA
-            tform[22] = "1E"; //float	DEC
-	    tform[23] = "48A";//char    filename
-            tform[24] = "1E"; //float	PSat
-            tform[25] = "1E"; //float	Imon
+            tform[20] = "1E"; //float	RA
+            tform[21] = "1E"; //float	DEC
+	    tform[22] = "48A";//char    filename
+            tform[23] = "1E"; //float	PSat
+            tform[24] = "1E"; //float	Vmon
+	    tform[25] = "1E"; //float	Imon
 	    tform[26] = "1E"; //float   Gmon
 	    // Various indices and keywords in the per row header that depend on Band #
             if (fits_header->unit==6){ //ACS5 B1
@@ -191,12 +199,10 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 
     // need to do this *again* because the one several lines back is only done for the fits file creation.
     // that bug took a day to find.
-    if (fits_header->unit==6){ //ACS5 B1
+    if (fits_header->unit==6)
         array_length=512;
-    }
-    if (fits_header->unit==4){ //ACS3 B2
+    else if (fits_header->unit==4)
         array_length=1024;
-    }
 
     // Move to the named HDU (where the table is stored)
     if (fits_movnam_hdu(fptr, BINARY_TBL, extname, 0, &status)) {
@@ -224,24 +230,20 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
     fits_write_col(fptr, TINT32BIT,  5, nrows+1, 1, 1, &fits_header->corrtime, &status);
     fits_write_col(fptr, TFLOAT,     6, nrows+1, 1, 1, &fits_header->inttime,  &status);
     fits_write_col(fptr, TINT32BIT,  7, nrows+1, 1, 1, &fits_header->row_flag, &status);
-
     fits_write_col(fptr, TINT32BIT,  8, nrows+1, 1, 1, &fits_header->Ihi,      &status);
     fits_write_col(fptr, TINT32BIT,  9, nrows+1, 1, 1, &fits_header->Qhi,      &status);
     fits_write_col(fptr, TINT32BIT, 10, nrows+1, 1, 1, &fits_header->Ilo,      &status);
     fits_write_col(fptr, TINT32BIT, 11, nrows+1, 1, 1, &fits_header->Qlo,      &status);
     fits_write_col(fptr, TINT32BIT, 12, nrows+1, 1, 1, &fits_header->Ierr,     &status);
     fits_write_col(fptr, TINT32BIT, 13, nrows+1, 1, 1, &fits_header->Qerr,     &status);
-
     fits_write_col(fptr, TFLOAT,    14, nrows+1, 1, 1, &fits_header->VIhi,     &status);
     fits_write_col(fptr, TFLOAT,    15, nrows+1, 1, 1, &fits_header->VQhi,     &status);
     fits_write_col(fptr, TFLOAT,    16, nrows+1, 1, 1, &fits_header->VIlo,     &status);
     fits_write_col(fptr, TFLOAT,    17, nrows+1, 1, 1, &fits_header->VQlo,     &status);
-									       
     fits_write_col(fptr, TINT32BIT, 18, nrows+1, 1, 1, &fits_header->scanID,   &status);
     fits_write_col(fptr, TINT32BIT, 19, nrows+1, 1, 1, &fits_header->subScan,  &status);
     fits_write_col(fptr, TSTRING,   20, nrows+1, 1, 1, &fits_header->type,     &status);
-
-    fits_write_col(fptr, TSTRING,   24, nrows+1, 1, 1, &fits_header->filename, &status);
+    fits_write_col(fptr, TSTRING,   23, nrows+1, 1, 1, &fits_header->filename, &status);
 
     // Write the spectra as a single 2*N column
     if (fits_write_col(fptr, TDOUBLE, 28, nrows+1, 1, 1 * array_length, array, &status)) {
@@ -267,7 +269,6 @@ void append_to_fits_table(const char *filename, struct s_header *fits_header, do
 void printDateTimeFromEpoch(time_t ts)
 {
    struct tm *tm = gmtime(&ts);
-
    char buffer[26];
    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", tm);
    printf("UTC Date and Time: %s\n", buffer);
@@ -277,47 +278,33 @@ void printDateTimeFromEpoch(time_t ts)
 void callback(char *filein){
    char *fullpath= malloc(128*sizeof(char));
    strcpy(fullpath, filein); // make a copy leaving filein intact for later tokenization
-
-   char *datafile;	// datafile is filename with no path - used in fits header
+   char *datafile; // filename with no path, for header
    datafile = strrchr(fullpath, '/');
-   if (datafile != NULL) {
-	   datafile++;
-   } else {
-	   datafile = fullpath;
-   }
+   if (datafile != NULL)     
+       datafile++;
+   else
+       datafile = fullpath;
 
    //timing
    struct timeval begin, end;
    gettimeofday(&begin, 0);
 
-   //correlator file objects
-   int N = 0;
+   //correlator file objects and variables from datafile
    FILE *fp;
-   double P_I=0;
-   double P_Q=0;
+   double P_I=0, P_Q=0;
    struct corrType corr;
-
-   // correlator variables from datafile
    uint64_t UNIXTIME=0;
-   int NINT=0, UNIT, DEV, NBYTES, MIXER;
-   float FRAC=0, FS_FREQ; // Full scale frequency, B1==5000MHz || B2==5000MHz
-   float VIhi = 0.0, VQhi = 0.0, VIlo = 0.0, VQlo = 0.0;
-
-   // For normalized float correlator lags from Quant Corr
-   float *Rn, *Rn2;
+   int N = 0, NINT=0, UNIT, DEV, NBYTES, MIXER;
+   float FRAC=0, FS_FREQ, VIhi = 0.0, VQhi = 0.0, VIlo = 0.0, VQlo = 0.0, *Rn, *Rn2;
 
    // file open notification
    printf("opened file: %s\n", filein);
    fp = fopen(filein, "r");
 
-   // tokenize scanID from filename
-   char *token, *prefix=malloc(8*sizeof(char));
-   int position = 0, band = -1, scanID = -1, subScan = -1;
+   // tokenize scanID and file type from filename
+   char *ptr = NULL, *token, *prefix=malloc(8*sizeof(char));
+   int i=0, position = 0, band = -1, scanID = -1, subScan = -1;
    bool error  = FALSE;	// status of error which may end processing early
-
-   // Find file type from filename
-   int i=0;
-   char *ptr = NULL;
    const char *prefix_names[]={"SRC", "REF", "OTF", "HOT", "COLD", "FOC", "UNK"};
 
    // Use strtok to tokenize the filename using underscores as delimiters
@@ -385,7 +372,7 @@ void callback(char *filein){
    if(DEBUG)
      printf("File has %.1f spectra\n", (float)sz/bps);
 
-   int32_t header[22];
+   int32_t header[22], rowflag=0;
 
    corr.corrtime=0;
 //////////////////////////////  LOOP OVER ALL SPECTRA IN FILE  ///////////////////////////////////
@@ -393,6 +380,7 @@ void callback(char *filein){
    // Start at beginning of data file
    for (int j=0; j<(int)sz/bps; j++)
    {
+   rowflag = 0; 
    if (DEBUG)
       printf("The type is %s\n", prefix);
       // Loop over header location
@@ -438,8 +426,7 @@ void callback(char *filein){
            (corr.corrtime*256.)/(FS_FREQ*1000000.)<0.1 || (corr.corrtime*256.)/(FS_FREQ*1000000.)>10.0 )
       {
          printf("######################## ERROR ###########################\n");
-         printf("#                Error, data is no good!                 #\n");
-         printf("#                        Exiting!                        #\n");
+         printf("#                  Data are no good!                     #\n");
          printf("######################## ERROR ###########################\n");
          printf("CORRTIME was %.6f\n", (corr.corrtime*256.)/(FS_FREQ*1000000.));
 	 error = TRUE;
@@ -461,30 +448,26 @@ void callback(char *filein){
 
 	// this section unfuck-ifys special cases when ICE was off by one
       if (VQlo==0.){
+	rowflag |= (1 << DAC_CAL_FIXED);
 	VIhi=VIhi-(VIlo-VQhi);  //make up this lost data, it'l be close enough
 	VQhi = dacV[DEV-1][0];
 	VIlo = dacV[DEV-1][1];
 	VQlo = dacV[DEV-1][2];
       }
       
-      if (VIhi==0.){ //Still no values?  bail and don't make spectra
-	printf("######################## ERROR ###########################\n");
-	printf("#                  Error, no DAC values!                 #\n");
-	printf("#                        Exiting!                        #\n");
-	printf("######################## ERROR ###########################\n");
-	break;
+      if (VIhi==0. || VIhi > 2.5 || VIhi < 2.0){ //Still no reasonable values?  Guess but flag it
+	rowflag |= (1 << DAC_CAL_EFFED);
+	VIhi = VQhi = 2.10;
+	VIlo = VQlo = 1.90;
+	printf("######################## WARN ###########################\n");
+	printf("#                no valid DAC values!                   #\n");
+	printf("######################## WARN ###########################\n");
       }
+      
       if (DEBUG)
 	printf("VIhi %.3f\tVQhi %.3f\tVIlo %.3f\tVQlo %.3f\n", VIhi, VQhi, VIlo, VQlo);
-      
-      if (NBYTES==8256)
-         N = 512;
-      else if (NBYTES==6208)
-         N = 384;
-      else if (NBYTES==4160)
-         N = 256;
-      else if (NBYTES==2112)
-         N = 128;
+
+      N = round(((float)NBYTES-64.)/16.);
       int specA = (int) N/128 - 1;
 
       //We don't know the lag # until we open the file, so malloc now
@@ -573,7 +556,7 @@ void callback(char *filein){
       fits_header->nbytes   = NBYTES;
       fits_header->corrtime = (int) corr.corrtime;
       fits_header->inttime  =(corr.corrtime*256.)/(FS_FREQ*1000000.);
-      fits_header->row_flag = 0;
+      fits_header->row_flag = rowflag;
       fits_header->channel_flag = 0;
 
       fits_header->Ihi      = corr.Ihi;
@@ -623,7 +606,6 @@ void callback(char *filein){
       free(Rn);
       free(Rn2);
       free(array);
-
       free(fits_header->type);
       free(fits_header->filename);
       free(fits_header);
@@ -656,9 +638,4 @@ void callback(char *filein){
    free(prefix);
    free(fullpath);
 }
-
-
-
-
-
 

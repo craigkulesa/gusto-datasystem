@@ -8,6 +8,10 @@
 #include <curl/curl.h>
 #include <fitsio.h>
 
+// make sure these are consistent with later flagdefs.py in ./common
+#define DAC_CAL_FIXED 25
+#define DAC_CAL_EFFED 31
+
 // function to process correlator lag file
 void callback(char *filein);
 
@@ -64,7 +68,6 @@ typedef struct s_header {
 	int		scanID;
 	int		subScan;
 	int		CALID;
-	float		THOT;
 	float		RA;
 	float		DEC;
 	float		LO;
@@ -73,6 +76,7 @@ typedef struct s_header {
 	char		*type;
 	char		*filename;
 	float           *psat;
+  	float           *vmon;
 	float           *imon;
 	float           *gmon;
 } s_header;

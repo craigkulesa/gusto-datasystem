@@ -3,10 +3,10 @@
 cpus=1
 clean=0
 
-while getopts "cj:f:" flag
+while getopts "ej:f:" flag
 do
     case "${flag}" in
-	c) clean=1;;
+	e) erase=1;;
         j) cpus=${OPTARG};;
 	f) list=${OPTARG};;
     esac
@@ -20,7 +20,7 @@ if [ ! -f $list ]; then
     exit
 fi
 
-if [ $clean -eq 1 ]; then
+if [ $erase -eq 1 ]; then
     echo "Cleaning destination directory..."
     rm -f build/B1/*.fits
     rm -f build/B2/*.fits
