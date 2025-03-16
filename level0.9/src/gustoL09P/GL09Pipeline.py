@@ -48,6 +48,7 @@ from .GL095Pipeline import GL095Pipeline
 from .GL09PUtils import *
 from .GL09PLogger import *
 from .GL10Pipeline import *
+from .GL09PCLArgParser import *
 
 #logger = logging.getLogger(__name__)
 
@@ -64,7 +65,8 @@ tpipe = 'GUSTO L1 Pipeline'
 
 runtime = time.strftime('%Y%m%d%H%M%S')
 
-def runGL09P(verbose=False):
+
+def runGL09P(cfi_file=None, verbose=False):
     r"""Function executing the GUSTO Level 2 pipeline.
     The process is:
     1) read the command line parameters
@@ -89,50 +91,6 @@ def runGL09P(verbose=False):
     on command line execute:
     execGL09P
     """
-    parser = argparse.ArgumentParser(
-        prog='execGL09P',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent('''\
-            GUSTO Level 1 Pipeline CLI
-            --------------------------------
-                I have indented it
-                exactly the way
-                I want it
-            '''))
-    parser.add_argument('--configFile', '-c', nargs='?', type=str,
-                        default=cfg_file0,
-                        help='GUSTO L1 Pipeline configuration file. This file contains the data directories, etc.')
-    parser.add_argument('--startLevel', '-s', nargs='?', type=str,
-                        default='0.8',
-                        help='GUSTO Data Level the pipeline should start processing (default=0.8); \npossible entries are 0.8, 0.9 and 0.95')
-    parser.add_argument('--lines', nargs='?', type=str,
-                        default='CII',
-                        help='Line to be processed: either CII or NII, if both lines are desired, do not use this option but the config file')
-    parser.add_argument('--endLevel', '-e', nargs='?', type=str,
-                        default='0.9',
-                        help='GUSTO Data Level produced by pipeline (default=1.0); possible entries are 0.9 and 1.0')
-    parser.add_argument('--scanRange', '-r', nargs=2, type=int,
-                        default=[2000, 30000],
-                        help='Range of scans to be processed by pipeline.')
-    parser.add_argument('--loglevel', '-l', type=str,
-                        #default='INFO',
-                        help='sets the log level of the {tpipe}')
-    parser.add_argument('--calmethod', '-m', nargs='?', type=int,
-                        #default='2',
-                        help='select GUSTO spectrum calibration method')
-    parser.add_argument('--verbose', '-v', action=argparse.BooleanOptionalAction,
-                        help='sets verbosity of the {tpipe}')
-    parser.add_argument('--debug', '-d', action=argparse.BooleanOptionalAction,
-                        help='sets settings for debugging pipeline')
-    args = parser.parse_args()
-    if verbose:
-        print('commandline arguments:\n', args, '\n')
-        print('configFile: ', args.configFile)
-        print()
-
-    # this overrides the verbosity from above in case it is enabled
-    if args.verbose is not None:
-        verbose = args.verbose
 
     # initialize the pipeline
     # this also sets all the directories
@@ -140,49 +98,34 @@ def runGL09P(verbose=False):
         print('\n%s: Initializing GUSTO L1 Pipeline'%(time.strftime("%c")))
         print()
 
+    args = GL09PCLArgParser(verbose=verbose)
+    if args.configFile is not None:
+        cfi_file = args.configFile
+
     gL09P = GL09PipelineSetupClass()
-    status = gL09P.initializePipeline(verbose=verbose, configFile=args.configFile)
+    status = gL09P.initializePipeline(verbose=verbose, configFile=cfi_file)
     
     #########################################################
     # get the pipeline configuration
     if verbose:
         print('\n%s: Reading pipeline configuration file ...\n'%(time.strftime("%c")))
     cfi = gL09P.getConfigInfo(verbose=verbose)
+
+
+    cfi = manageArgs(cfi, args, verbose=verbose)
+
     if verbose:
         print('\nProcessing settings:')
     pprint(cfi)
     print()
     print('debug: ', cfi['gprocs']['debug'], type(cfi['gprocs']['debug']))
 
-    if args.debug is not None:
-        print('args.debug: ', args.debug, type(args.debug))
-        cfi['gprocs']['debug'] = args.debug
 
-    if args.lines is not None:
-        print('args.lines: ', args.lines)
-        cfi['gprocs']['lines'] = [args.lines]
-    
-    if args.calmethod is not None:
-        print('args.calmethod: ', args.calmethod, type(args.calmethod), cfi['gprocs']['drmethod'], type(cfi['gprocs']['drmethod']))
-        cfi['gprocs']['drmethod'] = args.calmethod
-    else:
-        cfi['gprocs']['drmethod'] = int(cfi['gprocs']['drmethod'])
-        print('calmethod: ', cfi['gprocs']['drmethod'], type(cfi['gprocs']['drmethod']))
-    
-    
     # initialize logging:
     logDir = cfi['gdirs']['logDir']
     os.makedirs(logDir, exist_ok=True)
-
-    if args.loglevel is not None:
-        numeric_level = getattr(logging, args.loglevel.upper(), None)
-    elif cfi['gprocs']['loglevel'] != '':
-        print('cfi: ', cfi['gprocs']['loglevel'].upper())
-        numeric_level = getattr(logging, cfi['gprocs']['loglevel'].upper(), None)
-    else:
-        numeric_level = getattr(logging, 'INFO', None)
-    cfi['gprocs']['loglevel'] = numeric_level
     
+    numeric_level = cfi['gprocs']['loglevel']
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s\nValid options are: DEBUG, INFO, WARNING, ERROR, CRITICAL.' % numeric_level)
     logfile = os.path.join(logDir,'gusto_pipeline_%s.log'%(time.strftime("%Y%m%d%H%M%S")))
@@ -193,7 +136,7 @@ def runGL09P(verbose=False):
     logger.info('Pipeline configuration file: %s'%(args.configFile))
     logger.info('Pipeline configuration:')
     logger.info(pformat(cfi))
-        
+
 
     #########################################################
     # determine the pipeline parts to be executed

@@ -11,6 +11,7 @@ import time
 import configparser
 import os
 import sys
+import importlib
 from os.path import expanduser, expandvars
 from datetime import datetime
 # import pkg_resources
@@ -21,8 +22,10 @@ import numpy as np
 import logging
 log = logging.getLogger(__name__)
 
-# ProcFile0 = pkg_resources.resource_filename(
-#     'gustoL09P', 'data/CIIconfig.txt')
+
+cfg_file0 = importlib.resources.files('gustoL09P') / 'Data/GL09P_setup_pars.txt'
+
+
 ProcFile0 = importlib.resources.files('gustoL09P') / 'Data/CIIconfig.txt'
 
 spectralLines = ['CII', 'NII', 'OI']
@@ -164,7 +167,7 @@ class GL09PipelineSetupClass:
 
         if configFile == None:
             uhome = expanduser("~")
-            self.configFile = uhome+'/.gusto/GL09P_setup_pars.txt'
+            self.configFile = cfi_file0
         else:
             self.configFile = configFile
 

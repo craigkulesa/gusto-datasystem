@@ -16,13 +16,6 @@ from astropy.io import ascii, fits
 from astropy.utils.exceptions import AstropyWarning
 from scipy.interpolate import krogh_interpolate, barycentric_interpolate
 from pprint import pprint
-# import parsl
-# from parsl.app.app import python_app, bash_app
-# from parsl.configs.local_threads import config
-# from parsl.providers import LocalProvider
-# from parsl.channels import LocalChannel
-# from parsl.config import Config
-# from parsl.executors import HighThroughputExecutor
 import sys
 import os
 import re
@@ -30,10 +23,11 @@ import inspect
 import datetime
 import warnings
 import pkg_resources
+import logging
+from enum import Enum, Flag, auto
 from astropy.io import fits
 from tqdm import tqdm
 from scipy.signal import savgol_filter
-import logging
 log = logging.getLogger(__name__)
 
 
@@ -721,6 +715,7 @@ def smoothSpectrum(spec, cflag, window_length=5, polyorder=2):
 
 def checkRowflag(rowflagvalue, rowflagfilter=0):
     r"""Function checking bitflags from spectra to a bitmask of allowed bits.
+    See also the vectorized version checkRowflags() below.
 
     Parameters
     ----------
@@ -757,3 +752,59 @@ def checkRowflag(rowflagvalue, rowflagfilter=0):
         rowflagvalue = np.array([rowflagvalue])
     negfilt = ~rowflagfilter#.__invert__()
     return [True if negfilt.__and__(rfvalue) else False for rfvalue in rowflagvalue]
+
+
+checkRowflags = np.vectorize(checkRowflag)
+
+
+def string_to_enum_combination(istring):
+  """Converts a string of color names to an enum combination.
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
+    Examples
+    --------
+  """
+  inames = istring.split()
+  cflags = RowFlags(0)  # Initialize with no color
+  for name in inames:
+    print(name)
+    try:
+      flag = RowFlags[name.split('.')[1].upper()]
+      cflags |= flag
+    except KeyError:
+      raise ValueError(f"Invalid flag: {name}")
+  return cflags
+
+
+def anaFlagString(aa):
+    r"""Function .
+
+    Parameters
+    ----------
+    aa : int or string
+            rowflagfilter integer or string representation of allowed flags
+
+    Returns
+    -------
+    
+
+    Examples
+    --------
+    aa = 'RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_UNPUMPED'
+    enum_combination = anaFlagString(aa)
+    
+    print(repr(enum_combination), type(enum_combination))
+    #<RowFlags.NO_HK|MISSING_INT|MIXER_UNPUMPED: 84> <flag 'RowFlags'>
+    
+    """
+    if aa.isnumeric():
+        return RowFlags(int(aa))
+    else:
+        aa = aa.replace("|","")
+        return string_to_enum_combination(aa)
+
