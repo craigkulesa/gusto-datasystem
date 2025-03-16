@@ -5,6 +5,7 @@ import textwrap
 import importlib
 import logging
 from pprint import pprint
+from .GL09PUtils import *
 
 cfg_file0 = importlib.resources.files('gustoL09P') / 'Data/GL09P_setup_pars.txt'
 
@@ -120,6 +121,9 @@ def manageArgs(cfi, args, verbose=False):
     else:
         numeric_level = getattr(logging, 'INFO', None)
     cfi['gprocs']['loglevel'] = numeric_level
+    
+    # check the rowflagfilter: numeric or string
+    cfi['gprocs']['rowflagfilter'] = anaFlagString(cfi['gprocs']['rowflagfilter'])
     
     return cfi
 

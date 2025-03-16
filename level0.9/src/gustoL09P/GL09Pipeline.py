@@ -440,7 +440,8 @@ def processL08(paramlist):
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagfilter)
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(checkRowflag(data['ROW_FLAG'][msel], rowflagfilter=rowflagfilter))
+                # (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagfilter)
         if not check:
             print('mix, dfile')
             print('check: ', check)
@@ -451,13 +452,13 @@ def processL08(paramlist):
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size, (np.argwhere(data['scan_type']=='OTF').size > 5))
             print('other: ', (otfID.size>0), (rfsID.size>0), (rhsID.size>0), (hotID.size>0))
             print('IDs: ', otfID, rfsID, rhsID, hotID)
-            print('rowflagfilter: ', rowflagfilter, np.any(data['ROW_FLAG'][msel]<=rowflagfilter))
+            print('rowflagfilter: ', rowflagfilter, np.any(checkRowflag(data['ROW_FLAG'][msel], rowflagfilter=rowflagfilter)))
             print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
             data['ROW_FLAG'][msel] |= 4   # flagged as missing data
             datavalid[k] = False
             return 0
         
-        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags = getCalSpectra(mix, spec, data, hdr, verbose=True)
+        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags = getCalSpectra(mix, spec, data, hdr, rowflagfilter, verbose=True)
         rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):

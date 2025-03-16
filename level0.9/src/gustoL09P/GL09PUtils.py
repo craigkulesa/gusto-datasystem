@@ -28,6 +28,7 @@ from enum import Enum, Flag, auto
 from astropy.io import fits
 from tqdm import tqdm
 from scipy.signal import savgol_filter
+from .Data.flagdefs import *
 log = logging.getLogger(__name__)
 
 
@@ -175,22 +176,22 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     # dec    = data['DEC']
     # Thot   = float(hdr['THOT'])
     scan_type = data['scan_type']
-    row_flag = data['ROW_FLAG']      # spectra mask (one entry per spectrum)
+    rflags = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
     # ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
 
-    rfsel = (mixer == mixers) & (scan_type == 'REF') & (row_flag<=rowflagfilter)
+    rfsel = (mixer == mixers) & (scan_type == 'REF') & (rflags)
     rfsID = np.unique(scanID[rfsel])
-    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag<=rowflagfilter)
+    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (rflags)
     rhsID = np.unique(scanID[rhsel])
-    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag<=rowflagfilter)
+    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (rflags)
     rhsID = np.unique(scanID[rhsel])
 
     # identify the HOT spectra
-    htsel = (mixer == mixers) & (scan_type == 'HOT') & (row_flag<=rowflagfilter)
+    htsel = (mixer == mixers) & (scan_type == 'HOT') & (rflags)
     hotID = np.unique(scanID[htsel])
 
     # identify the OTF spectra
-    otsel = (mixer == mixers) & (scan_type == 'OTF') & (row_flag<=rowflagfilter)
+    otsel = (mixer == mixers) & (scan_type == 'OTF') & (rflags)
     otfID = np.unique(scanID[otsel])
     if len(otfID) > 1:
         otfID = otfID[1:]
@@ -206,7 +207,7 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     return otfID, rfsID, rhsID, hotID
 
 
-def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
+def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False):
     """Function calculating the calibration spectrum for a single mixer.
 
 
@@ -218,6 +219,8 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
         array containing the latest masked spectra
     data : FITS rec array
         record array containing the GUSTO data fron the FITS file
+    rowflagfilter : int
+        filter value for rowflags
     Tsky : float
         Sky temperature at wavelength of observation.
 
@@ -234,7 +237,7 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     scanID = data['scanID']
     Thot   = float(hdr['THOT'])
     scan_type = data['scan_type']
-    row_flag = data['ROW_FLAG']      # spectra mask (one entry per spectrum)
+    rflags = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
     ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
     stime = data['UNIXTIME']
 
@@ -280,8 +283,8 @@ def getCalSpectra(mixer, spec, data, hdr, Tsky=45., verbose=False):
     htimes = []
     for rhID in rhIDs:
         # determine yfactor
-        rsel = (rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (row_flag==0)
-        hsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (row_flag==0))
+        rsel = (rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (rflags)
+        hsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (rflags))
         # if we have 3 (or more, more than 3 is less likely) take only the last 2 since the first one is causing offsets!
         if hsel.size>2:
             data['ROW_FLAG'][hsel[0]] = 2<<15
@@ -370,10 +373,11 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagfilter=0):
     # added check for REFHOT duplicates at beginning and at end of sequence
     # there should only be one REFHOT at the beginning and one at
     # the end
-    rhscans = data['scanID'][(data['scan_type']=='REFHOT')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
-    rfscans = data['scanID'][(data['scan_type']=='REF')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
-    otscans = data['scanID'][(data['scan_type']=='OTF')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
-    htscans = data['scanID'][(data['scan_type']=='HOT')&(data['ROW_FLAG']<=rowflagfilter)&(data['MIXER']==mixer)]
+    rflags = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
+    rhscans = data['scanID'][(data['scan_type']=='REFHOT')&(rflags)&(data['MIXER']==mixer)]
+    rfscans = data['scanID'][(data['scan_type']=='REF')&(rflags)&(data['MIXER']==mixer)]
+    otscans = data['scanID'][(data['scan_type']=='OTF')&(rflags)&(data['MIXER']==mixer)]
+    htscans = data['scanID'][(data['scan_type']=='HOT')&(rflags)&(data['MIXER']==mixer)]
     urhs = np.unique(rhscans)
     urfs = np.unique(rfscans)
     uots = np.unique(otscans)
@@ -507,13 +511,13 @@ def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagfilter=0):
         #     print('mixer/# groups: ', mx, maxgrp)
     
         for j in range(maxgrp):
-            sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']<=rowflagfilter) & (uflag==1)
+            sel = (data['MIXER']==mx) & (hgroup==j) & (rflags) & (uflag==1)
             ghots[j,:] = np.mean(spec[sel,:], axis=0)
             ghtim[j] = np.mean(unixtime[sel])
             ghtint[j] = np.sum(tint[sel])
     
         # final check if the last OTF is followed by a HOT/REFHOT
-        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (data['ROW_FLAG']<=rowflagfilter))
+        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (rflags))
         if np.max(data['UNIXTIME'][sel])<ghtim[-1]:
             glast = True
         
@@ -634,13 +638,13 @@ def getHotInfo_old(spec, data, mixer, rowflagfilter=0, verbose=False):
             print('mixer/# groups: ', mx, maxgrp)
     
         for j in range(maxgrp):
-            sel = (data['MIXER']==mx) & (hgroup==j) & (data['ROW_FLAG']<=rowflagfilter)
+            sel = (data['MIXER']==mx) & (hgroup==j) & (rflags)
             ghots[j,:] = np.mean(spec[sel,:], axis=0)
             ghtim[j] = np.mean(unixtime[sel])
             ghtint[j] = np.sum(tint[sel])
     
         # final check if the last OTF is followed by a HOT/REFHOT
-        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (data['ROW_FLAG']<=rowflagfilter))
+        sel = np.argwhere((data['MIXER']==mx) & (data['scan_type']=='OTF') & (rflags))
         if np.max(data['UNIXTIME'][sel])<ghtim[-1]:
             glast = True
         
