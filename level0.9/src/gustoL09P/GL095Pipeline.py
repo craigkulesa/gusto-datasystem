@@ -126,7 +126,13 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
             
-        paramlist = [[a, b, c, e, f, g, d] for a in [line] for b in [inDir] for c in [outDir] for e in [int(cfi['gprocs']['drmethod'])] for f in [debug] for g in [cfi['gprocs']['loglevel']] for d in dfiles]
+        params = {'line': line, 'inDir': inDir, 'outDir': outDir, 
+                  'drmethod': int(cfi['gprocs']['drmethod']),
+                  'debug': cfi['gprocs']['debug'], 'verbose': verbose,
+                  'loglevel':cfi['gprocs']['loglevel'], 
+                  'rowflagfilter': int(cfi['gprocs']['rowflagfilter'])}
+        paramlist = [[a, b] for a in dfiles for b in [params]]
+        # paramlist = [[a, b, c, e, f, g, d] for a in [line] for b in [inDir] for c in [outDir] for e in [int(cfi['gprocs']['drmethod'])] for f in [debug] for g in [cfi['gprocs']['loglevel']] for d in dfiles]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         # pprint(paramlist)
         if verbose:
@@ -146,7 +152,7 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
 
 
 
-def processL09(params, verbose=True):
+def processL09(paramlist, verbose=True):
     """Function applying the actual baseline fit
 
 
@@ -160,7 +166,11 @@ def processL09(params, verbose=True):
     """
     import logging
     
-    line, inDir, outDir, drmethod, debug, loglevel, dfile = params[0], params[1], params[2], params[3], params[4], params[5], params[6]
+    dfile = paramlist[0]
+    params = paramlist[1]
+    # line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
+    line, inDir, outDir, drmethod = params['line'], params['inDir'], params['outDir'], params['drmethod']
+    debug, verbose, loglevel, rowflagfilter = params['debug'], params['verbose'], params['loglevel'], params['rowflagfilter']
 
     logger = logging.getLogger('GL09PLogger')
     #logger.addHandler(logging.StreamHandler())
@@ -195,6 +205,7 @@ def processL09(params, verbose=True):
     #logger.info(lstr)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
     rowFlag = data['ROW_FLAG']
+    rflag = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
     
     n_spec, n_pix = spec.shape
     
@@ -204,11 +215,11 @@ def processL09(params, verbose=True):
     prange = [int(hdr['goodpxst']), int(hdr['goodpxen'])]
     
     # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
-    osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
+    osel = np.argwhere((data['scan_type'] == 'OTF') & (rflag)).flatten()
     
     if len(osel) <= 0:
         print('File: ', os.path.join(inDir,dfile))
-        print(data['ROW_FLAG'].flatten())
+        print(rowFlag.flatten())
         print('WARNING: No OTF spectra available.')
         # logger.warning('No OTF spectra available.')
         datavalid = False
