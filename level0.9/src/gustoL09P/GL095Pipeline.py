@@ -112,7 +112,7 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
         #print(glob.glob(os.path.join(inDir,filter)))
         sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
         #print('single result: ', sdirs[0], os.path.split(sdirs[0]))
-        dsc = [int(os.path.split(sdir)[2].split('_')[1].split('.')[0]) for sdir in sdirs]
+        dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
         
         sdirs.sort(key=lambda sdirs: dsc)
         
@@ -202,8 +202,9 @@ def processL09(paramlist, verbose=True):
     datavalid = True
 
     lstr = 'loading file: %s for line: %s'%(os.path.join(inDir,dfile), line)
-    #logger.info(lstr)
+    logger.info(lstr)
     spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
+    chFlag = data['CHANNEL_FLAG']
     rowFlag = data['ROW_FLAG']
     rflag = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
     
@@ -245,8 +246,16 @@ def processL09(paramlist, verbose=True):
         # only correct the good part of the spectrum
         # try to mask bad spectral pixels using weights set to zero: TBI
         yywn = spec_OTF[i0,prange[0]:prange[1]]
-        nsel = np.argwhere(np.isfinite(yywn))
-        yy = yywn[nsel]
+        chf = chFlag[i0,prange[0]:prange[1]]
+        # fsel = np.argwhere(np.isfinite(yywn))
+        # nsel = np.argwhere(np.isfinite(yywn) == False)
+        # yy = yywn[fsel]
+        pargs = np.argwhere(chf == 0).flatten()
+        margs = np.argwhere(chf > 0).flatten()
+
+        yy = yywn.copy()
+        yy[margs] = np.interp(margs, pargs, yywn[pargs])
+        
         if yy.size > 0:
             xx = np.arange(yy.size)
                     
@@ -256,10 +265,10 @@ def processL09(paramlist, verbose=True):
             # rbs, rws = arplsw(yy, lam=bs_lam2, ratio=bs_ratio, itermax=bs_itermax)
             rmsotf[i0] = np.std(yy-rbs)
             
-            bswn = np.zeros(yywn.size)
-            bswn[:] = np.nan
-            bswn[np.squeeze(nsel)] = bs
-            basecorr[i0,prange[0]:prange[1]] = bswn
+            # bswn = np.zeros(yywn.size)
+            # bswn[:] = np.nan
+            # bswn[np.squeeze(fsel)] = bs
+            basecorr[i0,prange[0]:prange[1]] = bs   #bswn
             
             spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
     

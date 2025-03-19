@@ -755,34 +755,36 @@ def checkRowflag(rowflagvalue, rowflagfilter=0):
     if type(rowflagvalue) == type(0):
         rowflagvalue = np.array([rowflagvalue])
     negfilt = ~rowflagfilter#.__invert__()
-    return [True if negfilt.__and__(rfvalue) else False for rfvalue in rowflagvalue]
+    return np.array([False if int(negfilt).__and__(int(rfvalue)) else True for rfvalue in rowflagvalue], dtype=bool)
 
 
 checkRowflags = np.vectorize(checkRowflag)
 
 
 def string_to_enum_combination(istring):
-  """Converts a string of color names to an enum combination.
-
-    Parameters
-    ----------
-
-    Returns
-    -------
-
-    Examples
-    --------
-  """
-  inames = istring.split()
-  cflags = RowFlags(0)  # Initialize with no color
-  for name in inames:
-    print(name)
-    try:
-      flag = RowFlags[name.split('.')[1].upper()]
-      cflags |= flag
-    except KeyError:
-      raise ValueError(f"Invalid flag: {name}")
-  return cflags
+    """Converts a string of color names to an enum combination.
+    
+      Parameters
+      ----------
+    
+      Returns
+      -------
+    
+      Examples
+      --------
+    """
+    inames = str(istring).split()
+    cflags = RowFlags(0)  # Initialize with no color
+    for name in inames:
+        if '|' in name:
+            continue
+        else:
+            try:
+                flag = RowFlags[name.split('.')[1].upper()]
+                cflags |= flag
+            except KeyError:
+                raise ValueError(f"Invalid flag: {name}")
+    return cflags
 
 
 def anaFlagString(aa):

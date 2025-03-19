@@ -434,13 +434,15 @@ def processL08(paramlist):
 
     for k, mix in enumerate(umixers):
         # first check crudely if we have enough data of various scan_types
-        msel = np.argwhere(data['MIXER']==mix)
+        msel = np.nonzero(data['MIXER']==mix)
+        rflag = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
+        
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter)
         check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(checkRowflag(data['ROW_FLAG'][msel], rowflagfilter=rowflagfilter))
+                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(rflag[msel])
                 # (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagfilter)
         if not check:
             print('mix, dfile')
@@ -481,8 +483,9 @@ def processL08(paramlist):
         # 3/8/25: changed this check to exclude the requirement for HOTs since we have sequences without HOT measurements!
         osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & #(hotID.size>=1) & 
                            (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & 
-                           (data['ROW_FLAG']==0)).flatten()
+                           (rflag)).flatten()
         #print('otfID.size: ', otfID.size)
+        #print('osel: ', len(osel))
         if len(osel) > 2:
             # print('processing OTFs')
             # print('OTFs: ', otfID)
@@ -514,11 +517,14 @@ def processL08(paramlist):
         stime = data['UNIXTIME'][osel]
         btime = (rtime[0] + htime[0]) / 2. # before OTFs
         atime = (rtime[1] + htime[1]) / 2. # after OTFs
-        fracb = (stime - btime) / (atime - btime)
-        fraca = (atime - stime) / (atime - btime)
+        if atime < btime:
+            fracb = (stime - btime) / (atime - btime)
+            fraca = (atime - stime) / (atime - btime)
+        else:
+            # this is for the case of a single REF/REFHOT pair
+            fraca = np.ones(stime.size)
+            fracb = np.ones(stime.size)
         
-        print(spec_OTF.shape,flush=True)
-        print()
         n_OTF, n_opix = spec_OTF.shape
         # antenna temperature is a masked array
         ta = ma.zeros([n_OTF, n_opix])
@@ -589,7 +595,10 @@ def processL08(paramlist):
                 else:
                     ht2 = ghtim[hgroup[i0]]
                 # ht2 = ghtim[hgroup[i0]+1]
-                hfrac = (stime[i0]-ht1)/(ht2-ht1)
+                if ht2 > ht1:
+                    hfrac = (stime[i0]-ht1)/(ht2-ht1)
+                else:
+                    hfrac = 1.0
                 # determine the hots for the individual OTF spectra
                 if hgroup[i0]+1 <= hgroup.max():
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
@@ -607,6 +616,13 @@ def processL08(paramlist):
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref2[i0,:]
                 #print('%4i %i %7.2f %7.2f %7.2f %7.2f '%(i0, mix, np.nanmin(ta[i0,200:400]), np.nanmax(ta[i0,200:400]), 
                 #      ta2[i0,200:400].min(), ta2[i0,200:400].max()))
+                
+                # calculate an average Ta
+                if np.any(np.isfinite(ta[i0,pxrange[0]:pxrange[1]])):
+                    Ta_mean = np.nanmean(ta[i0,pxrange[0]:pxrange[1]])
+                else:
+                    Ta_mean = np.nan
+                # print('Ta mean (%i): %.4f'%(i0, Ta_mean), hgroup[i0], hfrac, fraca[i0], fracb[i0], stime[i0], ht1, ht2)
             elif drmethod==3:
                 fadd = '_m3'
                 # method 2: using HOTS to mitigate drifts
@@ -799,7 +815,7 @@ def processL08(paramlist):
         hdre1.set('vcut', value=vcut, comment='ringing treshold used with ringvar')
         fits.append(ofile, data=fT.as_array())
         
-        print('aghots: ', len(aghots))
+        #print('aghots: ', len(aghots))
         if len(aghots) > 0:
             col21 = Column(np.vstack(aghots), name='hots', description='averaged hot spectra')
             col22 = Column(np.hstack(aghtim), name='htime', description='utime of avg. hots')
