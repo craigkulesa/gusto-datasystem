@@ -618,9 +618,9 @@ def processL08(paramlist):
                 #spref_sm[i0,:] = smoothSpectrum(spref_sm[i0,:], cflag, window_length=5, polyorder=2)
                 
                 # calculate a scaling factor
-                scl[i0,:] = spec_OTF[i0,:] / (spref[i0,:]*hcorr[i0,:])
+                scl[i0,:] = spec_OTF[i0,:] / (spref[i0,:])
                 sscl[i0] = ma.median(scl[i0,:])
-                print('Scaling factor: %.4f'%(sscl[i0]))
+                #print('Scaling factor: %.4f'%(sscl[i0]))
                 
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref[i0,:]
