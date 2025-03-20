@@ -416,6 +416,7 @@ def processL08(paramlist):
     aspref = np.zeros([n_spec,n_pix])
     aspref2 = np.zeros([n_spec,n_pix])
     afrac = np.zeros([n_spec,2])
+    aTam = np.zeros([n_spec])
     aTa = np.zeros([n_spec,n_pix])
     aTa2 = np.zeros([n_spec,n_pix])
     if drmethod==3:
@@ -531,6 +532,7 @@ def processL08(paramlist):
         ta.mask = spec.mask
         ta2 = ma.zeros([n_OTF, n_opix])
         ta2.mask = spec.mask
+        tam = np.zeros([n_OTF])
         tsyseff = np.zeros([n_OTF, n_opix])
         hcorr = np.zeros([n_OTF, n_opix])
         scorr = np.zeros([n_OTF, n_opix])
@@ -620,9 +622,9 @@ def processL08(paramlist):
                 
                 # calculate an average Ta
                 if np.any(np.isfinite(ta[i0,pxrange[0]:pxrange[1]])):
-                    Ta_mean = np.nanmean(ta[i0,pxrange[0]:pxrange[1]])
+                    tam[i0] = np.nanmean(ta[i0,pxrange[0]:pxrange[1]])
                 else:
-                    Ta_mean = np.nan
+                    tam[i0] = np.nan
                 # print('Ta mean (%i): %.4f'%(i0, Ta_mean), hgroup[i0], hfrac, fraca[i0], fracb[i0], stime[i0], ht1, ht2)
             elif drmethod==3:
                 fadd = '_m3'
@@ -698,6 +700,7 @@ def processL08(paramlist):
         afrac[osel,0] = fraca
         afrac[osel,1] = fracb
         aTa[osel,:] = ta
+        aTam[osel] = tam
         aspref2[osel,:] = spref2
         aTa2[osel,:] = ta2
         if drmethod==3:
@@ -808,10 +811,11 @@ def processL08(paramlist):
         col7 = Column(spec_org, name='spec', description='original spectra')
         col8 = Column(aTa2, name='tant', description='spectrum without hot correction')
         col9 = Column(var, name='ringvar', description='value for determining if ringing in spectrum')
+        col14 = Column(aTam, name='Ta_mean', description='mean of Ta over good pixel range')
         if drmethod==3:
-            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13])
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14])
         else:
-            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9])
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col14])
         hdre1 = fits.Header()
         hdre1.set('vcut', value=vcut, comment='ringing treshold used with ringvar')
         fits.append(ofile, data=fT.as_array())
