@@ -43,10 +43,10 @@ vcut2 = 6.0
 # xiiprange: good pixel range
 # xiivrange: pixel range for checking ringing
 # NII
-niiprange = [80, 300]
+niiprange = [80, 370]
 niivrange = [200, 300
 # CII
-ciiprange = [90, 590]
+ciiprange = [90, 700]
 ciivrange = [500, 590]
 
 # select lines for processing

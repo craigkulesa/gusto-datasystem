@@ -331,7 +331,7 @@ def processL09(paramlist, verbose=True):
         col51 = Column(basecorrf, name='basecorr', description='baseline correction')
         col52 = Column(rms, name='rms', description='baseline RMS')
         col53 = Column(spec.data, name='spec', description='spectrum before baseline correction')
-        fits.append(ofile, data=Table([col51,col52]).as_array())
+        fits.append(ofile, data=Table([col51,col52, col53]).as_array())
         # this is a crutch to properly name the extensions!
         with fits.open(ofile) as hdu:
             hdu[2].header['EXTNAME'] = 'Baseline'
@@ -339,7 +339,7 @@ def processL09(paramlist, verbose=True):
 
     
     #print('saved file: ', ofile)
-    #logger.info('saved file: %s'%(ofile))
+    logger.info('saved file: %s'%(ofile))
         
         
     return dfile
