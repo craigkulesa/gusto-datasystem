@@ -417,6 +417,7 @@ def processL08(paramlist):
     aspref2 = np.zeros([n_spec,n_pix])
     afrac = np.zeros([n_spec,2])
     aTam = np.zeros([n_spec])
+    asscl = np.zeros([n_spec])
     aTa = np.zeros([n_spec,n_pix])
     aTa2 = np.zeros([n_spec,n_pix])
     if drmethod==3:
@@ -532,7 +533,9 @@ def processL08(paramlist):
         ta.mask = spec.mask
         ta2 = ma.zeros([n_OTF, n_opix])
         ta2.mask = spec.mask
-        tam = np.zeros([n_OTF])
+        scl = np.ones([n_OTF, n_opix])
+        sscl = np.ones(n_OTF)
+        tam = np.zeros(n_OTF)
         tsyseff = np.zeros([n_OTF, n_opix])
         hcorr = np.zeros([n_OTF, n_opix])
         scorr = np.zeros([n_OTF, n_opix])
@@ -543,7 +546,6 @@ def processL08(paramlist):
             hcorr_sm = np.zeros([n_OTF, n_opix])
             spref_sm = np.zeros([n_OTF, n_opix])
             spref2_sm = np.zeros([n_OTF, n_opix])
-            scl = np.ones([n_OTF, n_opix])
 
         # this call returns the results for all spectra, but we need only everything for the OTF spectra
         # ahgroup is the assignment of hots to all spectra
@@ -606,12 +608,19 @@ def processL08(paramlist):
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
                 else:
                     hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0],:]
+                #hcorr_sm[i0,:] = smoothSpectrum(hcorr[i0,:], cflag, window_length=5, polyorder=2)
                 # hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
                 # determine the hots-reduced REF spectra
                 # spref[i0,:] = (fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]) * hcorr[i0,:]
                 scorr[i0,:] = hcorr[i0,:] / (fracb[i0] * rhots[0,:] + fraca[i0] * rhots[1,:])
                 spref[i0,:] = (fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]) * scorr[i0,:]
                 spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
+                #spref_sm[i0,:] = smoothSpectrum(spref_sm[i0,:], cflag, window_length=5, polyorder=2)
+                
+                # calculate a scaling factor
+                scl[i0,:] = spec_OTF[i0,:] / (spref[i0,:]*hcorr[i0,:])
+                sscl[i0] = ma.median(scl[i0,:])
+                print('Scaling factor: %.4f'%(sscl[i0]))
                 
                 # put everything together. issue: divide by zero -> catch in masks
                 ta[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:] - spref[i0,:])/spref[i0,:]
@@ -674,7 +683,9 @@ def processL08(paramlist):
                 spref2_sm[i0,:] = smoothSpectrum(spref2_sm[i0,:], cflag, window_length=5, polyorder=2)
                 
                 # put everything together. issue: divide by zero -> catch in masks
-                scl[i0,:] = spec_OTF[i0,:] / (spref_sm[i0,:]*hcorr_sm[i0,:])
+                scl[i0,:] = spec_OTF[i0,:] / (spref_sm[i0,:]*hcorr[i0,:])
+                sscl[i0] = ma.median(scl[i0,:])
+                
                 # ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:]/hcorr_sm[i0,:] - spref_sm[i0,:])/spref_sm[i0,:]
                 ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:]*hcorr_sm[i0,:])/(spref_sm[i0,:]*hcorr_sm[i0,:])
                 # ta2[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:])/spref2_sm[i0,:]
@@ -701,6 +712,7 @@ def processL08(paramlist):
         afrac[osel,1] = fracb
         aTa[osel,:] = ta
         aTam[osel] = tam
+        asscl[osel] = sscl
         aspref2[osel,:] = spref2
         aTa2[osel,:] = ta2
         if drmethod==3:
