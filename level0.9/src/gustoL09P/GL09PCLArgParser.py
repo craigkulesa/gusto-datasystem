@@ -46,8 +46,8 @@ def GL09PCLArgParser(verbose=False):
                         default='0.8',
                         help='GUSTO Data Level the pipeline should start processing (default=0.8); \npossible entries are 0.8, 0.9 and 0.95')
     parser.add_argument('--lines', nargs='?', type=str,
-                        default='CII',
-                        help='Line to be processed: either CII or NII, if both lines are desired, do not use this option but the config file')
+                        action='store',
+                        help="Line(s) to be processed: either 'CII' or 'NII', 'CII NII'")
     parser.add_argument('--endLevel', '-e', nargs='?', type=str,
                         default='0.9',
                         help='GUSTO Data Level produced by pipeline (default=1.0); possible entries are 0.9 and 1.0')
@@ -103,8 +103,9 @@ def manageArgs(cfi, args, verbose=False):
         cfi['gprocs']['debug'] = args.debug
 
     if args.lines is not None:
-        print('args.lines: ', args.lines)
-        cfi['gprocs']['lines'] = [args.lines]
+        print('args.lines: ', args.lines, type(args.lines), cfi['gprocs']['lines'], type(cfi['gprocs']['lines']))
+        cfi['gprocs']['lines'] = args.lines
+    print('lines: ', cfi['gprocs']['lines'], type(cfi['gprocs']['lines']))
     
     if args.calmethod is not None:
         print('args.calmethod: ', args.calmethod, type(args.calmethod), cfi['gprocs']['drmethod'], type(cfi['gprocs']['drmethod']))

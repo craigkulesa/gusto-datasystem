@@ -127,7 +127,8 @@ def GL095Pipeline(cfi, scanRange, verbose=False):
             dfiles = dfiles[:n_ds]
             
         params = {'line': line, 'inDir': inDir, 'outDir': outDir, 
-                  'drmethod': int(cfi['gprocs']['drmethod']),
+                  'basemethod': int(cfi['gprocs']['basemethod']),
+                  'polyorder': int(cfi['gprocs']['polyorder']),
                   'debug': cfi['gprocs']['debug'], 'verbose': verbose,
                   'loglevel':cfi['gprocs']['loglevel'], 
                   'rowflagfilter': int(cfi['gprocs']['rowflagfilter'])}
@@ -169,8 +170,9 @@ def processL09(paramlist, verbose=True):
     dfile = paramlist[0]
     params = paramlist[1]
     # line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
-    line, inDir, outDir, drmethod = params['line'], params['inDir'], params['outDir'], params['drmethod']
+    line, inDir, outDir, drmethod = params['line'], params['inDir'], params['outDir'], params['basemethod']
     debug, verbose, loglevel, rowflagfilter = params['debug'], params['verbose'], params['loglevel'], params['rowflagfilter']
+    polyorder = params['polyorder']
 
     logger = logging.getLogger('GL09PLogger')
     #logger.addHandler(logging.StreamHandler())
@@ -258,17 +260,28 @@ def processL09(paramlist, verbose=True):
         
         if yy.size > 0:
             xx = np.arange(yy.size)
-                    
-            baseline_fitter = Baseline(x_data=xx)
-            bs, pars = baseline_fitter.aspls(yy, bs_lam)
-            rbs, rpars = baseline_fitter.aspls(yy, bs_lam2)
-            # rbs, rws = arplsw(yy, lam=bs_lam2, ratio=bs_ratio, itermax=bs_itermax)
-            rmsotf[i0] = np.std(yy-rbs)
-            
-            # bswn = np.zeros(yywn.size)
-            # bswn[:] = np.nan
-            # bswn[np.squeeze(fsel)] = bs
-            basecorr[i0,prange[0]:prange[1]] = bs   #bswn
+            if basemethod == 0:
+                # no baseline fit!
+                basecorr[i0,:] = np.zero(basecorr[i0,:].size)
+            elif basemethod == 1:
+                # polynomial fitter
+                
+                pass
+            elif basemethod == 2:
+                baseline_fitter = Baseline(x_data=xx)
+                bs, pars = baseline_fitter.aspls(yy, bs_lam)
+                rbs, rpars = baseline_fitter.aspls(yy, bs_lam2)
+                # rbs, rws = arplsw(yy, lam=bs_lam2, ratio=bs_ratio, itermax=bs_itermax)
+                rmsotf[i0] = np.std(yy-rbs)
+                
+                # bswn = np.zeros(yywn.size)
+                # bswn[:] = np.nan
+                # bswn[np.squeeze(fsel)] = bs
+                basecorr[i0,prange[0]:prange[1]] = bs   #bswn
+            else:
+                print('Error: Baseline fitting method %i does not exist. \n')
+                print('Treated as no baseline fit.')
+                basecorr[i0,:] = np.zero(basecorr[i0,:].size)
             
             spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
     

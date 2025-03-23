@@ -178,6 +178,7 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     scan_type = data['scan_type']
     rflags = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
     # ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
+    # print('getSpecScanTypes: rflags: ', rowflagfilter, list(rflags), list(data['ROW_FLAG']))
 
     rfsel = (mixer == mixers) & (scan_type == 'REF') & (rflags)
     rfsID = np.unique(scanID[rfsel])
@@ -243,11 +244,11 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
 
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, verbose=verbose)
     if (len(otfID)<1) | (len(rfsID)<1) | (len(rhsID)<1) | (len(hotID)<1):
-        print('Not enough scan types for processing (otf/refs/refhots/hots): ', otfID, rfsID, rhsID, hotID)
-        return -999, 0, 0, 0, 0, 0, 0, [0,0], -1
+        print('getCalSpectra: Not enough scan types for processing (otf/refs/refhots/hots): ', otfID, rfsID, rhsID, hotID)
+        return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0
     if (len(otfID)>1):
-        print('Too many OTF scan IDs for processing: ', otfID)
-        return -999, 0, 0, 0, 0, 0, 0, [0,0], -1
+        print('getCalSpectra: Too many OTF scan IDs for processing: ', otfID)
+        return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0
     
     # determine the REFHOTs that bracket the OTFs
     # set rfsflag accordingly: 0: both REFs available; 1: only start REF available
@@ -263,15 +264,15 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
         rhIDaft = aft[np.argmin(aft)]
         rhIDs = [rhIDaft, rhIDaft]
         rfsflag = 2
-        print('Only REF after OTF available')
+        print('getCalSpectra: Only REF after OTF available')
     elif (len(bef)>0):
         rhIDbef = bef[np.argmax(bef)]
         rhIDs = [rhIDbef, rhIDbef]
         rfsflag = 1
-        print('Only REF before OTF available')
+        print('getCalSpectra: Only REF before OTF available')
     else:
-        print('Not enough ref scans available (REFs before/after OTF): ', bef, aft)
-        return -999, 0, 0, 0, 0, 0, 0, [0,0], -1
+        print('getCalSpectra: Not enough ref scans available (REFs before/after OTF): ', bef, aft)
+        return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0
         rfsflag = 3
 
 
@@ -281,6 +282,7 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
     ttimes = []
     rtimes = []
     htimes = []
+    yfac = []
     for rhID in rhIDs:
         # determine yfactor
         rsel = (rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (rflags)
@@ -303,15 +305,17 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
         tsys = np.squeeze((Thot - Tsky*y_factor[:])/(y_factor[:] - 1.))
 
         Tsyss.append(tsys)
+        yfac.append(y_factor)
         REFs.append(spec_r)
         RHOTs.append(spec_h)
         rtimes.append(rtime)
         htimes.append(htime)
 
     Tsyss = np.ma.array(Tsyss)
+    yfac = np.ma.array(yfac)
     REFs = np.ma.array(REFs)
     RHOTs = np.ma.array(RHOTs)
-    return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky, rhIDs, rfsflag
+    return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky, rhIDs, rfsflag, yfac
 
 
 def getHotInfo(spec, data, mixer, dfile='', verbose=False, rowflagfilter=0):

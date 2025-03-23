@@ -430,6 +430,7 @@ def processL08(paramlist):
     aghtint = []  # integration time of hots
     aghmix = []   # mixer of hots
     atsys = []
+    ayfac = []
     atsmix = []
     datavalid = np.ones(n_umix, dtype=bool)
     rfsflag = 0
@@ -457,12 +458,12 @@ def processL08(paramlist):
             print('other: ', (otfID.size>0), (rfsID.size>0), (rhsID.size>0), (hotID.size>0))
             print('IDs: ', otfID, rfsID, rhsID, hotID)
             print('rowflagfilter: ', rowflagfilter, np.any(checkRowflag(data['ROW_FLAG'][msel], rowflagfilter=rowflagfilter)))
-            print('Not enough data available for processing. ROW_FLAGs are set appropriately. ')
+            print('GL09Pipeline: Not enough data available for processing. ROW_FLAGs are set appropriately. ')
             data['ROW_FLAG'][msel] |= 4   # flagged as missing data
             datavalid[k] = False
             return 0
         
-        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags = getCalSpectra(mix, spec, data, hdr, rowflagfilter, verbose=True)
+        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter, verbose=True)
         rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
@@ -573,6 +574,7 @@ def processL08(paramlist):
         
 
         atsys.append(tsys)
+        ayfac.append(yfac)
         atsmix.append(mix)
         
         # for debugging, add file indicator of method for drmethod=3
@@ -846,7 +848,8 @@ def processL08(paramlist):
 
         col31 = Column(np.array(atsys), name='Tsys', description='Tsys before/after OTF')
         col32 = Column(np.array(atsmix), name='tsmix', description='mixer of Tsys')
-        fits.append(ofile, data=Table([col31,col32]).as_array())
+        col33 = Column(np.array(ayfac), name='yfactor', description='y-factor')
+        fits.append(ofile, data=Table([col31, col32, col33]).as_array())
 
         col41 = Column(aTa, name='Ta', description='single mixer antenna temperature')
         fits.append(ofile, data=Table([col41]).as_array())

@@ -26,6 +26,12 @@ tmpDir = ${ghome}/work/tmp
 # drmethod 2: (s/h-r/h)/(r/h)
 drmethod = 2
 #
+# baseline fitting method
+#options: 0: no baseline fit; 1: polynomial baseline fit; 2: ASPLS fitting method
+basemethod = 0
+# order for polynomial baseline fitter else ignored
+polyorder = 3
+
 # max files is used for debugging runs limiting the number of files processed
 # 0: process all files; n: process n files
 max_files = 0
@@ -36,7 +42,7 @@ l09set_channel_flags = True
 
 # threshold values for detecting ringing/bad data - subject to tuning!
 # the vcuts are different for lines, but the same for all mixers of each line
-checkringflag = False
+checkringflag = True
 vcut1 = 6.0  
 vcut2 = 6.0
 
@@ -50,7 +56,7 @@ ciiprange = [90, 700]
 ciivrange = [500, 590]
 
 # select lines for processing
-# lines = ['CII']
+# lines = CII
 lines = CII NII
 debug = True
 loglevel = INFO
@@ -67,6 +73,16 @@ l10OTFonly = True
 
 # coordinate offsets file
 offsetsfile = 
+
+# inserting artificial lines
+enableArtLines: False
+# as IF frequencies
+linecenters: 
+# on IF frequency scale
+linewidths:
+# pre calibration -> Amp(K)/Tsys(K)
+linestrength: 
+
 
 
 [GUSTO_Parameters]

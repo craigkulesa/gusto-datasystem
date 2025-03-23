@@ -28,7 +28,7 @@ cfg_file0 = importlib.resources.files('gustoL09P') / 'Data/GL09P_setup_pars.txt'
 
 ProcFile0 = importlib.resources.files('gustoL09P') / 'Data/CIIconfig.txt'
 
-spectralLines = ['CII', 'NII', 'OI']
+spectralLines = ['CII', 'NII']
 
 
 class GL09PipelineSetupClass:
