@@ -214,39 +214,20 @@ class GL09PipelineSetupClass:
                 gpdict[key] = config.getboolean("GUSTO_Processing", key)
             else:
                 gpdict[key] = gpars[key]
-        # for key in gpars.keys():
-        #     if gpars[key].strip()=='False':
-        #         gpdict[key] = False
-        #     elif gpars[key].strip()=='True':
-        #         gpdict[key] = True
-        #     else:
-        #         gpdict[key] = gpars[key]
+
         gpars = config["CII_Parameters"]
         for key in gpars.keys():
             if gpars[key].strip() in ['True', 'true', 'False', 'false']:
                 gpdict[key] = config.getboolean("GUSTO_Processing", key)
             else:
                 gpdict[key] = gpars[key]
-        # for key in gpars.keys():
-        #     if gpars[key].strip()=='False':
-        #         gpdict[key] = False
-        #     elif gpars[key].strip()=='True':
-        #         gpdict[key] = True
-        #     else:
-        #         gpdict[key] = gpars[key]
+
         gpars = config["NII_Parameters"]
         for key in gpars.keys():
             if gpars[key].strip() in ['True', 'true', 'False', 'false']:
                 gpdict[key] = config.getboolean("GUSTO_Processing", key)
             else:
                 gpdict[key] = gpars[key]
-        # for key in gpars.keys():
-        #     if gpars[key].strip()=='False':
-        #         gpdict[key] = False
-        #     elif gpars[key].strip()=='True':
-        #         gpdict[key] = True
-        #     else:
-        #         gpdict[key] = gpars[key]
 
         # GUSTO_Processing
         gpars = config["GUSTO_Processing"]

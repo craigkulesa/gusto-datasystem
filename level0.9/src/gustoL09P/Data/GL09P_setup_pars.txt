@@ -77,11 +77,11 @@ offsetsfile =
 # inserting artificial lines
 enableArtLines: False
 # as IF frequencies
-linecenters: 
+linecenters: [500, 2000, 2500]
 # on IF frequency scale
-linewidths:
+linewidths: [10, 20, 40]
 # pre calibration -> Amp(K)/Tsys(K)
-linestrength: 
+linestrength: [8, 6, 7]
 
 
 

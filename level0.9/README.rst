@@ -35,6 +35,11 @@ For limiting the number of files processed, use (change the scan numbers appropr
 .. code-block:: python
 ``execGL09P -r 9000 9600``
 
+More complex command:
+
+.. code-block:: python
+``execGL09P -r 19000 19004 -d -v -s 0.9 -e 0.9 --lines 'NII CII'``
+
 All command line switches can be checked with:
 
 .. code-block:: python
