@@ -580,7 +580,29 @@ def processL08(paramlist):
         # for debugging, add file indicator of method for drmethod=3
         fadd = ''
         
-    
+        if drmethod==4:
+            def scalefunc(x, c1, c2):
+                x1=x[0]
+                x2=x[1]
+                y = c1 - (c2 * x1 +x2)
+                # Return square difference 
+                return(np.sum(y*y))
+            # rhots and refs should be same number of scans, but might not be
+            nhot = rhots.shape[0]
+            nref = refs.shape[0]
+            nghot = ghots.shape[0]
+
+            # we got the y-factor above
+            if yfac.shape[0] == 2:
+                y1 = yfac[0,:]
+                y2 = yfac[1,:]
+            else:
+                y1 = yfac[0,:]
+                y2 = yfac[0,:]
+
+            # combine all HOTs
+            seq_hots = np.vstack([rhots,ghots])
+
         # create the calibrated spectra
         for i0 in range(n_OTF):
             tsyseff[i0,:] = fracb[i0] * tsys[0,:] + fraca[i0] * tsys[1,:]
@@ -692,12 +714,55 @@ def processL08(paramlist):
                 ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:]*hcorr_sm[i0,:])/(spref_sm[i0,:]*hcorr_sm[i0,:])
                 # ta2[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:])/spref2_sm[i0,:]
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
+            elif drmethod==4:
+                fadd = '_m4'
+                
+                cflag = data['CHANNEL_FLAG'][i0,:]
+                #  S-R / R implementation fitting R to S
+                spec_otf1 = spec_OTF[i0,:]
+
+                # Useable Y factors should be > 1.0
+                quse = np.argwhere((y1 > 1.0) & (cflag == 0))
+                nsamp = quse.shape[0]
+                #print("Good channels",nsamp)
+                if nsamp == 0:
+                    #Try 2nd Y factor y2
+                    print('switching to 2nd Y')
+                    y1 = y2
+                    quse = np.argwhere((y2 > 1.0) & (cflag == 0))
+                    nsamp = quse.shape[0]
+
+                if nsamp > 0:
+
+                    testvar = []
+                    mincoeffs = []
+                    synRefs=[]
+                    for hot1 in seq_hots:
+                        sR1 = hot1/y1
+                        tsyseff1 = tsyseff[i0,:]
+                        xstart = [1.,0.0]
+                        synRefs.append(sR1)
+                        minresult = minimize(scalefunc,xstart,args=(spec_otf1[quse],sR1[quse]))
+                        mincoeffs.append(minresult.x)
+                        testvar.append(minresult.fun/nsamp)
+                        #print(testvar, minresult.x)
+                    testvar = np.array(testvar)
+                    mincoeffs = np.array(mincoeffs)
+                    #find the minimum variance
+                    qmin = np.argmin(testvar)
+                    #print(mincoeffs.shape)
+                    #print(testvar[qmin],mincoeffs[qmin])
+                    synRef = mincoeffs[qmin][0]*synRefs[qmin] + mincoeffs[qmin][1]
+                    
+                    #Ta_otf = 2. * tsyseff1 * ( spec_otf1 - synRef ) / synRef
+                    Ta_otf = 2. * Tsys_nominal * ( spec_otf1 - synRef ) / synRef
+                    ta[i0,:] = Ta_otf
+                    Trms = np.std(Ta_otf[quse])
+                    BW = hdr['CDELT1']*1e6 *2 
+                    #Expected = np.median(tsyseff1[quse])/np.sqrt(BW*0.33)
+                    Expected = 1100.0/np.sqrt(BW*0.33)
+                    #print(Trms / Expected)
             
-            # if type(ta)==type(np.ndarray(0)):
-            #     ta[i0,data['CHANNEL_FLAG'][i0,:]>0] = 0.0
-            # else:
-            #     ta[i0,ta[i0,:].mask>0] = 0.0
-            #     ta2[i0,ta2[i0,:].mask>0] = 0.0
 
     
         # now we have to save the data in a FITS file
