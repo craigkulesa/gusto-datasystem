@@ -26,6 +26,7 @@ import itertools
 import multiprocessing
 import astropy.wcs
 import zipfile
+import lmfit
 #import glidertools.cleaning as gc
 from matplotlib.patches import Rectangle
 from pathlib import Path
@@ -38,6 +39,7 @@ from astropy.time import Time
 from astropy.io import fits
 from multiprocessing.pool import Pool
 from itertools import repeat
+from scipy.optimize import minimize
 from scipy.signal import savgol_filter
 
 from .GL09PipelineSetupClass import GL09PipelineSetupClass
@@ -417,6 +419,7 @@ def processL08(paramlist):
     aspref2 = np.zeros([n_spec,n_pix])
     afrac = np.zeros([n_spec,2])
     aTam = np.zeros([n_spec])
+    aTrms = np.zeros([n_spec])
     asscl = np.zeros([n_spec])
     aTa = np.zeros([n_spec,n_pix])
     aTa2 = np.zeros([n_spec,n_pix])
@@ -537,6 +540,7 @@ def processL08(paramlist):
         scl = np.ones([n_OTF, n_opix])
         sscl = np.ones(n_OTF)
         tam = np.zeros(n_OTF)
+        trms = np.zeros(n_OTF)
         tsyseff = np.zeros([n_OTF, n_opix])
         hcorr = np.zeros([n_OTF, n_opix])
         scorr = np.zeros([n_OTF, n_opix])
@@ -739,7 +743,6 @@ def processL08(paramlist):
                     synRefs=[]
                     for hot1 in seq_hots:
                         sR1 = hot1/y1
-                        tsyseff1 = tsyseff[i0,:]
                         xstart = [1.,0.0]
                         synRefs.append(sR1)
                         minresult = minimize(scalefunc,xstart,args=(spec_otf1[quse],sR1[quse]))
@@ -754,17 +757,17 @@ def processL08(paramlist):
                     #print(testvar[qmin],mincoeffs[qmin])
                     synRef = mincoeffs[qmin][0]*synRefs[qmin] + mincoeffs[qmin][1]
                     
-                    #Ta_otf = 2. * tsyseff1 * ( spec_otf1 - synRef ) / synRef
-                    Ta_otf = 2. * Tsys_nominal * ( spec_otf1 - synRef ) / synRef
+                    Ta_otf = 2. * tsyseff[i0,:] * ( spec_otf1 - synRef ) / synRef
+                    # Ta_otf = 2. * Tsys_nominal * ( spec_otf1 - synRef ) / synRef
                     ta[i0,:] = Ta_otf
-                    Trms = np.std(Ta_otf[quse])
+                    trms[i0] = np.std(Ta_otf[quse])
+                    # this line is wrong!
                     BW = hdr['CDELT1']*1e6 *2 
                     #Expected = np.median(tsyseff1[quse])/np.sqrt(BW*0.33)
                     Expected = 1100.0/np.sqrt(BW*0.33)
                     #print(Trms / Expected)
-            
 
-    
+
         # now we have to save the data in a FITS file
         # Note: changing the output data format to
         # primarily passing through the header and the data table
@@ -779,6 +782,7 @@ def processL08(paramlist):
         afrac[osel,1] = fracb
         aTa[osel,:] = ta
         aTam[osel] = tam
+        aTrms[osel] = trms
         asscl[osel] = sscl
         aspref2[osel,:] = spref2
         aTa2[osel,:] = ta2
@@ -862,10 +866,7 @@ def processL08(paramlist):
     hdr.set('', value='', after='procmeth')
     
     os.makedirs(outDir, exist_ok=True)
-    if drmethod==3:
-        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
-    else:
-        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
+    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=data, header=hdr1)
     

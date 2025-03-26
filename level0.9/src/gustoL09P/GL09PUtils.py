@@ -311,10 +311,10 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
         rtimes.append(rtime)
         htimes.append(htime)
 
-    Tsyss = np.ma.array(Tsyss)
-    yfac = np.ma.array(yfac)
-    REFs = np.ma.array(REFs)
-    RHOTs = np.ma.array(RHOTs)
+    Tsyss = np.ma.array(Tsyss).squeeze()
+    yfac = np.ma.array(yfac).squeeze()
+    REFs = np.ma.array(REFs).squeeze()
+    RHOTs = np.ma.array(RHOTs).squeeze()
     return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, Tsky, rhIDs, rfsflag, yfac
 
 
