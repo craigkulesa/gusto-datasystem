@@ -60,6 +60,8 @@ def GL09PCLArgParser(verbose=False):
     parser.add_argument('--calmethod', '-m', nargs='?', type=int,
                         #default='2',
                         help='select GUSTO spectrum calibration method')
+    parser.add_argument('--applychannelfilter', '-ac', action=argparse.BooleanOptionalAction,
+                        help='apply channel filter when calibrating spectra')
     parser.add_argument('--verbose', '-v', action=argparse.BooleanOptionalAction,
                         help='sets verbosity of the {tpipe}')
     parser.add_argument('--debug', '-d', action=argparse.BooleanOptionalAction,
@@ -125,6 +127,10 @@ def manageArgs(cfi, args, verbose=False):
     
     # check the rowflagfilter: numeric or string
     cfi['gprocs']['rowflagfilter'] = anaFlagString(cfi['gprocs']['rowflagfilter'])
+    
+    if args.applychannelfilter is not None:
+        print('args.applychannelfilter: ', args.applychannelfilter, type(args.applychannelfilter))
+        cfi['gprocs']['applychannelfilter'] = args.applychannelfilter
     
     return cfi
 

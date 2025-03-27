@@ -170,7 +170,7 @@ def processL09(paramlist, verbose=True):
     dfile = paramlist[0]
     params = paramlist[1]
     # line, inDir, outDir, dfile, drmethod, debug = params[0], params[1], params[2], params[3], params[4], params[5]
-    line, inDir, outDir, drmethod = params['line'], params['inDir'], params['outDir'], params['basemethod']
+    line, inDir, outDir, basemethod = params['line'], params['inDir'], params['outDir'], params['basemethod']
     debug, verbose, loglevel, rowflagfilter = params['debug'], params['verbose'], params['loglevel'], params['rowflagfilter']
     polyorder = params['polyorder']
 
@@ -178,8 +178,8 @@ def processL09(paramlist, verbose=True):
     #logger.addHandler(logging.StreamHandler())
     #print('loglevel: ', loglevel)
     logger.setLevel(loglevel)
-    if debug:
-        logger.info('processing in debug mode')
+    # if debug:
+    #     logger.info('processing in debug mode')
     #print('debug proc 0.95: ', debug)
     
     # define some processing data first (maybe relocat to function later?)
@@ -237,7 +237,7 @@ def processL09(paramlist, verbose=True):
     rmsotf = np.zeros(n_OTF)
     rf = np.zeros(n_OTF)
     
-    print('processing data ...')
+    # print('processing data ...')
     # create the calibrated spectra
     for i0 in range(n_OTF):
         # perform a baseline correction on all OTF spectra
@@ -260,11 +260,22 @@ def processL09(paramlist, verbose=True):
         
         if yy.size > 0:
             xx = np.arange(yy.size)
+            xxwn = np.arange(yywn.size)
             if basemethod == 0:
                 # no baseline fit!
-                basecorr[i0,:] = np.zero(basecorr[i0,:].size)
+                basecorr[i0,:] = np.zeros(basecorr[i0,:].size)
             elif basemethod == 1:
                 # polynomial fitter
+                
+                try:
+                    z = np.ma.polyfit(xx, yy, deg=3)
+                    ip4n = np.poly1d(z)
+                    std = np.std(psp - ip4n(xx))
+                    #print('%4i, %7.3f %7.3f %7.3f'%(ch, std, np.min(psp - ip4n(pxx)), np.max(psp - ip4n(pxx))))
+            
+                except:
+                    print('Polyfit not possible for spec # %i in file %s'%(ch, dfile))
+                basecorr[i0,prange[0]:prange[1]] = ip4n(xxwn)   #bswn
                 
                 pass
             elif basemethod == 2:
@@ -281,7 +292,7 @@ def processL09(paramlist, verbose=True):
             else:
                 print('Error: Baseline fitting method %i does not exist. \n')
                 print('Treated as no baseline fit.')
-                basecorr[i0,:] = np.zero(basecorr[i0,:].size)
+                basecorr[i0,:] = np.zeros(basecorr[i0,:].size)
             
             spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
     

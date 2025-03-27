@@ -24,7 +24,9 @@ tmpDir = ${ghome}/work/tmp
 # data reduction methods
 # drmethod 1: (s-r)/r
 # drmethod 2: (s/h-r/h)/(r/h)
-drmethod = 2
+# drmethod 3: not finished
+# drmethod 4: fitting hots to spectrum
+drmethod = 4
 #
 # baseline fitting method
 #options: 0: no baseline fit; 1: polynomial baseline fit; 2: ASPLS fitting method
@@ -66,6 +68,9 @@ addpixelflag = True
 # rowflag filter value: int or string of RowFlag
 # e.g.: 'RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_UNPUMPED'
 rowflagfilter: 0
+
+#
+applychannelfilter: False
 
 # clean up the L1.0 data and save only good OTF spectra
 l10OTFonly = True

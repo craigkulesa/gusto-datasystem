@@ -312,7 +312,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                   'vcut': vcut, 'pxrange': pxrange, 'mranges': mranges,
                   'pvrange': pvrange, 'rowflagfilter': int(cfi['gprocs']['rowflagfilter']),
                   'addpixelflag': cfi['gprocs']['addpixelflag'],
-                  'checkringflag': cfi['gprocs']['checkringflag']}
+                  'checkringflag': cfi['gprocs']['checkringflag'],
+                  'applychannelfilter': cfi['gprocs']['applychannelfilter']}
         paramlist = [[a, b] for a in dfiles for b in [params]]
 
         if verbose:
@@ -356,10 +357,14 @@ def processL08(paramlist):
     addpixelflag = params['addpixelflag']
     checkringflag = params['checkringflag']
     rowflagfilter = params['rowflagfilter']
+    applychannelfilter = params['applychannelfilter']
     # good pixel ranges
     pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
     # ringing check ranges
     pvrange = (int(params['pvrange'][0]), int(params['pvrange'][1]))
+
+    if debug:
+        fadd = '_m%i'%(drmethod)
     
     # define some additional processing data (maybe relocat to function later?)
     if 'CII' in dfile:
@@ -396,14 +401,18 @@ def processL08(paramlist):
     
     data['CHANNEL_FLAG'][:,pxrange[1]:] = np.bitwise_or(data['CHANNEL_FLAG'][:,pxrange[1]:] ,(1<<7))
     data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<7))
-    spec.mask = data['CHANNEL_FLAG']
-    
-    if addpixelflag:
-        # more agressive spur flagging
-        for i in range(mranges.shape[0]):
-            # set the spur flag for the mranges
-            data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] ,(1<<7))
-            spec.mask = data['CHANNEL_FLAG']
+    if applychannelfilter:
+        if debug:
+            fadd = '_ac'
+        spec.mask = data['CHANNEL_FLAG']
+        if addpixelflag:
+            # more agressive spur flagging
+            for i in range(mranges.shape[0]):
+                # set the spur flag for the mranges
+                data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,mranges[i,0]:mranges[i,1]+1] ,(1<<7))
+                spec.mask = data['CHANNEL_FLAG']
+    else:
+        spec.mask = np.zeros(spec.shape)
     
     n_spec, n_pix = spec.shape
     
@@ -582,7 +591,6 @@ def processL08(paramlist):
         atsmix.append(mix)
         
         # for debugging, add file indicator of method for drmethod=3
-        fadd = ''
         
         if drmethod==4:
             def scalefunc(x, c1, c2):
@@ -664,7 +672,7 @@ def processL08(paramlist):
                     tam[i0] = np.nan
                 # print('Ta mean (%i): %.4f'%(i0, Ta_mean), hgroup[i0], hfrac, fraca[i0], fracb[i0], stime[i0], ht1, ht2)
             elif drmethod==3:
-                fadd = '_m3'
+                #fadd += '_m3'
                 # method 2: using HOTS to mitigate drifts
                 # apply the REFHOTS to the refs
                 # ToDo: check if the inttime of refs/hots/otfs matters
@@ -719,7 +727,6 @@ def processL08(paramlist):
                 # ta2[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:])/spref2_sm[i0,:]
                 ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
             elif drmethod==4:
-                fadd = '_m4'
                 
                 cflag = data['CHANNEL_FLAG'][i0,:]
                 #  S-R / R implementation fitting R to S
@@ -866,7 +873,10 @@ def processL08(paramlist):
     hdr.set('', value='', after='procmeth')
     
     os.makedirs(outDir, exist_ok=True)
-    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
+    if debug:
+        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
+    else:
+        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=data, header=hdr1)
     
