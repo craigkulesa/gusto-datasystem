@@ -707,9 +707,9 @@ def processL08(paramlist):
                 result = mini.minimize()
 
                 sR = getsRf(result.params, sRn)
-                spref[i0,:] = sR
+                spref[i0,:] = sR 
                 print(hcoef.shape, result.params, flush=True)
-                hcoef[i0,:n_ghots] = result.params
+                hcoef[i0,:] = result.params
 
                 ta[i0,:] = 2.*tsyseff[i0,:] * (sspec-sR)/sR                
                 trms[i0] = np.std(ta[i0,yvalid])
