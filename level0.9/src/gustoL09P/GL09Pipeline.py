@@ -258,14 +258,14 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
     
     # load ranges for 2nd pixel masking
     
+    inDir = cfi['gdirs']['L08DataDir']
+    outDir = cfi['gdirs']['L09DataDir']
+    os.makedirs(outDir, exist_ok=True)
     
     for line in lines:
         if verbose:
             print('\nProcessing line: ', line)
         # identify the files for processing
-        inDir = cfi['gdirs']['L08DataDir']
-        outDir = cfi['gdirs']['L09DataDir']
-        os.makedirs(outDir, exist_ok=True)
         
         # load spikes masking data from files
         if line=='NII':
@@ -600,7 +600,8 @@ def processL08(paramlist):
                 nRs, _ = sRn.shape
                 for i in range(1,nRs):
                     model += params['a%i'%(i)].value * sRn[i-1,:]
-                return (spec - model)**2
+                # return (spec - model)**2
+                return ((spec - model)/model)**2
             
             def getsRf(params, sRn):
                 model = params['a0']
@@ -608,6 +609,9 @@ def processL08(paramlist):
                 for i in range(1,nRs):
                     model += params['a%i'%(i)].value * sRn[i-1,:]
                 return model
+            
+            seq_hots = np.vstack([rhots,ghots])
+            n_shots = seq_hots.shape[0]
         
         if drmethod==4:
             def scalefunc(x, c1, c2):
@@ -693,11 +697,11 @@ def processL08(paramlist):
                 sspec = spec_OTF[i0,:]
                 
                 yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0))[0]
-                sRn = ghots / yfac[1,:].squeeze()
+                sRn = seq_hots / yfac[1,:].squeeze()
 
                 # Create parameters
                 params = lmfit.Parameters()
-                vals = np.zeros(n_ghots) + 0.2
+                vals = np.zeros(n_shots) + 0.2
                 vals[0] = 0.0
                 for index, value in enumerate(vals):
                     params.add('a%i'%index, value=vals[index])
@@ -708,10 +712,9 @@ def processL08(paramlist):
 
                 sR = getsRf(result.params, sRn)
                 spref[i0,:] = sR 
-                print(hcoef.shape, result.params, flush=True)
-                hcoef[i0,:] = result.params
+                hcoef[i0,:n_shots] = np.array(list(result.params.valuesdict().values()))
 
-                ta[i0,:] = 2.*tsyseff[i0,:] * (sspec-sR)/sR                
+                ta[i0,:] = 2.*tsyseff[i0,:] * (sspec-sR)/sR
                 trms[i0] = np.std(ta[i0,yvalid])
 
             elif drmethod==4:
@@ -863,7 +866,8 @@ def processL08(paramlist):
     
     os.makedirs(outDir, exist_ok=True)
     if debug:
-        ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
+        ofile = os.path.join(outDir+fadd, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
+        os.makedirs(outDir, exist_ok=True)
     else:
         ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
