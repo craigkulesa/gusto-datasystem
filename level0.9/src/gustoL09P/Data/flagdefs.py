@@ -46,3 +46,21 @@ class SeqFlags(IntFlag):
     NODATA = auto()
     
 B2Unlocked = [(13756, 14114)]
+
+
+
+def getFlagNames(flag_value, enum_type):
+    """Returns a list of flag names that compose the given value."""
+    if not isinstance(flag_value, enum_type):
+        flag_value = enum_type(flag_value)
+
+    names = []
+    for member in enum_type:
+        if member.value & flag_value.value:
+            names.append(member.name)
+    return names
+
+def getRowFlagNames(flag_value):
+    return getFlagNames(flag_value, RowFlags)
+
+

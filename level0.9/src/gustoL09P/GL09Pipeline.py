@@ -29,6 +29,7 @@ import zipfile
 import lmfit
 #import glidertools.cleaning as gc
 from matplotlib.patches import Rectangle
+from lmfit import Model, Parameters
 from pathlib import Path
 from pprint import pprint, pformat
 from datetime import datetime
@@ -403,7 +404,7 @@ def processL08(paramlist):
     data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<7))
     if applychannelfilter:
         if debug:
-            fadd = '_ac'
+            fadd += '_ac'
         spec.mask = data['CHANNEL_FLAG']
         if addpixelflag:
             # more agressive spur flagging
@@ -426,6 +427,7 @@ def processL08(paramlist):
     ascorr = np.zeros([n_spec,n_pix])
     aspref = np.zeros([n_spec,n_pix])
     aspref2 = np.zeros([n_spec,n_pix])
+    ahcoef = np.zeros([n_spec,30])
     afrac = np.zeros([n_spec,2])
     aTam = np.zeros([n_spec])
     aTrms = np.zeros([n_spec])
@@ -553,6 +555,7 @@ def processL08(paramlist):
         tsyseff = np.zeros([n_OTF, n_opix])
         hcorr = np.zeros([n_OTF, n_opix])
         scorr = np.zeros([n_OTF, n_opix])
+        hcoef = np.zeros([n_OTF, 30])
         spref = np.zeros([n_OTF, n_opix])
         spref2 = np.zeros([n_OTF, n_opix])
         if drmethod==3:
@@ -590,7 +593,21 @@ def processL08(paramlist):
         ayfac.append(yfac)
         atsmix.append(mix)
         
-        # for debugging, add file indicator of method for drmethod=3
+        if drmethod==3:
+            # Define the model function
+            def scalefunc(params, spec, sRn):
+                model = params['a0']
+                nRs, _ = sRn.shape
+                for i in range(1,nRs):
+                    model += params['a%i'%(i)].value * sRn[i-1,:]
+                return (spec - model)**2
+            
+            def getsRf(params, sRn):
+                model = params['a0']
+                nRs, _ = sRn.shape
+                for i in range(1,nRs):
+                    model += params['a%i'%(i)].value * sRn[i-1,:]
+                return model
         
         if drmethod==4:
             def scalefunc(x, c1, c2):
@@ -672,60 +689,31 @@ def processL08(paramlist):
                     tam[i0] = np.nan
                 # print('Ta mean (%i): %.4f'%(i0, Ta_mean), hgroup[i0], hfrac, fraca[i0], fracb[i0], stime[i0], ht1, ht2)
             elif drmethod==3:
-                #fadd += '_m3'
-                # method 2: using HOTS to mitigate drifts
-                # apply the REFHOTS to the refs
-                # ToDo: check if the inttime of refs/hots/otfs matters
-                # calculate the fraction of hot used for the spectrum
-                ht1 = ghtim[hgroup[i0]]
-                if hgroup[i0]+1 <= hgroup.max():
-                    ht2 = ghtim[hgroup[i0]+1]
-                else:
-                    ht2 = ghtim[hgroup[i0]]
-                # ht2 = ghtim[hgroup[i0]+1]
-                hfrac = (stime[i0]-ht1)/(ht2-ht1)
-                # determine the hots for the individual OTF spectra
-                if hgroup[i0]+1 <= hgroup.max():
-                    hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0]+1,:]
-                else:
-                    hcorr[i0,:] = ghots[hgroup[i0],:]*hfrac + (1-hfrac) * ghots[hgroup[i0],:]
-                    
-                # before hcorr can be smoothed, it has to be interpolated
-                #hcorr_sm[i0,:] = savgol_filter(np.where(np.isnan(hcorr[i0,:]), 0, hcorr[i0,:]), window_length=5, polyorder=2)
-                cflag = data['CHANNEL_FLAG'][i0,:]
-                hcorr_sm[i0,:] = smoothSpectrum(hcorr[i0,:], cflag, window_length=5, polyorder=2)
                 
-                # before tsys_eff can be smoothed, it has to be interpolated
-                #tsyseff_sm[i0,:] = savgol_filter(np.where(np.isnan(tsyseff[i0,:]), 0, tsyseff[i0,:]), window_length=5, polyorder=2)
-                tsyseff_sm[i0,:] = smoothSpectrum(tsyseff[i0,:], cflag, window_length=5, polyorder=2)
+                sspec = spec_OTF[i0,:]
                 
-                # smoothing options
-                # import glidertools.cleaning as gc
-                # filtered = gc.savitzky_golay(data, window_length=5, polyorder=2)
-                # or
-                # from scipy.signal import savgol_filter
-                # filtered = savgol_filter(np.where(np.isnan(data), 0, data), window_length=5, polyorder=2)
-                # filtered[mask] = np.nan
+                yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0))[0]
+                sRn = ghots / yfac[1,:].squeeze()
+
+                # Create parameters
+                params = lmfit.Parameters()
+                vals = np.zeros(n_ghots) + 0.2
+                vals[0] = 0.0
+                for index, value in enumerate(vals):
+                    params.add('a%i'%index, value=vals[index])
                 
-                # also include scaling the ref to the on to first order with a single scaling factor (averaged over 
-                # the important spectrum range at least from -200 to 200 km/s) to minimize offsets
-                # determine the hots-reduced REF spectra
-                
-                spref[i0,:] = fracb[i0] * refs[0,:] / ghots[0,:] + fraca[i0] * refs[1,:] / ghots[-1,:]
-                spref2[i0,:] = fracb[i0] * refs[0,:] + fraca[i0] * refs[1,:]
-                # spref_sm[i0,:] = savgol_filter(np.where(np.isnan(spref[i0,:]), 0, spref[i0,:]), window_length=5, polyorder=2)
-                # spref2_sm[i0,:] = savgol_filter(np.where(np.isnan(spref2[i0,:]), 0, spref2[i0,:]), window_length=5, polyorder=2)
-                spref_sm[i0,:] = smoothSpectrum(spref_sm[i0,:], cflag, window_length=5, polyorder=2)
-                spref2_sm[i0,:] = smoothSpectrum(spref2_sm[i0,:], cflag, window_length=5, polyorder=2)
-                
-                # put everything together. issue: divide by zero -> catch in masks
-                scl[i0,:] = spec_OTF[i0,:] / (spref_sm[i0,:]*hcorr[i0,:])
-                sscl[i0] = ma.median(scl[i0,:])
-                
-                # ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:]/hcorr_sm[i0,:] - spref_sm[i0,:])/spref_sm[i0,:]
-                ta[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:]*hcorr_sm[i0,:])/(spref_sm[i0,:]*hcorr_sm[i0,:])
-                # ta2[i0,:] = 2.*tsyseff_sm[i0,:] * (spec_OTF[i0,:] - spref_sm[i0,:])/spref2_sm[i0,:]
-                ta2[i0,:] = 2.*tsyseff[i0,:] * (spec_OTF[i0,:]/hcorr[i0,:] - spref[i0,:])/spref[i0,:]
+                # Minimize the objective function
+                mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
+                result = mini.minimize()
+
+                sR = getsRf(result.params, sRn)
+                spref[i0,:] = sR
+                print(hcoef.shape, result.params, flush=True)
+                hcoef[i0,:n_ghots] = result.params
+
+                ta[i0,:] = 2.*tsyseff[i0,:] * (sspec-sR)/sR                
+                trms[i0] = np.std(ta[i0,yvalid])
+
             elif drmethod==4:
                 
                 cflag = data['CHANNEL_FLAG'][i0,:]
@@ -787,6 +775,7 @@ def processL08(paramlist):
         aspref[osel,:] = spref
         afrac[osel,0] = fraca
         afrac[osel,1] = fracb
+        ahcoef[osel,:] = hcoef
         aTa[osel,:] = ta
         aTam[osel] = tam
         aTrms[osel] = trms
@@ -902,10 +891,12 @@ def processL08(paramlist):
         col8 = Column(aTa2, name='tant', description='spectrum without hot correction')
         col9 = Column(var, name='ringvar', description='value for determining if ringing in spectrum')
         col14 = Column(aTam, name='Ta_mean', description='mean of Ta over good pixel range')
+        col15 = Column(ahcoef, name='hot coefs', description='coef for hots to create synth. REF')
+        
         if drmethod==3:
-            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14])
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col10, col11, col12, col13, col14, col15])
         else:
-            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col14])
+            fT = Table([col1, col2, col3, col4, col5, col6, col7, col8, col9, col14, col15])
         hdre1 = fits.Header()
         hdre1.set('vcut', value=vcut, comment='ringing treshold used with ringvar')
         fits.append(ofile, data=fT.as_array())
