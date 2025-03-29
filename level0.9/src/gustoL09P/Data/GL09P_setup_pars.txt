@@ -60,7 +60,7 @@ ciivrange = [500, 590]
 # select lines for processing
 # lines = CII
 lines = CII NII
-debug = True
+debug = False
 loglevel = INFO
 # addpixelflag: True: more agressive pixel flagging; False: nothing more
 addpixelflag = True

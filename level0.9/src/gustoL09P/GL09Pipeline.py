@@ -866,8 +866,8 @@ def processL08(paramlist):
     
     os.makedirs(outDir, exist_ok=True)
     if debug:
-        ofile = os.path.join(outDir+fadd, os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
-        os.makedirs(outDir, exist_ok=True)
+        ofile = os.path.join(outDir+'_m%i'%(drmethod), os.path.split(dfile)[1].replace('.fits','%s_L09.fits'%(fadd)))
+        os.makedirs(outDir+'_m%i'%(drmethod), exist_ok=True)
     else:
         ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
