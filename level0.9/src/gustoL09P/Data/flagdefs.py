@@ -16,6 +16,7 @@ class RowFlags(IntFlag):
     BAD_BASELINE = auto()
     UNABLE_TO_PROCESS = auto()
     LO_SYNTH_UNLOCKED = auto()
+    FAILED_REF_FIT = 1<<24
     DAC_CAL_FIXED = 1 << 25
     RINGING_BIT0 = 1 << 26
     RINGING_BIT1 = 1 << 27

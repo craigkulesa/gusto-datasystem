@@ -698,17 +698,22 @@ def processL08(paramlist):
                 
                 yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0))[0]
                 sRn = seq_hots / yfac[1,:].squeeze()
-
-                # Create parameters
-                params = lmfit.Parameters()
-                vals = np.zeros(n_shots) + 0.2
-                vals[0] = 0.0
-                for index, value in enumerate(vals):
-                    params.add('a%i'%index, value=vals[index])
-                
-                # Minimize the objective function
-                mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
-                result = mini.minimize()
+                try:
+                    # Create parameters
+                    params = lmfit.Parameters()
+                    vals = np.zeros(n_shots) + 0.2
+                    vals[0] = 0.0
+                    for index, value in enumerate(vals):
+                        params.add('a%i'%index, value=vals[index])
+                    
+                    # Minimize the objective function
+                    mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
+                    result = mini.minimize()
+                except:
+                    print('Problems with REF fitting for spectrum %i in %s ...'%(i0, dfile))
+                    data['ROW_FLAG'][msel] |= 1<<24   # flagged as missing data
+                    continue
+                    
 
                 sR = getsRf(result.params, sRn)
                 spref[i0,:] = sR 
