@@ -710,8 +710,8 @@ def processL08(paramlist):
                     mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
                     result = mini.minimize()
                 except:
-                    print('Problems with REF fitting for spectrum %i in %s ...'%(i0, dfile))
-                    data['ROW_FLAG'][msel] |= 1<<24   # flagged as missing data
+                    print('Problems with REF fitting for spectrum %i in %s ...'%(i0, dfile), flush=True)
+                    data['ROW_FLAG'][i0] |= 1<<24   # flagged as failed fit
                     continue
                     
 
