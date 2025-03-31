@@ -916,7 +916,9 @@ def processL08(paramlist):
     hdr.set('RFSFLAG', value=rfsflag, comment='flag indicating which REFS are available')
     hdr.set('rhID1', value=rhIDs[0], comment='scan ID for REFHOT/REF before OTF')
     hdr.set('rhID2', value=rhIDs[1], comment='scan ID for REFHOT/REF after OTF')
-    hdr.set('Tsysmean', value=tsys_mean, comment='mean Tsys over goodpx')
+    for l in range(n_umix):
+        hdr.set('Tsysmean%i'%(l), value=atsys_mean[l], comment='mean Tsys for mixer %i over goodpx'%(l))
+        hdr.set('MixerTsys%i'%(l), value=atsmix[l], comment='mixer for Tsys_mean%i'%(l))
     hdr.set('procmeth', value=drmethod, comment='data reduction processing method applied')
     hdr.set('', value='')
     hdr.set('', value='', after='VLSR')
