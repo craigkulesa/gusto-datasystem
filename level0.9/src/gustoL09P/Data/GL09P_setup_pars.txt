@@ -70,7 +70,7 @@ addpixelflag = True
 rowflagfilter: 0
 
 #
-applychannelfilter: False
+applychannelfilter: True
 
 # clean up the L1.0 data and save only good OTF spectra
 l10OTFonly = True

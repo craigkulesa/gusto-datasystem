@@ -534,13 +534,13 @@ def processL08(paramlist):
         stime = data['UNIXTIME'][osel]
         btime = (rtime[0] + htime[0]) / 2. # before OTFs
         atime = (rtime[1] + htime[1]) / 2. # after OTFs
-        if atime < btime:
+        if atime > btime:
             fracb = (stime - btime) / (atime - btime)
             fraca = (atime - stime) / (atime - btime)
         else:
             # this is for the case of a single REF/REFHOT pair
-            fraca = np.ones(stime.size)
-            fracb = np.ones(stime.size)
+            fraca = np.ones(stime.size) / 2.
+            fracb = np.ones(stime.size) / 2.
         
         n_OTF, n_opix = spec_OTF.shape
         # antenna temperature is a masked array
@@ -600,7 +600,6 @@ def processL08(paramlist):
                 nRs, _ = sRn.shape
                 for i in range(1,nRs):
                     model += params['a%i'%(i)].value * sRn[i-1,:]
-                # return (spec - model)**2
                 return ((spec - model)/model)**2
             
             def getsRf(params, sRn):
@@ -636,6 +635,25 @@ def processL08(paramlist):
             # combine all HOTs
             seq_hots = np.vstack([rhots,ghots])
 
+        if drmethod==5:
+            # Define the model function
+            def scalefunc(params, spec, sRn):
+                model = params['a0']
+                nRs, _ = sRn.shape
+                for i in range(1,nRs):
+                    model += params['a%i'%(i)].value * sRn[i-1,:]
+                return ((spec - model)/model)**2
+            
+            def getsRf(params, sRn):
+                model = params['a0']
+                nRs, _ = sRn.shape
+                for i in range(1,nRs):
+                    model += params['a%i'%(i)].value * sRn[i-1,:]
+                return model
+            
+            # seq_hots = np.vstack([rhots,ghots])
+            # n_shots = seq_hots.shape[0]
+        
         # create the calibrated spectra
         for i0 in range(n_OTF):
             tsyseff[i0,:] = fracb[i0] * tsys[0,:] + fraca[i0] * tsys[1,:]
@@ -701,7 +719,7 @@ def processL08(paramlist):
                 try:
                     # Create parameters
                     params = lmfit.Parameters()
-                    vals = np.zeros(n_shots) + 0.2
+                    vals = np.zeros(n_shots) + 0.5
                     vals[0] = 0.0
                     for index, value in enumerate(vals):
                         params.add('a%i'%index, value=vals[index])
@@ -769,6 +787,43 @@ def processL08(paramlist):
                     #Expected = np.median(tsyseff1[quse])/np.sqrt(BW*0.33)
                     Expected = 1100.0/np.sqrt(BW*0.33)
                     #print(Trms / Expected)
+            elif drmethod==5:
+                
+                sspec = spec_OTF[i0,:]
+                
+                seq_hots = ghots[hgroup[i0],:]
+                if hgroup[i0]+1 <= hgroup.max():
+                    seq_hots = np.vstack([seq_hots, ghots[hgroup[i0]+1,:]])
+                if hgroup[i0]-1 >= 1:
+                    seq_hots = np.vstack([seq_hots, ghots[hgroup[i0]-1,:]])
+                n_shots = seq_hots.shape[0]
+                
+                yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0))[0]
+                sRn = seq_hots / yfac[1,:].squeeze()
+                try:
+                    # Create parameters
+                    params = lmfit.Parameters()
+                    vals = np.zeros(n_shots) + 0.5
+                    vals[0] = 0.0
+                    for index, value in enumerate(vals):
+                        params.add('a%i'%index, value=vals[index])
+                    
+                    # Minimize the objective function
+                    mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
+                    result = mini.minimize()
+                except:
+                    print('Problems with REF fitting for spectrum %i in %s ...'%(i0, dfile), flush=True)
+                    data['ROW_FLAG'][i0] |= 1<<24   # flagged as failed fit
+                    continue
+                    
+
+                sR = getsRf(result.params, sRn)
+                spref[i0,:] = sR 
+                hcoef[i0,:n_shots] = np.array(list(result.params.valuesdict().values()))
+
+                ta[i0,:] = 2.*tsyseff[i0,:] * (sspec-sR)/sR
+                trms[i0] = np.std(ta[i0,yvalid])
+
 
 
         # now we have to save the data in a FITS file
