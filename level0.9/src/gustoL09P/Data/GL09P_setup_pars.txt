@@ -24,8 +24,9 @@ tmpDir = ${ghome}/work/tmp
 # data reduction methods
 # drmethod 1: (s-r)/r
 # drmethod 2: (s/h-r/h)/(r/h)
-# drmethod 3: not finished
+# drmethod 3: fiting all HOTs and REFs
 # drmethod 4: fitting hots to spectrum
+# drmethod 5: simplification proposed by Craig
 drmethod = 4
 #
 # baseline fitting method
