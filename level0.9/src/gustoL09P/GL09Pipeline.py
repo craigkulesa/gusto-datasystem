@@ -423,6 +423,8 @@ def processL08(paramlist):
     
     tsyseff_avg = np.zeros(umixers.size)
     aTsyseff = np.zeros([n_spec,n_pix])
+    aTsys_mean = np.zeros([n_umix])
+    amixer = np.zeros(n_umix)
     ahcorr = np.zeros([n_spec,n_pix])
     ascorr = np.zeros([n_spec,n_pix])
     aspref = np.zeros([n_spec,n_pix])
@@ -453,6 +455,7 @@ def processL08(paramlist):
         # first check crudely if we have enough data of various scan_types
         msel = np.nonzero(data['MIXER']==mix)
         rflag = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
+        amixer[k] = mix
         
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter)
         check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
@@ -487,6 +490,7 @@ def processL08(paramlist):
             datavalid[k] = False
             continue
         tsys_mean = np.nanmean(tsys[:,pxrange[0]:pxrange[1]])
+        aTsys_mean[k] = tsys_mean
         print('<Tsys_%i>: %.2f'%(mix, tsys_mean))
         tsys.fill_value = 0.0
         #print('tsys shape: ', tsys.shape)
