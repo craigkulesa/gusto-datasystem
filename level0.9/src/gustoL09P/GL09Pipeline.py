@@ -297,12 +297,14 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             vcut = float(cfi['gprocs']['vcut1'])
             pvrange = np.array(getValues(cfi['gprocs']['niivrange']), dtype=int)
             pxrange = np.array(getValues(cfi['gprocs']['niiprange']), dtype=int)
+            pfrange = np.array(getValues(cfi['gprocs']['niifrange']), dtype=int)
             # pxrange = getRange(cfi['gprocs']['niiprange'], dtype=int)
             # pvrange = getRange(cfi['gprocs']['niivprange'], dtype=int)
         elif line == 'CII':
             vcut = float(cfi['gprocs']['vcut2'])
             pvrange = np.array(getValues(cfi['gprocs']['ciivrange']), dtype=int)
             pxrange = np.array(getValues(cfi['gprocs']['ciiprange']), dtype=int)
+            pfrange = np.array(getValues(cfi['gprocs']['ciifrange']), dtype=int)
             # pxrange = getRange(cfi['gprocs']['ciiprange'], dtype=int)
             # pvrange = getRange(cfi['gprocs']['ciivrange'], dtype=int)
             
@@ -311,7 +313,8 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                   'drmethod': int(cfi['gprocs']['drmethod']),
                   'debug': cfi['gprocs']['debug'], 'verbose': verbose,
                   'vcut': vcut, 'pxrange': pxrange, 'mranges': mranges,
-                  'pvrange': pvrange, 'rowflagfilter': int(cfi['gprocs']['rowflagfilter']),
+                  'pvrange': pvrange, 'pfrange': pfrange, 
+                  'rowflagfilter': int(cfi['gprocs']['rowflagfilter']),
                   'addpixelflag': cfi['gprocs']['addpixelflag'],
                   'checkringflag': cfi['gprocs']['checkringflag'],
                   'applychannelfilter': cfi['gprocs']['applychannelfilter']}
@@ -363,6 +366,7 @@ def processL08(paramlist):
     pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
     # ringing check ranges
     pvrange = (int(params['pvrange'][0]), int(params['pvrange'][1]))
+    pfrange = (int(params['pfrange'][0]), int(params['pfrange'][1]))
 
     if debug:
         fadd = '_m%i'%(drmethod)
