@@ -31,7 +31,7 @@ drmethod = 4
 #
 # baseline fitting method
 #options: 0: no baseline fit; 1: polynomial baseline fit; 2: ASPLS fitting method
-basemethod = 0
+basemethod = 1
 # order for polynomial baseline fitter else ignored
 polyorder = 3
 
