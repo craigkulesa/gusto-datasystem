@@ -494,7 +494,7 @@ def processL08(paramlist):
         rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
-            print('No Tsys available! Stop processing %i of dfile %s'%(mix, dfile), tsys)
+            print('No Tsys available! Stopped processing of mixer %i of dfile %s'%(mix, dfile), tsys)
             # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.info('Tsys: ', tsys)
             datavalid[k] = False
