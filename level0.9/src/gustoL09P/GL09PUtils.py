@@ -244,10 +244,10 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
 
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, verbose=verbose)
     if (len(otfID)<1) | (len(rfsID)<1) | (len(rhsID)<1) | (len(hotID)<1):
-        print('getCalSpectra: Not enough scan types for processing (otf/refs/refhots/hots): ', otfID, rfsID, rhsID, hotID)
+        print('getCalSpectra mixer %i: Not enough scan types for processing (otf/refs/refhots/hots): ', mixer, otfID, rfsID, rhsID, hotID)
         return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0
     if (len(otfID)>1):
-        print('getCalSpectra: Too many OTF scan IDs for processing: ', otfID)
+        print('getCalSpectra mixer %i: Too many OTF scan IDs for processing: '%mixer, otfID)
         return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0
     
     # determine the REFHOTs that bracket the OTFs
