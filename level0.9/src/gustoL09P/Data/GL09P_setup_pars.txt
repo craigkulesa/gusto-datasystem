@@ -68,7 +68,7 @@ addpixelflag = True
 
 # rowflag filter value: int or string of RowFlag
 # e.g.: 'RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_UNPUMPED'
-rowflagfilter: 0
+rowflagfilter: 'RowFlags.MIXER_MISPUMPED | RowFlags.UNSTABLE_POINTING | RowFlags.MISSING_INTEGRATION | RowFlags.PROCESSOR_ERROR | RowFlags.DAC_CAL_FIXED'
 
 #
 applychannelfilter: True

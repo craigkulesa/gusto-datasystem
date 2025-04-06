@@ -784,6 +784,7 @@ def string_to_enum_combination(istring):
             continue
         else:
             try:
+                print(name.split('.'))
                 flag = RowFlags[name.split('.')[1].upper()]
                 cflags |= flag
             except KeyError:

@@ -8,14 +8,13 @@ from astropy.io import fits
 def doStuff(fits_file):
 # Open file
     with fits.open(fits_file, memmap=True) as hdul:
-
         # Read in hdu[2] DATA_TABLE
-        data = hdul['DATA_TABLE'].data
+        data = hdul[1].data
 
         # Mask of all REF type rows
         mask = data['scan_type']=='OTF'
         # All REF type scanID
-        listOTF = hdul['DATA_TABLE'].data['scanID'][mask]
+        listOTF = hdul[1].data['scanID'][mask]
         if (len(list(set(listOTF))) == 1):
             otf = list(set(listOTF))[0]
         elif (len(list(set(listOTF))) == 0):
@@ -32,7 +31,7 @@ def doStuff(fits_file):
         # Mask of all REF type rows
         mask = data['scan_type']=='REF'
         # All REF type scanID
-        listREF = hdul['DATA_TABLE'].data['scanID'][mask]
+        listREF = hdul[1].data['scanID'][mask]
         if not listREF.size:
             print(fits_file, "error no REFs!")
             new_file = f"{fits_file}.bad"
@@ -42,7 +41,7 @@ def doStuff(fits_file):
         # Mask of all HOT type rows
         mask = data['scan_type']=='HOT'
         # All REF type scanID
-        listHOT = hdul['DATA_TABLE'].data['scanID'][mask]
+        listHOT = hdul[1].data['scanID'][mask]
         if not listHOT.size:
             print(fits_file, "error no HOTs!")
             new_file = f"{fits_file}.bad"
@@ -60,8 +59,10 @@ def doStuff(fits_file):
             os.rename(fits_file, new_file)
 
 directory = "./"
-partial = sys.argv[1]
+partial = sys.argv[1] 
 fits_files = sorted(glob.glob(f"{directory}/{partial}.fits"))
+print('argv: ', sys.argv[1])
+print('files:\n',fits_files)
 
 for fits_file in fits_files:
     doStuff(fits_file)
