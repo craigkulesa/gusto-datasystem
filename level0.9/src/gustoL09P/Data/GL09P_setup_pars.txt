@@ -31,7 +31,7 @@ drmethod = 4
 #
 # baseline fitting method
 #options: 0: no baseline fit; 1: polynomial baseline fit; 2: ASPLS fitting method
-basemethod = 0
+basemethod = 1
 # order for polynomial baseline fitter else ignored
 polyorder = 3
 
@@ -51,12 +51,16 @@ vcut2 = 6.0
 
 # xiiprange: good pixel range
 # xiivrange: pixel range for checking ringing
+# xiifrange: pixel range used for fitting REFs (to be implemented!)
 # NII
-niiprange = [80, 370]
-niivrange = [200, 300
+#niiprange = [80, 370]
+niiprange = [30, 370]
+niivrange = [200, 300]
+niifrange = [30, 200]
 # CII
 ciiprange = [90, 700]
 ciivrange = [500, 590]
+ciifrange = [90, 400]
 
 # select lines for processing
 # lines = CII

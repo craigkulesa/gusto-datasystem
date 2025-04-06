@@ -269,13 +269,15 @@ def processL09(paramlist, verbose=True):
                 # polynomial fitter
                 
                 try:
-                    z = np.ma.polyfit(xx, yy, deg=3)
+                    z = np.polyfit(xx, yy, deg=3)
                     ip4n = np.poly1d(z)
-                    std = np.std(psp - ip4n(xx))
+                    std = np.std(yy - ip4n(xx))
                     #print('%4i, %7.3f %7.3f %7.3f'%(ch, std, np.min(psp - ip4n(pxx)), np.max(psp - ip4n(pxx))))
             
-                except:
-                    print('Polyfit not possible for spec # %i in file %s'%(ch, dfile))
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()                    
+                    print('Polyfit not possible for spec # %i in file %s'%(i0, dfile))
                 basecorr[i0,prange[0]:prange[1]] = ip4n(xxwn)   #bswn
                 
                 pass
