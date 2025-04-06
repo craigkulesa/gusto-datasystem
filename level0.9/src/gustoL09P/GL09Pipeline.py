@@ -399,7 +399,13 @@ def processL08(paramlist):
     # The channel_flag cannot be set in the mask array, but must be set directly:
     # spec.mask[:,pxrange[1]:] = np.bitwise_or(spec.mask[:,pxrange[1]:] ,(1<<7))
     # spec.mask[:,:pxrange[0]+1] = np.bitwise_or(spec.mask[:,:pxrange[0]+1], (1<<7))
-    
+
+       
+    #check if Thot is in hdr
+    if not 'THOT' in hdr:
+        print('GL09Pipeline: THOT keyword not in FITS-header')
+        return 0
+     
     data['CHANNEL_FLAG'][:,pxrange[1]:] = np.bitwise_or(data['CHANNEL_FLAG'][:,pxrange[1]:] ,(1<<7))
     data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<7))
     if applychannelfilter:

@@ -777,15 +777,18 @@ def string_to_enum_combination(istring):
       Examples
       --------
     """
-    inames = str(istring).split()
-    cflags = RowFlags(0)  # Initialize with no color
+    if type(istring)==type('m'):
+        inames = istring.split()
+    else:
+        inames = str(istring).split()
+    print(inames)
+    cflags = RowFlags(0)  # Initialize with no value
     for name in inames:
         if '|' in name:
             continue
         else:
             try:
-                print(name.split('.'))
-                flag = RowFlags[name.split('.')[1].upper()]
+                flag = RowFlags[name.replace("'","").replace('"','').split('.')[1].upper()]
                 cflags |= flag
             except KeyError:
                 raise ValueError(f"Invalid flag: {name}")
