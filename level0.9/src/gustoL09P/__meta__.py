@@ -4,7 +4,7 @@ name = "gustoL08"
 path = name.lower().replace("-", "_").replace(" ", "_")
 # Your version number should follow https://python.org/dev/peps/pep-0440 and
 # https://semver.org
-version = "0.1.0"
+version = "0.2.0"
 author = "vtcloud"
 author_email = "vtolls@cfa.harvard.edu"
 description = "GUSTO L08 Pipeline"  # One-liner
