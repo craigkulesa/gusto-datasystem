@@ -244,10 +244,10 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
 
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, verbose=verbose)
     if (len(otfID)<1) | (len(rfsID)<1) | (len(rhsID)<1) | (len(hotID)<1):
-        print('getCalSpectra: Not enough scan types for processing (otf/refs/refhots/hots): ', otfID, rfsID, rhsID, hotID)
+        print('getCalSpectra mixer %i: Not enough scan types for processing (otf/refs/refhots/hots): '%mixer, otfID, rfsID, rhsID, hotID)
         return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0
     if (len(otfID)>1):
-        print('getCalSpectra: Too many OTF scan IDs for processing: ', otfID)
+        print('getCalSpectra mixer %i: Too many OTF scan IDs for processing: '%mixer, otfID)
         return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0
     
     # determine the REFHOTs that bracket the OTFs
@@ -777,14 +777,18 @@ def string_to_enum_combination(istring):
       Examples
       --------
     """
-    inames = str(istring).split()
-    cflags = RowFlags(0)  # Initialize with no color
+    if type(istring)==type('m'):
+        inames = istring.split()
+    else:
+        inames = str(istring).split()
+    print(inames)
+    cflags = RowFlags(0)  # Initialize with no value
     for name in inames:
         if '|' in name:
             continue
         else:
             try:
-                flag = RowFlags[name.split('.')[1].upper()]
+                flag = RowFlags[name.replace("'","").replace('"','').split('.')[1].upper()]
                 cflags |= flag
             except KeyError:
                 raise ValueError(f"Invalid flag: {name}")

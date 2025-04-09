@@ -403,7 +403,13 @@ def processL08(paramlist):
     # The channel_flag cannot be set in the mask array, but must be set directly:
     # spec.mask[:,pxrange[1]:] = np.bitwise_or(spec.mask[:,pxrange[1]:] ,(1<<7))
     # spec.mask[:,:pxrange[0]+1] = np.bitwise_or(spec.mask[:,:pxrange[0]+1], (1<<7))
-    
+
+       
+    #check if Thot is in hdr
+    if not 'THOT' in hdr:
+        print('GL09Pipeline: THOT keyword not in FITS-header')
+        return 0
+     
     data['CHANNEL_FLAG'][:,pxrange[1]:] = np.bitwise_or(data['CHANNEL_FLAG'][:,pxrange[1]:] ,(1<<7))
     data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<7))
     if applychannelfilter:
@@ -488,7 +494,7 @@ def processL08(paramlist):
         rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
-            print('No Tsys available! Stop processing %i of dfile %s'%(mix, dfile), tsys)
+            print('No Tsys available! Stopped processing of mixer %i of dfile %s'%(mix, dfile), tsys)
             # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.info('Tsys: ', tsys)
             datavalid[k] = False
