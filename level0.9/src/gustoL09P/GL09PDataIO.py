@@ -57,7 +57,7 @@ warnings.filterwarnings('ignore', category=Warning,
                         message=' FITSFixedWarning: ', append=True)
 
 
-def loadL08Data(ifile, verbose=False):
+def loadL08Data(ifile, verbose=False, usemask=True):
     """Function loading Level 0.8 data.
 
     Parameters
@@ -116,7 +116,10 @@ def loadL08Data(ifile, verbose=False):
     #     print('channel mask: ', data['CHANNEL_FLAG'].shape)
 
     # combine spectrum and channel_flag mask
-    spec = ma.MaskedArray(data[dkey], mask=data['CHANNEL_FLAG'])
+    if usemask == True:
+        spec = ma.MaskedArray(data[dkey], mask=data['CHANNEL_FLAG'])
+    else:
+        spec = ma.MaskedArray(data[dkey], mask=np.zeros(data[dkey].size))
     #spec = ma.masked_invalid(spec)
     #spec.mask[:,612:1023] = 1
 
