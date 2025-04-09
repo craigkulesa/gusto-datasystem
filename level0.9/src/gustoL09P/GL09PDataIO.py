@@ -57,7 +57,7 @@ warnings.filterwarnings('ignore', category=Warning,
                         message=' FITSFixedWarning: ', append=True)
 
 
-def loadL08Data(ifile, verbose=False, usemask=True):
+def loadL08Data(ifile, verbose=False, usemask=False):
     """Function loading Level 0.8 data.
 
     Parameters
