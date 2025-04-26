@@ -284,7 +284,7 @@ def processL10(params, verbose=True):
     hdr['PROCTIME'] = tred
     
     hdr.set('', value='', after='BS_ITERM')
-    hdr.set('', value='          Level 0.95 Pipeline Processing', after='BS_ITERM')
+    hdr.set('', value='          Level 1.00 Pipeline Processing', after='BS_ITERM')
     hdr.set('', value='', after='BS_ITERM')
     hdr.set('L10PTIME', value=tred, comment=('L1.0 pipeline processing time'))
     
