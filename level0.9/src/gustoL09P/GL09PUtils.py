@@ -180,19 +180,19 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     # ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
     # print('getSpecScanTypes: rflags: ', rowflagfilter, list(rflags), list(data['ROW_FLAG']))
 
-    rfsel = (mixer == mixers) & (scan_type == 'REF') & (rflags)
+    rfsel = (mixers == mixer) & (scan_type == 'REF') & (rflags)
     rfsID = np.unique(scanID[rfsel])
-    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (rflags)
+    rhsel = (mixers == mixer) & (scan_type == 'REFHOT') & (rflags)
     rhsID = np.unique(scanID[rhsel])
-    rhsel = (mixer == mixers) & (scan_type == 'REFHOT') & (rflags)
-    rhsID = np.unique(scanID[rhsel])
+    # rhsel = (mixers == mixer) & (scan_type == 'REFHOT') & (rflags)
+    # rhsID = np.unique(scanID[rhsel])
 
     # identify the HOT spectra
-    htsel = (mixer == mixers) & (scan_type == 'HOT') & (rflags)
+    htsel = (mixers == mixer) & (scan_type == 'HOT') & (rflags)
     hotID = np.unique(scanID[htsel])
 
     # identify the OTF spectra
-    otsel = (mixer == mixers) & (scan_type == 'OTF') & (rflags)
+    otsel = (mixers == mixer) & (scan_type == 'OTF') & (rflags)
     otfID = np.unique(scanID[otsel])
     if len(otfID) > 1:
         otfID = otfID[1:]
@@ -208,7 +208,7 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     return otfID, rfsID, rhsID, hotID
 
 
-def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False):
+def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=False):
     """Function calculating the calibration spectrum for a single mixer.
 
 
@@ -242,7 +242,7 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky=45., verbose=False
     ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
     stime = data['UNIXTIME']
 
-    otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, verbose=verbose)
+    otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
     if (len(otfID)<1) | (len(rfsID)<1) | (len(rhsID)<1) | (len(hotID)<1):
         print('getCalSpectra mixer %i: Not enough scan types for processing (otf/refs/refhots/hots): '%mixer, otfID, rfsID, rhsID, hotID)
         return -999, 0, 0, 0, 0, 0, 0, [0,0], -1, 0

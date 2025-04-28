@@ -490,7 +490,7 @@ def processL08(paramlist):
             datavalid[k] = False
             return 0
         
-        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter, verbose=True)
+        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=True)
         rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
