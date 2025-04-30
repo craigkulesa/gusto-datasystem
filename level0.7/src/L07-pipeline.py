@@ -13,7 +13,7 @@ import configargparse
 import argparse
 import subprocess
 sys.path.append("../../common/")
-import flagdefs
+import flagdefs as flags
 
 acsPrefix = ['ACS5_', 'ACS3_']
 outputPrefix = ['NII_', 'CII_']
@@ -23,7 +23,7 @@ C2K = 273.15
 CDELT = [5000.0/511.0, 5000.0/1023.0] 
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
-__version__ = '20250306'
+__version__ = '20250331'
 commit_info = ''
 
 
@@ -121,8 +121,8 @@ def checkSequence(fileList):
 
     if(num[REF] == 0):
         print("ERROR: no REFs found")
-        seqFlag |= flagdefs.SeqFlags.NOREFS
-    elif(num[REF] > 0 and num[REF] < 2):
+        seqFlag |= flags.SeqFlags.NOREFS
+    elif(num[REF] > 0 and num[REF] < 2 and num[OTF] > 0):
         index = type.index('OTF')
         OTFscanID = scanID[index]
         refList= [i for i,e in enumerate(type) if e == 'REF']
@@ -132,18 +132,16 @@ def checkSequence(fileList):
             elif scanID[item] > OTFscanID:
                 foundUpperREF = True
         if foundLowerREF == False:
-            seqFlag |= flagdefs.SeqFlags.MISSING_LEADING_REF
-            print("MISSING_LEADING_REF")
+            seqFlag |= flags.SeqFlags.MISSING_LEADING_REF
         elif foundUpperREF == False:
-            seqFlag |= flagdefs.SeqFlags.MISSING_TRAILING_REF
-            print("MISSING_TRAILING_REF")
+            seqFlag |= flags.SeqFlags.MISSING_TRAILING_REF
         else:
             print("ERROR: inconsistent REF count")
     if(num[OTF] == 0 and num[APS] == 0):
         print("ERROR: no data!")
-        seqFlag |= flagdefs.SeqFlags.NODATA
+        seqFlag |= flags.SeqFlags.NODATA
     if(num[HOT] != num[REF] + num[OTF]):
-        seqFlag |= flagdefs.SeqFlags.MISSING_HOT
+        seqFlag |= flags.SeqFlags.MISSING_HOT
     return seqFlag,isHOTREF
 
 
@@ -170,9 +168,9 @@ def makeUDP(startID, stopID, dir):
     return np.array(output)
 
 
-def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=900):
+def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=1800):
     startTime = int((startTime-lookBack)*1.0e+09)
-    endTime = int((endTime+lookBack/20)*1.0e+09)
+    endTime = int((endTime+lookBack/40)*1.0e+09)
     client = InfluxDBClient(host='localhost', port=8086, database='gustoDBlp')
     if getAll == False:
         query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC LIMIT 1"
@@ -183,9 +181,9 @@ def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=900)
     if results.items() == []:  
         print("WARNING:  Nothing from influx query", queryStr, "returned.")
         if queryStr == 'B2_AD590_' or queryStr == 'B1_AD590_':
-            seqFlag |= flagdefs.SeqFlags.MAYBE_HUNG_LO
+            seqFlag |= flags.SeqFlags.MAYBE_HUNG_LO
         else:
-            seqFlag |= flagdefs.SeqFlags.MISSING_HK
+            seqFlag |= flags.SeqFlags.MISSING_HK
     return results, seqFlag
 
 
@@ -315,12 +313,12 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
             IMON[index] = imon[closest][pIdx[bandNum-1][MIXER[index]]]
             closest = np.argmin(np.abs(gmon[:,0] - curTime))
             GMON[index] = gmon[closest][pIdx[bandNum-1][MIXER[index]]]
-        if bandNum == 2 and isKnownBad(SCANID[index], flagdefs.B2Unlocked):
-            ROWFLAG[index] |= flagdefs.RowFlags.LO_SYNTH_UNLOCKED
+        if bandNum == 2 and isKnownBad(SCANID[index], flags.B2Unlocked):
+            ROWFLAG[index] |= flags.RowFlags.LO_SYNTH_UNLOCKED
         if IMON[index] < min(imonRange) or IMON[index] > max(imonRange):
-            ROWFLAG[index] |= flagdefs.RowFlags.MIXER_MISPUMPED
+            ROWFLAG[index] |= flags.RowFlags.MIXER_MISPUMPED
             if IMON[index] > 60 or IMON[index] < 0.0:
-                ROWFLAG[index] |= flagdefs.RowFlags.MIXER_UNPUMPED
+                ROWFLAG[index] |= flags.RowFlags.MIXER_UNPUMPED
         index += 1
     
     
@@ -438,24 +436,23 @@ def scanSequenceFile(input, options):
 
 
 def processSequence(options, line):
-    bandNum=int(options.band)
-    start = int(options.scanid[0])
-    stop = int(options.scanid[1])
+    band = options.band
     dirUDP = options.inpath + 'udp/'
     dirDataIn = options.inpath + 'level0.5/'
     dirDataOut = options.outpath + 'level0.7/'
 
     (seqID, startID, endID, obsType, catName) = line[0:5]
-    print("Processing sequence", seqID, "from", startID, "-", endID)
-    fileList = makeFileGlob(int(startID), int(endID), bandNum, dirDataIn)
-    seqFlag,listREF = checkSequence(fileList)
-    if(seqFlag < flagdefs.SeqFlags.NOREFS):  # acceptable, process it
-        pointingStream = makeUDP(int(startID), int(endID), dirUDP)
-        output_file = dirDataOut+outputPrefix[bandNum-1]+seqID+'_'+startID+'.fits'
-        processFITS(fileList, output_file, bandNum, pointingStream, seqFlag, listREF, catName)
-    else:
-        # skip it because seqFlag says it's unusable
-        print("Sequence", seqID, "NOT OK, flag is", seqFlag)
+    for bandNum in band:
+        print("Processing Band", bandNum, "sequence", seqID, "from", startID, "-", endID)
+        fileList = makeFileGlob(int(startID), int(endID), int(bandNum), dirDataIn)
+        seqFlag,listREF = checkSequence(fileList)
+        if(seqFlag < flags.SeqFlags.NOREFS):  # acceptable, process it
+            pointingStream = makeUDP(int(startID), int(endID), dirUDP)
+            output_file = dirDataOut+outputPrefix[int(bandNum)-1]+seqID+'_'+startID+'.fits'
+            processFITS(fileList, output_file, int(bandNum), pointingStream, seqFlag, listREF, catName)
+        else:
+            # skip it because seqFlag says it's unusable
+            print("Sequence", seqID, "NOT OK, flag is", seqFlag)
 
 
 if __name__ == '__main__':
@@ -463,7 +460,7 @@ if __name__ == '__main__':
     p.add('-c', '--config', required=False, is_config_file=True, help='config file path')
     p.add('-e', '--erase', required=False, action=argparse.BooleanOptionalAction, help='erase contents of output folder before starting')
     p.add('-j', '--cpus', required=False, help='set number of CPUs to use')
-    p.add('-b', '--band', required=True, help='process Band 1 or 2 data')
+    p.add('-b', '--band', required=True, help='GUSTO band range: 1, 2, or 1 2 for both', nargs="+")
     p.add('-i', '--inpath', required=True, help='path to input udp and level0.5 folders')
     p.add('-o', '--outpath', required=True, help='path to output Level 0.7 files')
     p.add('-s', '--scanid', required=True, help='scanID range', nargs=2)
@@ -472,7 +469,6 @@ if __name__ == '__main__':
     print(options)
     print(p.format_values())    # show where different settings came from
 
-    bandNum=int(options.band)        
     dirDataOut = options.outpath + 'level0.7/'
     input = options.outpath + sequencesFile
     commit_info = runGitLog()  # lookup git commit info only once

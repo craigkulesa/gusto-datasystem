@@ -1,0 +1,9 @@
+# ranges for pixel masking ACS5, Band1
+# st,end if single pixel, st=end: 95,95
+23,50
+65,71
+100,103
+163,170
+198,206
+232,236
+300, 511

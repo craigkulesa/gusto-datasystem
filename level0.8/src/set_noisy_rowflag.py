@@ -1,11 +1,11 @@
-import os
+#import os
 import sys
 import glob
 import numpy as np
+from datetime import datetime
 import configparser
 from astropy.io import fits
-from astropy import constants as const
-from pybaselines import Baseline, utils
+#from astropy import constants as const
 import matplotlib.pyplot as plt
 
 import argparse
@@ -14,16 +14,16 @@ from functools import partial
 
 from tqdm import tqdm
 
+sys.path.append("../../common/")
+import flagdefs as flags
+
 '''
 Goal:
    1)  Read all rows in all given fits files
    2)  Check baseband spectra against threshold per mixer/band for ringing
    3)  For REFs and HOTs, note failed rows in log
    4)  For OTFs, check Tsys from quasi-Level 1 
-
 '''
-
-
 
 def find_mixer(line, mixer):
     #
@@ -40,8 +40,7 @@ def find_mixer(line, mixer):
 
 
 def doTsys(hot, ref, thot):
-    tsky = 35 # callen welton 1.4 THz
-    tsky = 46 # callen welton 1.9 THz
+    tsky = 40 # callen welton temp between [CII] and [NII] ~1.7 THz
     y_factor = np.zeros(hot.shape)
     y_factor = hot/ref
 
@@ -84,11 +83,11 @@ def doStuff(scan, args, ta_std, fitnes, tsys, resgood, resbad):
 
     # READ DATA_TABLE
     data   = hdu[1].data
-    spec   = data['spec'] 
+    spec   = data['DATA'] 
     scan_type = data['scan_type']
     mixer     = data['MIXER']
     unixtime  = data['UNIXTIME']
-    THOT      = data['THOT']
+    #THOT      = header['THOT']
     ROW_FLAG  = data['ROW_FLAG']
 
     if(line=='NII'):
@@ -116,14 +115,11 @@ def doStuff(scan, args, ta_std, fitnes, tsys, resgood, resbad):
         for j in range(l0):
             data[j] = ydata[j] - p(j)
 
-        #RESET
-        ROW_FLAG[i] = 0
-
         if(np.std(data)>thresh[find_mixer(line, mixer[i])]):
-            ROW_FLAG[i] |=  (1<<26 | 1<<27)  # set "clear ringing"
+            ROW_FLAG[i] |=  (flags.RowFlags.RINGING_BIT1 | flags.RowFlags.RINGING_BIT0)  # set "clear ringing"
             resbad  = np.vstack([resbad,  [[np.std(data), unixtime[i], mixer[i]]]])
         else:
-            ROW_FLAG[i] &= ~(1<<26 | 1<<27)  # unset both ringing bits
+            ROW_FLAG[i] &= ~(flags.RowFlags.RINGING_BIT1 | flags.RowFlags.RINGING_BIT0)  # unset both ringing bits
             resgood  = np.vstack([resgood, [[np.std(data), unixtime[i], mixer[i]]]])
 
         if(scan_type[i] == 'OTF' and args.stats):
@@ -151,7 +147,11 @@ def doStuff(scan, args, ta_std, fitnes, tsys, resgood, resbad):
             fitnes = np.vstack([fitnes, [[fitnes_mix, unixtime[i], mixer[i]]]])
 
     # Write the change back to the fits file
+    
     hdu[0].header.add_history('noisy rows flagged')
+    header['DLEVEL'] = 0.8
+    now = datetime.now()
+    header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
     hdu.flush()
 
     if args.stats:

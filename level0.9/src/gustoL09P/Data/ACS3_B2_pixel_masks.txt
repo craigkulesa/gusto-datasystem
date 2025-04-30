@@ -1,0 +1,10 @@
+# ranges for pixel masking ACS3, Band 2
+# st,end if single pixel, st=end: 95,95
+20,83
+130,140
+200,205
+265,274
+323,340
+399,407
+465,470
+497,509
