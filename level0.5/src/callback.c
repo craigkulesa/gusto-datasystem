@@ -459,7 +459,7 @@ void callback(char *filein, char *dirOut){
       }
       
       if (VIhi==0. || VIhi > 2.5 || VIhi < 2.0){ //Still no reasonable values?  Guess but flag it
-	rowflag |= (1 << DAC_CAL_EFFED);
+	rowflag |= (1 << DAC_CAL_FAKED);
 	VIhi = VQhi = 2.10;
 	VIlo = VQlo = 1.90;
 	printf("######################## WARN ###########################\n");

@@ -8,8 +8,8 @@
 #include <fitsio.h>
 
 // make sure these are consistent with flagdefs.py in ../common for Level 0.7+
-#define DAC_CAL_FIXED 25
-#define DAC_CAL_EFFED 31
+#define DAC_CAL_FIXED 29
+#define DAC_CAL_FAKED 30
 
 // function to process correlator lag file
 void callback(char *, char *);

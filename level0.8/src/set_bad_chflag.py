@@ -1,4 +1,4 @@
-import os
+#import os
 import sys
 import glob
 import shutil
@@ -6,14 +6,17 @@ import configparser
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import numpy as np
-from pybaselines import Baseline, utils
-from astropy import constants as const
+#from astropy import constants as const
 
 import argparse
 import multiprocessing
 from functools import partial
 
 from tqdm import tqdm
+
+sys.path.append("../../common/")
+import flagdefs as flags
+
 
 def doStuff(scan, args):
     # open fits file
@@ -24,7 +27,7 @@ def doStuff(scan, args):
     line   = header['LINE']
     # read data_table
     data   = hdu[1].data
-    spec   = data['spec'] 
+    spec   = data['DATA'] 
     nrow   = len(spec)
     CHANNEL_FLAG = data['CHANNEL_FLAG']
 
@@ -51,8 +54,8 @@ def doStuff(scan, args):
     # 972       100-101 201-203
     #
     # Iridium
-    # 1314      133-136 :wq
-
+    # 1314      133-136 266-272
+    # 1458      147-152 294-303
     # 1610      165-168 331-335
     # Look through all of the spectra to set row_flags for noisy data
 
@@ -62,23 +65,27 @@ def doStuff(scan, args):
 
     if(line=='NII'):
         for i in range(nrow-1):
-            CHANNEL_FLAG[i][31:36]   |= 1<<4    # LO 1 330 MHz Bit 4 SPUR
-            CHANNEL_FLAG[i][66:69]   |= 1<<4    # LO 2 656 MHz Bit 4 SPUR
-            CHANNEL_FLAG[i][100:101] |= 1<<4    # LO 3 980 MHz Bit 4 SPUR
-            CHANNEL_FLAG[i][133:136] |= 1<<7    # Iridium 1314 MHz *Variable Bit 7 VARIABLE SPUR
-            CHANNEL_FLAG[i][147:152] |= 1<<7    # Iridium 1458 MHz *Variable Bit 7 VARIABLE SPUR
-            CHANNEL_FLAG[i][165:168] |= 1<<4    # Iridium 1 1616-1625 MHz Bit 4 SPUR
+            CHANNEL_FLAG[i][31:36]   |= flags.ChanFlags.VARIABLE_SPUR    # LO 1 330 MHz 
+            CHANNEL_FLAG[i][66:69]   |= flags.ChanFlags.VARIABLE_SPUR    # LO 2 656 MHz 
+            CHANNEL_FLAG[i][100:101] |= flags.ChanFlags.VARIABLE_SPUR    # LO 3 980 MHz 
+            CHANNEL_FLAG[i][133:136] |= flags.ChanFlags.VARIABLE_SPUR    # Iridium 1314 MHz 
+            CHANNEL_FLAG[i][147:152] |= flags.ChanFlags.VARIABLE_SPUR    # Iridium 1458 MHz 
+            CHANNEL_FLAG[i][165:168] |= flags.ChanFlags.VARIABLE_SPUR    # Iridium 1 1616-1625 MHz Bit 
+            CHANNEL_FLAG[i][0:31]    |= flags.ChanFlags.OOB    # Out of band 0-300MHz (lower)
+            CHANNEL_FLAG[i][410:511] |= flags.ChanFlags.OOB    # Out of band 4000-5000MHz (upper)
 
         hdu[0].header.add_history('known bad NII channels flagged')
 
     elif(line=='CII'):
         for i in range(nrow-1):
-            CHANNEL_FLAG[i][66:70]   |= 1<<4    # LO 1 330 MHz Bit 4 SPUR
-            CHANNEL_FLAG[i][134:136] |= 1<<4    # LO 2 656 MHz Bit 4 SPUR
-            CHANNEL_FLAG[i][201:203] |= 1<<4    # LO 3 980 MHz Bit 4 SPUR
-            CHANNEL_FLAG[i][266:272] |= 1<<7    # Iridium 1314 MHz *Variable Bit 7 VARIABLE SPUR
-            CHANNEL_FLAG[i][294:303] |= 1<<7    # Iridium 1458 MHz *Variable Bit 7 VARIABLE SPUR
-            CHANNEL_FLAG[i][331:335] |= 1<<4    # Iridium 1 1616-1625 MHz Bit 4 SPUR
+            CHANNEL_FLAG[i][66:70]   |= flags.ChanFlags.VARIABLE_SPUR    # LO 1 330 MHz Bit 
+            CHANNEL_FLAG[i][134:136] |= flags.ChanFlags.VARIABLE_SPUR    # LO 2 656 MHz Bit 
+            CHANNEL_FLAG[i][201:203] |= flags.ChanFlags.VARIABLE_SPUR    # LO 3 980 MHz Bit 
+            CHANNEL_FLAG[i][266:272] |= flags.ChanFlags.VARIABLE_SPUR    # Iridium 1314 MHz 
+            CHANNEL_FLAG[i][294:303] |= flags.ChanFlags.VARIABLE_SPUR    # Iridium 1458 MHz 
+            CHANNEL_FLAG[i][331:335] |= flags.ChanFlags.VARIABLE_SPUR    # Iridium 1 1616-1625 MHz 
+            CHANNEL_FLAG[i][0:62]    |= flags.ChanFlags.OOB    # Out of band 0-300MHz (lower)
+            CHANNEL_FLAG[i][820:1023]|= flags.ChanFlags.OOB    # Out of band 4000-5000MHz (upper)
 
         hdu[0].header.add_history('known bad CII channels flagged')
 

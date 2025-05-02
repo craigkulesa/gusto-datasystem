@@ -1,0 +1,15 @@
+File: README_scripts
+
+The data directory contains scripts used for execution. This file saves the commands 
+used to execute these scripts for convenience. Example is a script for debugging the 
+code that works only on a small amount of data for testing the proper execution of the 
+pipeline code.
+	
+# regular execution processing all data:
+	execGL09P
+
+# for debugging:
+	execGL09P -c GL09P_debug.txt -r 9000 9200 -d True -v True
+
+
+# user specific commands should go below here:
