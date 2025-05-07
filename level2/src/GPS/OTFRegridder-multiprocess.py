@@ -242,7 +242,7 @@ if __name__ == '__main__':
         plt.gca().set_facecolor('black')
         if (linename == "CII"):
             plt.gca().title.set_text("line:CII mixers:5,8 vel:%.0f to %.0f km/s" % (v_vector[idx], v_vector[idx+1]))
-        if (linename == "NII") & (line_freq > 1900500):
+        if (linename == "NII"):
             plt.gca().title.set_text("line:NII mixers:2,3,6 vel:%.0f to %.0f km/s" % (v_vector[idx], v_vector[idx+1]))
         plt.gca().set_aspect('equal', adjustable='datalim')
         plt.colorbar(output)
