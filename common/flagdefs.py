@@ -42,7 +42,8 @@ class SeqFlags(IntFlag):
     MISSING_HK = auto()
     MAYBE_HUNG_LO = auto()
     MISSING_HOT = auto()
-    MISSING_REF = auto()
+    MISSING_LEADING_REF = auto()
+    MISSING_TRAILING_REF = auto()
     NOREFS = auto()
     NODATA = auto()
     

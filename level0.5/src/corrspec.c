@@ -1,5 +1,6 @@
 #include "corrspec.h"
 #include "callback.h"
+#include <sys/stat.h>
 
 extern struct coeffs c;
 char commit_info[256];
@@ -38,13 +39,23 @@ void get_git_commit_info(const char *filename, char *commit_info) {
     snprintf(commit_info, BUFSIZ+sizeof(filename), "%s %s", filename, hash);
 }
 
+
 int main(int argc, char **argv) {
    // Set up SIGSEGV handler
    FILE *fp;
-   char fileName[128];
+   char fileName[128], outputPath[128]="./build";
 
+   if(argc < 2)
+     {
+       printf("Syntax:\n\t./corrspec <file list> <optional output directory>\n");
+       return 1;
+     }
+   else if(argc == 3)
+     sprintf(outputPath, "%s", argv[2]);
+   
+   printf("Using output directories: %s/B1 and %s/B2\n", outputPath, outputPath);
+   
    c.len = readQCfile();
-   // get git versioning once at start
    get_git_commit_info("./src/callback.c", commit_info);
    
    // Setup all possible FFTW array lengths
@@ -58,8 +69,7 @@ int main(int argc, char **argv) {
 
    fp = fopen(argv[1], "r");
    while(fscanf(fp,"%s", fileName) != EOF)
-      callback(fileName);
+     callback(fileName, outputPath);
    fclose(fp);
    return 0;
 }
-
