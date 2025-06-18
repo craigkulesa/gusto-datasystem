@@ -262,7 +262,15 @@ def processL10(params, verbose=True):
     # select only the processed good data
     odata = data[osel]
     
-    # add 
+    # change the spectral axis from IF frequency to velocity
+    IF_freq = (np.arange(hdr['NPIX'])-hdr['CRPIX1'])*hdr['CDELT1']+hdr['CRVAL1']    
+    vlsr    = (hdr['IF0'] - IF_freq)/hdr['LINEFREQ']*const.c.value/1.e3 + hdr['VLSR'] # Vlsr in km/s
+    hdr.set('IFPIX0', value=hdr['CRPIX1'], comment='')
+    hdr.set('IFDELT', value=hdr['CDELT1'], comment='')
+    hdr.set('IFVAL0', value=hdr['CRVAL1'], comment='')
+    hdr.set('CRPIX1', value=0.000, comment=(''))
+    hdr.set('CRVAL1', value=vlsr[0], comment=(''))
+    hdr.set('CDELT1', value=np.abs(np.diff(vlsr).mean()), comment=(''))
     hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
     hdr.set('CRVAL2', value=(data['ra'][osel[0]]*u.deg).value, comment=(''), after='CDELT1')
     hdr.set('CRPIX2', value=0, comment=(''), after='CDELT1')
