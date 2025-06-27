@@ -10,32 +10,33 @@
           time ./L07-pipeline.py
 or you can override any of the configuration variables with command line arguments:
           
-          time ./L07-pipeline.py -e -j 2 -b 1 -s 9520 9530
-          
-       Namespace(config=None, erase=True, cpus='2', band='1', inpath='/home/ckulesa/data/GUSTO/', outpath='/home/ckulesa/data/GUSTO/', scanid=['9520', '9530'])
-       Command Line Args:   -e -b 1 -j 2 -s 9520 9530
-       Config File (./L07-config):
-         inpath:            /home/ckulesa/data/GUSTO/
-         outpath:           /home/ckulesa/data/GUSTO/
+    time ./L07-pipeline.py -e -b 1 -j 2 -s 9520 9530 
 
-       Sequences file exists, skipping step...
-       Directory '/home/ckulesa/data/GUSTO/level0.7/B1/' created.
-       Processing sequence 3237 from 09520 - 09522
-       Processing sequence 3238 from 09522 - 09524
-       seq  3238  OK, flag is  0
-       seq  3237  OK, flag is  2
-       Processing sequence 3239 from 09524 - 09526
-       seq  3239  OK, flag is  0
-       Processing sequence 3240 from 09526 - 09528
-       seq  3240  OK, flag is  2
-       Processing sequence 3241 from 09528 - 09530
-       seq  3241  OK, flag is  2
-       Processing sequence 3242 from 09530 - 09532
-       seq  3242  OK, flag is  0
+          Namespace(config=None, erase=True, cpus='2', band=['1'], path='/home/obs/data/GUSTO/', scanid=['9520', '9530'])          
+          Command Line Args:   -e -b 1 -j 2 -s 9520 9530
+          Config File (./L07-config):
+            path:              /home/obs/data/GUSTO/
 
-       real	0m8.463s
-       user	0m1.462s
-       sys	0m0.189s
+          Sequences file seemingly exists, skipping step...
+          Reusing directory /home/obs/data/GUSTO/level0.7/
+          Erasing contents of /home/obs/data/GUSTO/level0.7/
+          Processing Band 1 sequence 03237 from 09520 - 09522
+          Processing Band 1 sequence 03238 from 09522 - 09524
+          Sequence flag is 0
+          Sequence flag is 8
+          Processing Band 1 sequence 03239 from 09524 - 09526
+          Processing Band 1 sequence 03240 from 09526 - 09528
+          Sequence flag is 16
+          Sequence flag is 0
+          Processing Band 1 sequence 03241 from 09528 - 09530
+          Processing Band 1 sequence 03242 from 09530 - 09532
+          Sequence flag is 8
+          Sequence flag is 0
+
+          real    0m2.775s
+          user    0m1.746s
+          sys     0m1.514s
+
 
 where the arguments are:
 
@@ -43,13 +44,7 @@ where the arguments are:
        -j specifies the number of CPUs to use (without it, python will best-guess)
        -b will either process B1 or B2 data, depending on whether you specify 1 or 2
        -s sets the scanID range for the processing
-       -i sets the input data path (which should contain the calibration files, level0.5 input data folders, and udp folder)
-       -o sets the output data root folder (for the level 0.7 data)
-
-## TEST DATA (generated 2/12/2025) ##
-- [Level 0.5 data (54 MB)](http://soral.as.arizona.edu/GUSTO/calibration/level05_20250212_test.tar.xz)
-- [Level 0.7 data (54 MB)](http://soral.as.arizona.edu/GUSTO/calibration/level07_20250212_test.tar.xz)
-
+       -p sets the data path (which should contain the calibration files, level0.5 input data folders, udp, and output level 0.7 folder)
 
 ## Data snapshot for Level 0.5 and Level 0.7 (2/25/2025) ##
 - [Level 0.5 data snapshot from 20250217 version](http://soral.as.arizona.edu/GUSTO/data/level0.5/) (organized by scanID)
