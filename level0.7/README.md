@@ -46,7 +46,7 @@ where the arguments are:
        -s sets the scanID range for the processing
        -p sets the data path (which should contain the calibration files, level0.5 input data folders, udp, and output level 0.7 folder)
 
-## Data snapshot for Level 0.5 and Level 0.7 (2/25/2025) ##
-- [Level 0.5 data snapshot from 20250217 version](http://soral.as.arizona.edu/GUSTO/data/level0.5/) (organized by scanID)
-- [Level 0.7 data snapshot from 20250225 version](http://soral.as.arizona.edu/GUSTO/data/level0.7/) (organized by sequence ID), [see README](http://soral.as.arizona.edu/GUSTO/data/level0.7/README.txt)
+## Notes for current version ##
+- If you are using the influx database from DR1 Rev A or earlier, please download and install the new version with reduced size and with interpolated calibration load THOT values when they are missing [link to calibration folder](http://soral.as.arizona.edu/GUSTO/calibration/) 
+- Also be sure to either delete any old sequences.txt file for the pipeline to regenerate, or download a new one from the calibration folder, above
   
