@@ -47,6 +47,6 @@ where the arguments are:
        -p sets the data path (which should contain the calibration files, level0.5 input data folders, udp, and output level 0.7 folder)
 
 ## Notes for current version ##
-- If you are using the influx database from DR1 Rev A or earlier, please download and install the new version with reduced size and with interpolated calibration load THOT values when they are missing [link to calibration folder](http://soral.as.arizona.edu/GUSTO/calibration/) 
-- Also be sure to either delete any old sequences.txt file for the pipeline to regenerate, or download a new one from the calibration folder, above
+- If you are using the influx database from DR1 Rev A or earlier, please download and install the new version (reduced size = 260 MB) with interpolated calibration load THOT values when they are missing: [see link to calibration folder](http://soral.as.arizona.edu/GUSTO/calibration/) and look at the instructions for installing it from the Level 0.5 pipeline readme.
+- Finally, either delete any old sequences.txt file for the L07 pipeline to regenerate, or download a new sequences.txt from the calibration folder, above
   
