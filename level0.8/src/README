@@ -1,19 +1,31 @@
-This folder contains source code for the level 0.8 pipeline, first-round deSpur.
+The L08 pipeline step has similar behavior and arguments to the L07 pipeline. 
 
-example usage of setting channel flags:
-python3 set_bad_ch_flags.py "ACS*_1450*"
+Flags are:
+-c or --config will specify the location of the config file
+-e or --erase will wipe the contents of the output level0.8 directory before starting
+-p or --path with set the data path where the level0.7 and level0.8 directories are expected to be found
+-j or --cpus will specify the number of cpu cores to use
+-f or --force will force channel and row flagging, even if it has been already done
+-s or --scanid has two arguments and will set the range of scanids to process
+-u or --update will update files found in level0.8 "in place". 
 
-Will operate on Bands 1 and 2, from ScanID 14500 - 14509
+Not specifying -u is the default; the pipeline will look in level 0.7 for the input files, and write new data to the level 0.8 directory.
 
-Any fits file matching the name ACS3_1450*.fits
+Example:
 
-Will skip files that already have the "set bad channel flag" in HISTORY
+This example uses 2 CPUs, processes scanids from 1 to 30000 (e.g. the whole survey), and erases the output level 0.8 directory before starting. 
 
---
+obs@gusto-soc$ time ./L08-pipeline.py -j 2 -e -s 1 30000
+Namespace(config=None, erase=True, path='/home/obs/data/GUSTO/', update=False, cpus='2', force=False, scanid=['1', '30000'])
+Command Line Args:   -j 2 -e -s 1 30000
+Config File (../../common/config.ini):
+  path:              /home/obs/data/GUSTO/
 
-example usage of setting noisy row flags:
-python3 set_noisy_row_flag.py "ACS3_1450*"
-
-Will operate on Band 2, from ScanID 14500 - 14509
-
-
+Reusing directory /home/obs/data/GUSTO/level0.8/
+Erasing contents of /home/obs/data/GUSTO/level0.8/
+Using level 0.7 folder for input and creating new level 0.8 files
+Found 23728 files to process
+Done.
+real    47m7.321s
+user    89m3.860s
+sys     1m43.046s
