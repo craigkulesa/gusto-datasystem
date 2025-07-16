@@ -1,9 +1,9 @@
 # Level 0.8 Quick Start
 ## tl;dr version for the impatient
-1. There are relatively few dependencies for the Level 0.8 pipeline step.  If you have a working python3 setup with astropy and a few other minor packages, it should run without concern.
-2. You should have your data in a common path such as $HOME/data, and the level 0.7 data will be expected to be found in a "level0.7" directory, and the level 0.8 data will go into "level0.8".
+1. There are relatively few dependencies for the Level 0.8 pipeline step.  There are no new dependencies from Level 0.7.   If you have a working python3 setup with astropy and a few other semi-standard packages (such as numpy, functools, configargparse), it should run without concern.
+2. You should have your data in a common path, say $HOME/data.   Under that directory, level 0.7 input data should be found in a "level0.7" directory, and the output level 0.8 data will go into "level0.8".
 3. Feel free to modify the config file (default is config.ini in the common/ folder) as needed.  Presently, it is used only to remember your data path.
-4. Run the processor on some Level 0.7 data.  You can accept the defaults from the config file and simply the pipeline step from the level0.8/src directory without any arguments:
+4. You are ready to run the processor on some Level 0.7 data.  You can accept the defaults from the config file and simply run the pipeline step from the level0.8/src directory without any arguments:
 
        time ./L08-pipeline.py
 or you can override the defaults on the command line.   The example below will use 2 CPUs, process scanIDs from 1 to 30000 (e.g. the whole survey) from the level0.7 data, writing new files, and erases the output level 0.8 directory before starting.
