@@ -2,18 +2,18 @@ The L08 pipeline step has similar behavior and arguments to the L07 pipeline.
 
 Flags are:
 -c or --config will specify the location of the config file
--e or --erase will wipe the contents of the output level0.8 directory before starting
--p or --path with set the data path where the level0.7 and level0.8 directories are expected to be found
+-e or --erase will wipe the contents of the level0.8 directory before starting
+-p or --path with set the data path where the level0.7 and level0.8 directories are
 -j or --cpus will specify the number of cpu cores to use
--f or --force will force channel and row flagging, even if it has been already done
--s or --scanid has two arguments and will set the range of scanids to process
--u or --update will update files found in level0.8 "in place". 
+-f or --force will force channel and row flagging, even if already performed
+-s or --scanid has two arguments and will set the range of scanIDs to process
+-u or --update will update files in level0.8 folder "in place" (behavior of Abe's scripts)
 
 Not specifying -u is the default; the pipeline will look in level 0.7 for the input files, and write new data to the level 0.8 directory.
 
 Example:
 
-This example uses 2 CPUs, processes scanids from 1 to 30000 (e.g. the whole survey), and erases the output level 0.8 directory before starting. 
+This example uses 2 CPUs, processes scanids from 1 to 30000 (e.g. the whole survey) from the level0.7 data, writing new files, and erases the output level 0.8 directory before starting. 
 
 obs@gusto-soc$ time ./L08-pipeline.py -j 2 -e -s 1 30000
 Namespace(config=None, erase=True, path='/home/obs/data/GUSTO/', update=False, cpus='2', force=False, scanid=['1', '30000'])
