@@ -14,8 +14,8 @@ dhome = /rdat/Projects/GUSTO/Data
 workDir = ${ghome}/work
 L08DataDir = ${dhome}/level0.8
 L09DataDir = ${dhome}/level0.9
-L095DataDir = ${dhome}/level0.95
-L10DataDir = ${dhome}/level1.0
+L095DataDir = ${dhome}/level0.95dev
+L10DataDir = ${dhome}/level1.0dev
 logDir = ${ghome}/work/logs
 tmpDir = ${ghome}/work/tmp
 

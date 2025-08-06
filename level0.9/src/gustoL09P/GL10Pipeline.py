@@ -3,9 +3,9 @@
 This is the executable for the GUSTO L2 Pipeline.
 """
 
-__date__ = '12/12/2024'
-__updated__ = '20241212'
-__version__ = '0.1'
+__date__ = '6/17/2025'
+__updated__ = '20240617'
+__version__ = '0.2'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
 from joblib import Parallel, delayed
@@ -107,9 +107,9 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
         inDir = cfi['gdirs']['L095DataDir']
         outDir = cfi['gdirs']['L10DataDir']
         if line=='CII':
-            filter = 'ACS5*.fits'
+            filter = 'CII*.fits'
         else:
-            filter = 'ACS3*.fits'
+            filter = 'NII*.fits'
         print('outDir: ', outDir)
         print('filter: ', os.path.join(inDir,filter))
         
@@ -117,7 +117,8 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
         #print(glob.glob(os.path.join(inDir,filter)))
         sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
         #print('single result: ', sdirs[0], os.path.split(sdirs[0]))
-        dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
+        #dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
+        dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
         
         sdirs.sort(key=lambda sdirs: dsc)
         
@@ -186,7 +187,8 @@ def processL10(params, verbose=True):
     
     n_spec, n_pix = spec.shape
     
-    prange = [int(hdr['pgpixst']), int(hdr['pgpixen'])]
+    #prange = [int(hdr['pgpixst']), int(hdr['pgpixen'])]
+    prange = [int(hdr['goodpxst']), int(hdr['goodpxen'])]
     
     # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
     # osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
@@ -219,9 +221,14 @@ def processL10(params, verbose=True):
             decs = data['DEC'][msel]
             utime = data['UNIXTIME'][msel]
             
-            glat = hdr['GOND_LAT']
-            glon = hdr['GOND_LON']
-            galt = hdr['ELEVATON']
+            try:
+                glat = hdr['GOND_LAT']
+                glon = hdr['GOND_LON']
+                galt = hdr['GOND_ALT']
+            except:
+                glat = hdr['GON_LAT']
+                glon = hdr['GON_LON']
+                galt = hdr['GON_ALT']
             
             cc = SkyCoord(ra=ras*u.deg, dec=decs*u.deg, frame='icrs')
             
@@ -265,12 +272,13 @@ def processL10(params, verbose=True):
     # change the spectral axis from IF frequency to velocity
     IF_freq = (np.arange(hdr['NPIX'])-hdr['CRPIX1'])*hdr['CDELT1']+hdr['CRVAL1']    
     vlsr    = (hdr['IF0'] - IF_freq)/hdr['LINEFREQ']*const.c.value/1.e3 + hdr['VLSR'] # Vlsr in km/s
+    hdr.set('CUNIT1', value='km/s', comment='Spectral unit: velocity')
     hdr.set('IFPIX0', value=hdr['CRPIX1'], comment='')
-    hdr.set('IFDELT', value=hdr['CDELT1'], comment='')
-    hdr.set('IFVAL0', value=hdr['CRVAL1'], comment='')
+    hdr.set('IFDELT', value=hdr['CDELT1'], comment='Channel width (km/s)')
+    hdr.set('IFVAL0', value=hdr['CRVAL1'], comment='Start of spectra (km/s)')
     hdr.set('CRPIX1', value=0.000, comment=(''))
     hdr.set('CRVAL1', value=vlsr[0], comment=(''))
-    hdr.set('CDELT1', value=np.abs(np.diff(vlsr).mean()), comment=(''))
+    hdr.set('CDELT1', value=np.diff(vlsr).mean(), comment=(''))
     hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
     hdr.set('CRVAL2', value=(data['ra'][osel[0]]*u.deg).value, comment=(''), after='CDELT1')
     hdr.set('CRPIX2', value=0, comment=(''), after='CDELT1')
