@@ -11,9 +11,12 @@ from astropy.io import fits
 import numpy as np
 from multiprocessing import Pool
 from functools import partial
+import subprocess
 
 sys.path.append("../../common/")
 import flagdefs as flags
+
+commit_info = ''
 
 
 def clear_folder(folder_path):
@@ -28,8 +31,18 @@ def clear_folder(folder_path):
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
 
+            
 def flatten(xss):
     return [x for xs in xss for x in xs]
+
+
+def runGitLog():
+    try:
+        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 0.8 commit %h by %an %ad', '--', './L08-pipeline.py'], capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return f"Error: {e}"
+
 
 def find_mixer(line, mixer):
     if(line=='NII'):
@@ -151,12 +164,13 @@ def doStuff(scan, options):
         if(np.std(data) > thresh[find_mixer(line, mixer[i])]):
             ROW_FLAG[i] |=  (flags.RowFlags.RINGING_BIT1 | flags.RowFlags.RINGING_BIT0)  # set ringing bits
         else:
-            ROW_FLAG[i] &= ~(flags.RowFlags.RINGING_BIT1 | flags.RowFlags.RINGING_BIT0)  # unset ringing bits
+            ROW_FLAG[i] &= ~(flags.RowFlags.RINGING_BIT1 | flags.RowFlags.RINGING_BIT0)  # clear ringing bits
       
     hdu[0].header.add_history('badly fringing rows flagged')
     header['DLEVEL'] = 0.8
     now = datetime.now()
     header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
+    header['COMMENT'] = commit_info
     
     # Write the changes back to fits in update mode or as new file
     if(options.update == True):
@@ -167,7 +181,7 @@ def doStuff(scan, options):
 
 
 if __name__ == "__main__":
-    parser = configargparse.ArgParser(default_config_files=['../../common/config.ini', '~/.config.gusto'], ignore_unknown_config_file_keys=True)
+    parser = configargparse.ArgParser(default_config_files=['../../common/config.gusto', '~/.config.gusto'], ignore_unknown_config_file_keys=True)
     parser.add('-c', '--config', required=False, is_config_file=True, help='config file path')
     parser.add('-e', '--erase', required=False, action=argparse.BooleanOptionalAction, help='erase contents of output folder before starting')
     parser.add('-p', '--path', required=False, help="\tData path")
@@ -181,6 +195,8 @@ if __name__ == "__main__":
     print(options)
     print(parser.format_values())
 
+    commit_info = runGitLog()  # lookup git commit info only once
+    
     dirDataOut = options.path+'level0.8/'
     if not os.path.exists(dirDataOut):
         os.makedirs(dirDataOut)

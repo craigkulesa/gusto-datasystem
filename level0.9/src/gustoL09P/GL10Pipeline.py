@@ -117,7 +117,7 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
         #print(glob.glob(os.path.join(inDir,filter)))
         sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
         #print('single result: ', sdirs[0], os.path.split(sdirs[0]))
-        dsc = [int(os.path.split(sdir)[1].split('_')[1].split('.')[0]) for sdir in sdirs]
+        dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
         
         sdirs.sort(key=lambda sdirs: dsc)
         
@@ -260,6 +260,17 @@ def processL10(params, verbose=True):
     # select only the processed good data
     osel = np.argwhere(data['scan_type'] == 'OTF').flatten()
     odata = data[osel]
+
+    # change the spectral axis from IF frequency to velocity
+    IF_freq = (np.arange(hdr['NPIX'])-hdr['CRPIX1'])*hdr['CDELT1']+hdr['CRVAL1']
+    vlsr    = (hdr['IF0'] - IF_freq)/hdr['LINEFREQ']*const.c.value/1.e3 + hdr['VLSR'] # Vlsr in km/s
+    hdr.set('CUNIT1', value='km/s', comment='Spectral unit: velocity')
+    hdr.set('IFPIX0', value=hdr['CRPIX1'], comment='')
+    hdr.set('IFDELT0', value=hdr['CDELT1'], comment='')
+    hdr.set('IFVAL0', value=hdr['CRVAL1'], comment='')
+    hdr.set('CRPIX1', value=0.000, comment=(''))
+    hdr.set('CRVAL1', value=vlsr[0], comment=(''))
+    hdr.set('CDELT1', value=np.diff(vlsr).mean(), comment=(''))
     # add 
 #    hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
 #    hdr.set('CRVAL2', value=(data['ra'][osel[0]]*u.deg).value, comment=(''), after='CDELT1')
@@ -282,7 +293,7 @@ def processL10(params, verbose=True):
     hdr['PROCTIME'] = tred
     
     hdr.set('', value='', after='BS_ITERM')
-    hdr.set('', value='          Level 0.95 Pipeline Processing', after='BS_ITERM')
+    hdr.set('', value='          Level 1.0 Pipeline Processing', after='BS_ITERM')
     hdr.set('', value='', after='BS_ITERM')
     hdr.set('L10PTIME', value=tred, comment=('L1.0 pipeline processing time'))
     
@@ -296,7 +307,6 @@ def processL10(params, verbose=True):
     
     return dfile
 
-   
 
 def getMixerOffsets(band, mixers, type='THEORY', offsetfile=None, verbose=False):
     """Function retrieving the GUSTO on-sky mixer offsets from file.

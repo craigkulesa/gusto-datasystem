@@ -93,7 +93,7 @@ def makeSequences(input, output):
         seqNum+=1
         print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
 
- 
+
 def makeFileGlob(startID, endID, bandNum, dirDataIn):
     fileList = []
     for scanID in range(startID, endID+1):
@@ -465,12 +465,12 @@ def processSequence(options, line):
 
 
 if __name__ == '__main__':
-    p = configargparse.ArgParser(default_config_files=['./L07-config', '~/.L07-config'])
+    p = configargparse.ArgParser(default_config_files=['~/.config.gusto', '../../common/config.gusto'])
     p.add('-c', '--config', required=False, is_config_file=True, help='config file path')
     p.add('-e', '--erase', required=False, action=argparse.BooleanOptionalAction, help='erase contents of output folder before starting')
     p.add('-j', '--cpus', required=False, help='set number of CPUs to use')
     p.add('-b', '--band', required=True, help='GUSTO band range: 1, 2, or 1 2 for both', nargs="+")
-    p.add('-p', '--path', required=True, help='path to input udp/level0.5, output level0.7 folders')
+    p.add('-p', '--path', required=True, help='path to input udp,level0.5, and output level0.7 folders')
     p.add('-s', '--scanid', required=True, help='scanID range', nargs=2)
     options = p.parse_args()
     
