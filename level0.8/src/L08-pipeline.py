@@ -181,7 +181,7 @@ def doStuff(scan, options):
 
 
 if __name__ == "__main__":
-    parser = configargparse.ArgParser(default_config_files=['../../common/config.gusto', '~/.config.gusto'], ignore_unknown_config_file_keys=True)
+    parser = configargparse.ArgParser(default_config_files=['../../config.gusto', '~/.config.gusto'], ignore_unknown_config_file_keys=True)
     parser.add('-c', '--config', required=False, is_config_file=True, help='config file path')
     parser.add('-e', '--erase', required=False, action=argparse.BooleanOptionalAction, help='erase contents of output folder before starting')
     parser.add('-p', '--path', required=False, help="\tData path")

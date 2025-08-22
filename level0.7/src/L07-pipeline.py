@@ -465,7 +465,7 @@ def processSequence(options, line):
 
 
 if __name__ == '__main__':
-    p = configargparse.ArgParser(default_config_files=['~/.config.gusto', '../../common/config.gusto'])
+    p = configargparse.ArgParser(default_config_files=['~/.config.gusto', '../../config.gusto'], ignore_unknown_config_file_keys=True)
     p.add('-c', '--config', required=False, is_config_file=True, help='config file path')
     p.add('-e', '--erase', required=False, action=argparse.BooleanOptionalAction, help='erase contents of output folder before starting')
     p.add('-j', '--cpus', required=False, help='set number of CPUs to use')
