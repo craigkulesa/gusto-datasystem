@@ -222,7 +222,7 @@ def splitConcatenate(array, dim=4):
     return newarray
 
 
-def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, listREF, catName):
+def processFITS(input_files, output_file, bandNum, pointingStream, seqID, seqFlag, listREF, catName):
     with fits.open(input_files[0]) as hdul1:
         nrows1 = hdul1[1].data.shape[0]
         columns = hdul1[1].columns
@@ -400,11 +400,12 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     header['SYNTMULT'] = (MULT[bandNum-1], 'Synthesizer multiplier')
     header['VLSR'] = (info[1], 'Commanded catalog velocity (km/s LSR)')
     
-    # modify some last second items
+    # modify or add some last second items
     now = datetime.now()
     header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
     header['DLEVEL'] = 0.7
     header['VERSION'] = __version__
+    header['SEQ_ID'] = (int(seqID), 'Sequence ID')
     header['SEQ_FLAG'] = seqFlag
     header['COMMENT'] = commit_info
     print("Sequence flag is", seqFlag)
@@ -458,7 +459,7 @@ def processSequence(options, line):
         if(seqFlag < flags.SeqFlags.NOREFS):  # acceptable, process it
             pointingStream = makeUDP(int(startID), int(endID), dirUDP)
             output_file = dirDataOut+outputPrefix[int(bandNum)-1]+seqID+'_'+startID+'.fits'
-            processFITS(fileList, output_file, int(bandNum), pointingStream, seqFlag, listREF, catName)
+            processFITS(fileList, output_file, int(bandNum), pointingStream, seqID, seqFlag, listREF, catName)
         else:
             # skip it because seqFlag says it's unusable
             print("Sequence", seqID, "NOT OK, flag is", seqFlag)
