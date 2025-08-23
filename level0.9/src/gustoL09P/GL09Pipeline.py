@@ -211,8 +211,6 @@ def runGL09P(cfi_file=None, verbose=False):
         
     
 
-
-
 def GL09Pipeline(cfi, scanRange, verbose=False):
     """Function processing the Level 0.8 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
@@ -484,11 +482,11 @@ def processL08(paramlist):
             datavalid[k] = False
             return 0
         
-        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter, verbose=True)
+        tsys, refs, rhots, rtime, htime, Thot, Tsky, rhIDs, rfsflags, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=True)
         rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
-            print('No Tsys available! Stop processing %i of dfile %s'%(mix, dfile), tsys)
+            print('No Tsys available! Stopped processing of mixer %i in dfile %s'%(mix, dfile), tsys)
             # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.info('Tsys: ', tsys)
             datavalid[k] = False
@@ -721,7 +719,6 @@ def processL08(paramlist):
             elif drmethod==3:
                 
                 sspec = spec_OTF[i0,:]
-                print(hgroup[i0], hgroup.max())
                 yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0))[0]
                 sRn = seq_hots / yfac[1,:].squeeze()
                 try:

@@ -23,7 +23,7 @@ C2K = 273.15
 CDELT = [5000.0/511.0, 5000.0/1023.0] 
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
-__version__ = '20250331'
+__version__ = '20250613'
 commit_info = ''
 
 
@@ -55,6 +55,10 @@ def makeSequences(input, output):
                 if(obsType == 'REF' and newSeq == True): # new target, reset startID
                     newSeq = False
                     startID = int(scanID)
+                elif obsType == 'OTF':
+                    seqType = obsType
+                elif obsType == 'SRC' and mode == 'ABS_OBS':
+                    seqType = 'APS'
                 elif(obsType == 'REF'):
                     if(int(scanID) == startID + 1):
                         startID = int(scanID)  # back to back REFs, only use the last one
@@ -89,7 +93,7 @@ def makeSequences(input, output):
         seqNum+=1
         print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
 
- 
+
 def makeFileGlob(startID, endID, bandNum, dirDataIn):
     fileList = []
     for scanID in range(startID, endID+1):
@@ -189,7 +193,7 @@ def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=1800
 
 def getIFinfo(startTime):
     try:
-        data = np.genfromtxt(options.inpath+"IF.txt", delimiter=None, dtype=None, usecols=(0,1,3,5,6,7), encoding=None, names=True)
+        data = np.genfromtxt(options.path+"IF.txt", delimiter=None, dtype=None, usecols=(0,1,3,5,6,7), encoding=None, names=True)
     except Exception as e:
         raise Exception(f"Error reading CSV file: {e}")
 
@@ -218,7 +222,7 @@ def splitConcatenate(array, dim=4):
     return newarray
 
 
-def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, listREF, catName):
+def processFITS(input_files, output_file, bandNum, pointingStream, seqID, seqFlag, listREF, catName):
     with fits.open(input_files[0]) as hdul1:
         nrows1 = hdul1[1].data.shape[0]
         columns = hdul1[1].columns
@@ -384,6 +388,11 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
         header['GON_LON'] = (RAD2DEG*np.mean(pointingStream[:,3]), 'Gondola Longitude (deg)')
         header['GON_LAT'] = (RAD2DEG*np.mean(pointingStream[:,4]), 'Gondola Latitude (deg)')
 
+    results,seqFlag = getInflux(min(UNIXTIME)-86400, max(UNIXTIME)+30, "gonVel", seqFlag)
+    points = results.get_points(measurement='gonVel')
+    for point in points:
+        header['GON_VEL'] = (point['vel'], 'Gondola Velocity to LSR (km/s)')
+        
     info = getIFinfo(np.mean(UNIXTIME))
     header['OBJECT'] = (catName, 'Name of the target object')
     header['IF0'] = (info[0], 'IF Frequency (MHz) of catalog velocity')
@@ -391,11 +400,12 @@ def processFITS(input_files, output_file, bandNum, pointingStream, seqFlag, list
     header['SYNTMULT'] = (MULT[bandNum-1], 'Synthesizer multiplier')
     header['VLSR'] = (info[1], 'Commanded catalog velocity (km/s LSR)')
     
-    # modify some last second items
+    # modify or add some last second items
     now = datetime.now()
     header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
     header['DLEVEL'] = 0.7
     header['VERSION'] = __version__
+    header['SEQ_ID'] = (int(seqID), 'Sequence ID')
     header['SEQ_FLAG'] = seqFlag
     header['COMMENT'] = commit_info
     print("Sequence flag is", seqFlag)
@@ -437,9 +447,9 @@ def scanSequenceFile(input, options):
 
 def processSequence(options, line):
     band = options.band
-    dirUDP = options.inpath + 'udp/'
-    dirDataIn = options.inpath + 'level0.5/'
-    dirDataOut = options.outpath + 'level0.7/'
+    dirUDP = options.path + 'udp/'
+    dirDataIn = options.path + 'level0.5/'
+    dirDataOut = options.path + 'level0.7/'
 
     (seqID, startID, endID, obsType, catName) = line[0:5]
     for bandNum in band:
@@ -449,32 +459,31 @@ def processSequence(options, line):
         if(seqFlag < flags.SeqFlags.NOREFS):  # acceptable, process it
             pointingStream = makeUDP(int(startID), int(endID), dirUDP)
             output_file = dirDataOut+outputPrefix[int(bandNum)-1]+seqID+'_'+startID+'.fits'
-            processFITS(fileList, output_file, int(bandNum), pointingStream, seqFlag, listREF, catName)
+            processFITS(fileList, output_file, int(bandNum), pointingStream, seqID, seqFlag, listREF, catName)
         else:
             # skip it because seqFlag says it's unusable
             print("Sequence", seqID, "NOT OK, flag is", seqFlag)
 
 
 if __name__ == '__main__':
-    p = configargparse.ArgParser(default_config_files=['./L07-config', '~/.L07-config'])
+    p = configargparse.ArgParser(default_config_files=['~/.config.gusto', '../../config.gusto'], ignore_unknown_config_file_keys=True)
     p.add('-c', '--config', required=False, is_config_file=True, help='config file path')
     p.add('-e', '--erase', required=False, action=argparse.BooleanOptionalAction, help='erase contents of output folder before starting')
     p.add('-j', '--cpus', required=False, help='set number of CPUs to use')
     p.add('-b', '--band', required=True, help='GUSTO band range: 1, 2, or 1 2 for both', nargs="+")
-    p.add('-i', '--inpath', required=True, help='path to input udp and level0.5 folders')
-    p.add('-o', '--outpath', required=True, help='path to output Level 0.7 files')
+    p.add('-p', '--path', required=True, help='path to input udp,level0.5, and output level0.7 folders')
     p.add('-s', '--scanid', required=True, help='scanID range', nargs=2)
     options = p.parse_args()
     
     print(options)
     print(p.format_values())    # show where different settings came from
 
-    dirDataOut = options.outpath + 'level0.7/'
-    input = options.outpath + sequencesFile
+    dirDataOut = options.path + 'level0.7/'
+    input = options.path + sequencesFile
     commit_info = runGitLog()  # lookup git commit info only once
     
     if not os.path.exists(input) or os.path.getsize(input) == 0:
-        makeSequences(options.inpath+"dataLog.txt", options.outpath + sequencesFile)
+        makeSequences(options.path+"dataLog.txt", options.path + sequencesFile)
     else:
         print("Sequences file seemingly exists, skipping step...")
 
