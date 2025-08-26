@@ -22,7 +22,6 @@ import re
 import inspect
 import datetime
 import warnings
-import pkg_resources
 import logging
 from enum import Enum, Flag, auto
 from astropy.io import fits

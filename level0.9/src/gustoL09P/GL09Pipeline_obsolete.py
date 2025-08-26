@@ -4,10 +4,12 @@ This is the GUSTO L09 Pipeline.
 """
 
 __date__ = '9/19/2024'
-__updated__ = '20250826'
-__version__ = '0.3.3'
+__updated__ = '20250210'
+__version__ = '0.3.2'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
+from joblib import Parallel, delayed
+from joblib import Memory
 import glob
 import numpy as np
 import numpy.ma as ma
@@ -15,6 +17,7 @@ import time
 import argparse
 import textwrap
 import importlib
+import parsl
 import sys
 import os
 import logging
@@ -101,7 +104,7 @@ def runGL09P(cfi_file=None, verbose=False):
     args = GL09PCLArgParser(verbose=verbose)
     if args.configFile is not None:
         cfi_file = args.configFile
-        
+
     gL09P = GL09PipelineSetupClass()
     status = gL09P.initializePipeline(verbose=verbose, configFile=cfi_file)
     
@@ -208,6 +211,8 @@ def runGL09P(cfi_file=None, verbose=False):
         
     
 
+
+
 def GL09Pipeline(cfi, scanRange, verbose=False):
     """Function processing the Level 0.8 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
@@ -303,7 +308,6 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
             # pxrange = getRange(cfi['gprocs']['ciiprange'], dtype=int)
             # pvrange = getRange(cfi['gprocs']['ciivrange'], dtype=int)
             
-        velorange = np.array(getValues(cfi['gprocs']['velorange']), dtype=float)
         
         params = {'line': line, 'inDir': inDir, 'outDir': outDir, 
                   'drmethod': int(cfi['gprocs']['drmethod']),
@@ -313,10 +317,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                   'rowflagfilter': int(cfi['gprocs']['rowflagfilter']),
                   'addpixelflag': cfi['gprocs']['addpixelflag'],
                   'checkringflag': cfi['gprocs']['checkringflag'],
-                  'applychannelfilter': cfi['gprocs']['applychannelfilter'],
-                  'velorange': velorange,
-                  'perclim': float(cfi['gprocs']['perclim'])}
-        
+                  'applychannelfilter': cfi['gprocs']['applychannelfilter']}
         paramlist = [[a, b] for a in dfiles for b in [params]]
 
         if verbose:
@@ -361,8 +362,6 @@ def processL08(paramlist):
     checkringflag = params['checkringflag']
     rowflagfilter = params['rowflagfilter']
     applychannelfilter = params['applychannelfilter']
-    velorange = params['velorange']
-    perclim = params['perclim']
     # good pixel ranges
     pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
     # ringing check ranges
@@ -405,26 +404,12 @@ def processL08(paramlist):
     # spec.mask[:,pxrange[1]:] = np.bitwise_or(spec.mask[:,pxrange[1]:] ,(1<<7))
     # spec.mask[:,:pxrange[0]+1] = np.bitwise_or(spec.mask[:,:pxrange[0]+1], (1<<7))
 
-    # compute velocity
-    npix    = hdr['NPIX']
-    IF_pix  = hdr['CRPIX1']
-    IF_val  = hdr['CRVAL1']
-    IF_del  = hdr['CDELT1']
-    IF_freq = (np.arange(npix)-IF_pix)*IF_del+IF_val
-    VLSRs    = hdr['VLSR'] 
-    if verbose:
-        print('Line: ', line)
-        print('\ncmd vlsr: %.1f\n'%(VLSRs))
-        print('delta f: ', IF_del)
-    
-    IF_vlsr0= hdr['IF0']
-    line_freq = hdr['LINEFREQ']
-    vlsr    = (IF_vlsr0 - IF_freq)/line_freq*const.c.value/1.e3 + VLSRs # Vlsr in km/s
-    if verbose:
-        print('vlsr min/max: ', vlsr.min(), vlsr.max())
-        print('delta vlsr: ', np.abs(np.diff(vlsr).mean()), np.abs(np.diff(vlsr).min()), np.abs(np.diff(vlsr).max()))
-        print('vlsr[0]: ', vlsr[0])
-    
+       
+    #check if Thot is in hdr
+    if not 'THOT' in hdr:
+        print('GL09Pipeline: THOT keyword not in FITS-header')
+        return 0
+     
     data['CHANNEL_FLAG'][:,pxrange[1]:] = np.bitwise_or(data['CHANNEL_FLAG'][:,pxrange[1]:] ,(1<<7))
     data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<7))
     if applychannelfilter:
@@ -458,13 +443,9 @@ def processL08(paramlist):
     afrac = np.zeros([n_spec,2])
     aTam = np.zeros([n_spec])
     aTrms = np.zeros([n_spec])
-    astd = np.zeros([n_spec])
-    amax = np.zeros([n_spec])
     asscl = np.zeros([n_spec])
     aTa = np.zeros([n_spec,n_pix])
     aTa2 = np.zeros([n_spec,n_pix])
-    anit = np.zeros([n_spec], dtype=int)
-    asucc = np.zeros([n_spec], dtype=bool)
     if drmethod==3:
         aTsyseff_sm = np.zeros([n_spec,n_pix])
         ahcorr_sm = np.zeros([n_spec,n_pix])
@@ -513,7 +494,7 @@ def processL08(paramlist):
         rfsflag += rfsflags*10**k
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
-            print('No Tsys available! Stopped processing of mixer %i in dfile %s'%(mix, dfile), tsys)
+            print('No Tsys available! Stopped processing of mixer %i of dfile %s'%(mix, dfile), tsys)
             # logger.error('No Tsys available! Stop processing mix of dfile ', mix, dfile, tsys)
             # logger.info('Tsys: ', tsys)
             datavalid[k] = False
@@ -528,7 +509,7 @@ def processL08(paramlist):
         #pxs = np.arange(n_pix)
         
         
-        # otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
+        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
         # osel = np.argwhere((otfID == data['scanID']) & (otfID.size>=1) & (rfsID.size>2) & (rhsID.size>2) & (hotID.size>2) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0))
         # 3/8/25: changed this check to exclude the requirement for HOTs since we have sequences without HOT measurements!
         osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & #(hotID.size>=1) & 
@@ -581,21 +562,17 @@ def processL08(paramlist):
         ta.mask = spec.mask
         ta2 = ma.zeros([n_OTF, n_opix])
         ta2.mask = spec.mask
-        nit = np.ones(n_OTF, dtype=int)
-        succ = np.ones(n_OTF, dtype=bool)
         scl = np.ones([n_OTF, n_opix])
         sscl = np.ones(n_OTF)
         tam = np.zeros(n_OTF)
         trms = np.zeros(n_OTF)
-        imax = np.zeros(n_OTF)
-        istd = np.zeros(n_OTF)
         tsyseff = np.zeros([n_OTF, n_opix])
         hcorr = np.zeros([n_OTF, n_opix])
         scorr = np.zeros([n_OTF, n_opix])
         hcoef = np.zeros([n_OTF, 30])
         spref = np.zeros([n_OTF, n_opix])
         spref2 = np.zeros([n_OTF, n_opix])
-        if (drmethod==3)|(drmethod==6):
+        if drmethod==3:
             tsyseff_sm = np.zeros([n_OTF, n_opix])
             hcorr_sm = np.zeros([n_OTF, n_opix])
             spref_sm = np.zeros([n_OTF, n_opix])
@@ -630,7 +607,7 @@ def processL08(paramlist):
         ayfac.append(yfac)
         atsmix.append(mix)
         
-        if (drmethod==3)|(drmethod==6):
+        if drmethod==3:
             # Define the model function
             def scalefunc(params, spec, sRn):
                 model = params['a0']
@@ -750,6 +727,7 @@ def processL08(paramlist):
             elif drmethod==3:
                 
                 sspec = spec_OTF[i0,:]
+                
                 yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0))[0]
                 sRn = seq_hots / yfac[1,:].squeeze()
                 try:
@@ -833,6 +811,7 @@ def processL08(paramlist):
                 if hgroup[i0]-1 >= 1:
                     seq_hots = np.vstack([seq_hots, ghots[hgroup[i0]-1,:]])
                 n_shots = seq_hots.shape[0]
+                
                 yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0))[0]
                 sRn = seq_hots / yfac[1,:].squeeze()
                 try:
@@ -846,8 +825,8 @@ def processL08(paramlist):
                     # Minimize the objective function
                     mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
                     result = mini.minimize()
-                except Exception as e:
-                    print('REF fitting, row %i:'%(i0), e, flush=True)
+                except:
+                    print('Problems with REF fitting for spectrum %i in %s ...'%(i0, dfile), flush=True)
                     data['ROW_FLAG'][i0] |= 1<<24   # flagged as failed fit
                     continue
                     
@@ -858,60 +837,6 @@ def processL08(paramlist):
 
                 ta[i0,:] = 2.*tsyseff[i0,:] * (sspec-sR)/sR
                 trms[i0] = np.std(ta[i0,yvalid])
-            
-            elif drmethod==6:
-                # Volker's method with masking
-                
-                sspec = spec_OTF[i0,:]
-    
-                # before we limited the good values only to be with yfac > 1.0
-                # now, we also limit the velocity range to the range we are interested in: +/- 220 km/s
-                yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0)&(vlsr > velorange[0])&(vlsr < velorange[1]))[0]
-                sRn = seq_hots / yfac[1,:].squeeze()
-                
-                # Create parameters
-                params = lmfit.Parameters()
-                vals = np.zeros(n_shots) + 0.5
-                vals[0] = 0.0
-                for index, value in enumerate(vals):
-                    params.add('a%i'%index, value=vals[index])
-                # Minimize the objective function
-                mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
-                result = mini.minimize(method='least_squares', max_nfev=1000)
-                
-                nit[i0] = result.nfev
-                succ[i0] = result.success
-                sR = getsRf(result.params, sRn)
-    
-                # now we calculate Ta intermittently
-                ita = 2.*tsyseff[i0,:] * (sspec-sR)/sR
-                istd[i0] = np.std(ita[(vlsr > velorange[0])&(vlsr < velorange[1])])
-                sita = ita[(vlsr > velorange[0])&(vlsr < velorange[1])].filled(np.nan)
-                imax[i0] = np.nanpercentile(sita, perclim).max()
-                
-                yvalid = np.nonzero((yfac[1,:].squeeze() > 1.0)&(vlsr > velorange[0])&(vlsr < velorange[1])&(sspec<imax[i0]))[0]
-                sRn = seq_hots / yfac[1,:].squeeze()
-                
-                # Create parameters
-                params = lmfit.Parameters()
-                vals = np.zeros(n_shots) + 0.5
-                vals[0] = 0.0
-                for index, value in enumerate(vals):
-                    params.add('a%i'%index, value=vals[index])
-                # Minimize the objective function
-                mini = lmfit.Minimizer(scalefunc, params, fcn_args=(sspec[yvalid], sRn[:,yvalid]))
-                result = mini.minimize(method='least_squares', max_nfev=1000)
-                
-                nit[i0] = result.nfev
-                succ[i0] = result.success
-                sR = getsRf(result.params, sRn)
-                
-                spref[i0,:] = sR 
-                hcoef[i0,:n_shots] = np.array(list(result.params.valuesdict().values()))
-    
-                ta[i0,:] = 2.*tsyseff[i0,:] * (sspec-sR)/sR
-                trms[i0] = np.std(ta[i0,yvalid])
-
 
 
 
@@ -931,10 +856,6 @@ def processL08(paramlist):
         aTa[osel,:] = ta
         aTam[osel] = tam
         aTrms[osel] = trms
-        astd[osel] = istd
-        amax[osel] = imax
-        anit[osel] = nit
-        asucc[osel] = succ
         asscl[osel] = sscl
         aspref2[osel,:] = spref2
         aTa2[osel,:] = ta2

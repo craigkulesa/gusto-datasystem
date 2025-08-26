@@ -29,7 +29,7 @@ import math
 import inspect
 import datetime
 import warnings
-import pkg_resources
+import importlib
 warnings.filterwarnings('ignore')
 import logging
 log = logging.getLogger(__name__)
@@ -63,7 +63,8 @@ class GL09PParameters:
 
         
         if parfile is None:
-            ifile = pkg_resources.resource_filename('gustoL1', 'Data/GUSTO_Baseline_Data_draft2.xlsx')
+            ifile = importlib.resources.files('gustoL09P') / 'Data/GUSTO_Baseline_Data_draft2.xlsx'
+
         else:
             ifile = parfile
         self.padd('__parfile__', ifile, '', 'file containing parameters')

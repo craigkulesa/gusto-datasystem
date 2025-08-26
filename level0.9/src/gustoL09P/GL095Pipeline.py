@@ -8,13 +8,10 @@ __updated__ = '20241212'
 __version__ = '0.1'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
-from joblib import Parallel, delayed
-from joblib import Memory
 import glob
 import numpy as np
 import time
 import pkg_resources
-import parsl
 import sys
 import os
 import logging

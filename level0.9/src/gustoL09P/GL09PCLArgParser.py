@@ -27,7 +27,6 @@ def GL09PCLArgParser(verbose=False):
     --------
     """
     
-    
     parser = argparse.ArgumentParser(
         prog='execGL09P',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -39,34 +38,36 @@ def GL09PCLArgParser(verbose=False):
                 I want it
             '''),
         epilog='')
-    parser.add_argument('--configFile', '-c', nargs='?', type=str,
+    parser.add_argument('-c', '--configFile', nargs='?', type=str,
                         default=cfg_file0,
                         help='GUSTO L1 Pipeline configuration file. This file contains the data directories, etc.')
-    parser.add_argument('--startLevel', '-s', nargs='?', type=str,
+    parser.add_argument('-s', '--startLevel', nargs='?', type=str,
                         default='0.8',
                         help='GUSTO Data Level the pipeline should start processing (default=0.8); \npossible entries are 0.8, 0.9 and 0.95')
     parser.add_argument('--lines', nargs='?', type=str,
                         action='store',
                         help="Line(s) to be processed: either 'CII' or 'NII', 'CII NII'")
-    parser.add_argument('--endLevel', '-e', nargs='?', type=str,
+    parser.add_argument('-e', '--endLevel', nargs='?', type=str,
                         default='0.9',
                         help='GUSTO Data Level produced by pipeline (default=1.0); possible entries are 0.9 and 1.0')
-    parser.add_argument('--scanRange', '-r', nargs=2, type=int,
+    parser.add_argument('-r', '--scanRange', nargs=2, type=int,
                         default=[2000, 30000],
                         help='Range of scans to be processed by pipeline.')
-    parser.add_argument('--loglevel', '-l', type=str,
+    parser.add_argument('-l', '--loglevel', type=str,
                         #default='INFO',
                         help='sets the log level of the {tpipe}')
-    parser.add_argument('--calmethod', '-m', nargs='?', type=int,
+    parser.add_argument('-m', '--calmethod', nargs='?', type=int,
                         #default='2',
                         help='select GUSTO spectrum calibration method')
-    parser.add_argument('--applychannelfilter', '-ac', action=argparse.BooleanOptionalAction,
+    parser.add_argument('-ac', '--applychannelfilter', action=argparse.BooleanOptionalAction,
                         help='apply channel filter when calibrating spectra')
-    parser.add_argument('--verbose', '-v', action=argparse.BooleanOptionalAction,
+    parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction,
                         help='sets verbosity of the {tpipe}')
-    parser.add_argument('--debug', '-d', action=argparse.BooleanOptionalAction,
+    parser.add_argument('-d', '--debug', action=argparse.BooleanOptionalAction,
                         help='sets settings for debugging pipeline')
+    
     args = parser.parse_args()
+    
     if verbose:
         print('commandline arguments:\n', args, '\n')
         print('configFile: ', args.configFile)

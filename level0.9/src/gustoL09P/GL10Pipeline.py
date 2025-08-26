@@ -4,17 +4,14 @@ This is the executable for the GUSTO L2 Pipeline.
 """
 
 __date__ = '6/17/2025'
-__updated__ = '20240617'
-__version__ = '0.2'
+__updated__ = '20250826'
+__version__ = '0.3.3'
 __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 
-from joblib import Parallel, delayed
-from joblib import Memory
 import glob
 import numpy as np
 import time
-import pkg_resources
-import parsl
+import importlib
 import sys
 import os
 import logging
@@ -43,7 +40,7 @@ from .GL09PLogger import *
 import logging
 log = logging.getLogger(__name__)
 
-offsetsfile0 = pkg_resources.resource_filename('gustoL09P', 'Data/offsets.txt')
+offsetsfile0 = importlib.resources.files('gustoL09P') / 'Data/offsets.txt'
 
 
 def GL10Pipeline(cfi, scanRange, verbose=False):

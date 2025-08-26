@@ -275,8 +275,7 @@ class GL09PipelineSetupClass:
         if not os.path.isdir(configPath):
             if self.configFile is not None:
                 # check if the file is in the module data directory
-                self.configFile = pkg_resources.resource_filename(
-                        'gustoL09P', os.path.join('Data',self.configFile))
+                self.configFile = importlib.resources.files('gustoL09P') / os.path.join('Data',self.configFile)
             else:
                 print(
                     'Error: GUSTO configuration directory does not exist: %s \n' % (configPath))
