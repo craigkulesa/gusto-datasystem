@@ -276,13 +276,16 @@ def processL10(params, verbose=True):
     hdr.set('CRPIX1', value=0.000, comment=(''))
     hdr.set('CRVAL1', value=vlsr[0], comment=(''))
     hdr.set('CDELT1', value=np.diff(vlsr).mean(), comment=(''))
+    hdr.set('CTYPE1', value='VOPT', comment=(''))
+    
     hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
     hdr.set('CRVAL2', value=(data['ra'][osel[0]]*u.deg).value, comment=(''), after='CDELT1')
     hdr.set('CRPIX2', value=0, comment=(''), after='CDELT1')
     hdr.set('CUNIT2', value='deg', comment=(''), after='CDELT1')
     hdr.set('CTYPE2', value='RA---GLS', comment=(''), after='CDELT1')
+    
     hdr.set('CDELT3', value=0.000000001, comment=(''), after='CDELT2')
-    hdr.set('CRVAL3', value=(data['dec'][osel[0]]*u.deg).value, comment=('CDELT2'))
+    hdr.set('CRVAL3', value=(data['dec'][osel[0]]*u.deg).value, comment=(''), after='CDELT2')
     hdr.set('CRPIX3', value=0, comment=(''), after='CDELT2')
     hdr.set('CUNIT3', value='deg', comment=(''), after='CDELT2')
     hdr.set('CTYPE3', value='DEC--GLS', comment=(''), after='CDELT2')
