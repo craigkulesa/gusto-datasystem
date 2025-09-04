@@ -14,7 +14,6 @@ import sys
 import importlib
 from os.path import expanduser, expandvars
 from datetime import datetime
-# import pkg_resources
 import importlib
 from pprint import pprint
 import numpy as np

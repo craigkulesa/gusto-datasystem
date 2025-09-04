@@ -11,7 +11,6 @@ __author__ = 'V. Tolls, CfA | Harvard & Smithsonian'
 import glob
 import numpy as np
 import time
-import pkg_resources
 import sys
 import os
 import logging

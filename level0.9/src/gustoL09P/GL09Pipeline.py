@@ -59,7 +59,6 @@ cfg_file0 = importlib.resources.files('gustoL09P') / 'Data/GL09P_setup_pars.txt'
 par_file0 = importlib.resources.files('gustoL09P') / 'Data/GUSTO_BaselineData_draft3.xlsx'
 pmfileB1 = importlib.resources.files('gustoL09P') / 'Data/ACS5_B1_pixel_masks.txt'
 pmfileB2 = importlib.resources.files('gustoL09P') / 'Data/ACS3_B2_pixel_masks.txt'
-#cii_file0 = pkg_resources.resource_filename('gustoL09P', 'Data/CIIconfig.txt')
 
 tpipe = 'GUSTO L1 Pipeline'
 
