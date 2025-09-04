@@ -23,7 +23,7 @@ import inspect
 import datetime
 import warnings
 import logging
-from enum import Enum, Flag, auto
+from enum import Enum, IntFlag, Flag, auto
 from astropy.io import fits
 from tqdm import tqdm
 from scipy.signal import savgol_filter
@@ -820,4 +820,29 @@ def anaFlagString(aa):
     else:
         aa = aa.replace("|","")
         return string_to_enum_combination(aa)
+
+
+def get_flag_names(flag_value, enum_type):
+    """Function that returns a list of flag names that compose the given value.
+
+    Parameters
+    ----------
+    flagvalue : int 
+            rowflagfilter integer
+    enum_type : class
+            enum flag class
+
+    Returns
+    -------
+    List with set flag names.
+
+    """
+    if not isinstance(flag_value, enum_type):
+        flag_value = enum_type(flag_value)
+
+    names = []
+    for member in enum_type:
+        if member.value & flag_value.value:
+            names.append(member.name)
+    return names
 

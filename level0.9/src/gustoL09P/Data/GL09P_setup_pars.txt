@@ -78,8 +78,11 @@ loglevel = INFO
 addpixelflag = True
 
 # rowflag filter value: int or string of RowFlag
+# the flags listed below are allowed flags (aka., good data)
+# see file flagdefs.py for flags
 # e.g.: 'RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_UNPUMPED'
-rowflagfilter: "RowFlags.MIXER_MISPUMPED | RowFlags.UNSTABLE_POINTING | RowFlags.MISSING_INT | RowFlags.PROCESSOR_ERROR | RowFlags.DAC_CAL_FIXED"
+# rowflagfilter: "RowFlags.MIXER_MISPUMPED | RowFlags.UNSTABLE_POINTING | RowFlags.MISSING_INT | RowFlags.PROCESSOR_ERROR | RowFlags.DAC_CAL_FIXED"
+rowflagfilter: 'RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_MISPUMPED | RowFlags.MIXER_UNPUMPED | RowFlags.MIXERCURRENT_MISMATCH | RowFlags.DAC_CAL_FIXED | RowFlags.DAC_CAL_FAKED'
 
 #
 applychannelfilter: True

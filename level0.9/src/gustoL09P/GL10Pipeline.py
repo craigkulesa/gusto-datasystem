@@ -129,7 +129,8 @@ def GL10Pipeline(cfi, scanRange, verbose=False):
             n_ds = int(cfi['gprocs']['max_files'])
             dfiles = dfiles[:n_ds]
                     
-        paramlist = [[a, b, c, d, e, f] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [offs] for f in [bool(cfi['gprocs']['debug'])]]
+        rowflagfilter = int(cfi['gprocs']['rowflagfilter'])
+        paramlist = [[a, b, c, d, e, f, g] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in [offs] for f in [bool(cfi['gprocs']['debug'])] for g in [rowflagfilter]]
         # paramlist = [[a, b, c, d, e] for a in [line] for b in [inDir] for c in [outDir] for d in dfiles for e in worker_configurer]
         #print(paramlist)
         if verbose:
@@ -163,6 +164,7 @@ def processL10(params, verbose=True):
     
     #loadL08Data(dfile, verbose=True)
     line, inDir, outDir, dfile, offsets, debug = params[0], params[1], params[2], params[3], params[4], params[5]
+    rowflagfilter = params[6]
     
     # define some processing data first (maybe relocat to function later?)
 
@@ -196,8 +198,9 @@ def processL10(params, verbose=True):
     #     datavalid = False
     #     return 0
 
-    osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
-    
+    #osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
+    rowflag = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
+    osel = np.argwhere((data['scan_type'] == 'OTF') & (rowflag))
     umixers = np.unique(data['MIXER'])
     
     
@@ -212,7 +215,8 @@ def processL10(params, verbose=True):
         azoff = mxoffs['az'][i]
         eloff = mxoffs['el'][i]
         
-        msel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0) & (data['MIXER']==mix)).flatten()
+        # msel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0) & (data['MIXER']==mix)).flatten()
+        msel = np.argwhere((data['scan_type'] == 'OTF') & (rowflag) & (data['MIXER']==mix)).flatten()
         if msel.size > 0:
             ras = data['RA'][msel]
             decs = data['DEC'][msel]
@@ -279,13 +283,13 @@ def processL10(params, verbose=True):
     hdr.set('CTYPE1', value='VOPT', comment=(''))
     
     hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
-    hdr.set('CRVAL2', value=(data['ra'][osel[0]]*u.deg).value, comment=(''), after='CDELT1')
+    hdr.set('CRVAL2', value=float((data['ra'][osel[0]]*u.deg).value), comment=(''), after='CDELT1')
     hdr.set('CRPIX2', value=0, comment=(''), after='CDELT1')
     hdr.set('CUNIT2', value='deg', comment=(''), after='CDELT1')
     hdr.set('CTYPE2', value='RA---GLS', comment=(''), after='CDELT1')
     
     hdr.set('CDELT3', value=0.000000001, comment=(''), after='CDELT2')
-    hdr.set('CRVAL3', value=(data['dec'][osel[0]]*u.deg).value, comment=(''), after='CDELT2')
+    hdr.set('CRVAL3', value=float((data['dec'][osel[0]]*u.deg).value), comment=(''), after='CDELT2')
     hdr.set('CRPIX3', value=0, comment=(''), after='CDELT2')
     hdr.set('CUNIT3', value='deg', comment=(''), after='CDELT2')
     hdr.set('CTYPE3', value='DEC--GLS', comment=(''), after='CDELT2')

@@ -494,7 +494,8 @@ def processL08(paramlist):
                 (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(rflag[msel])
                 # (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(data['ROW_FLAG'][msel]==rowflagfilter)
         if not check:
-            print('mix, dfile')
+            print('File: ', dfile)
+            print('mixer: ', mix)
             print('check: ', check)
             print('specs: ', spec.shape)
             print('REFs: ', np.argwhere(data['scan_type']=='REF').size, (np.argwhere(data['scan_type']=='REF').size > 3))
@@ -503,7 +504,9 @@ def processL08(paramlist):
             print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size, (np.argwhere(data['scan_type']=='OTF').size > 5))
             print('other: ', (otfID.size>0), (rfsID.size>0), (rhsID.size>0), (hotID.size>0))
             print('IDs: ', otfID, rfsID, rhsID, hotID)
+            #print('msel: ', msel)
             print('rowflagfilter: ', rowflagfilter, np.any(checkRowflag(data['ROW_FLAG'][msel], rowflagfilter=rowflagfilter)))
+            print(np.unique(data['ROW_FLAG'][msel]))
             print('GL09Pipeline: Not enough data available for processing. ROW_FLAGs are set appropriately. ')
             data['ROW_FLAG'][msel] |= 4   # flagged as missing data
             datavalid[k] = False
@@ -560,7 +563,7 @@ def processL08(paramlist):
             # print('mixer: ', mix)
             #print(k, mix, umixers)
             datavalid[k] = False
-            data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
+            data['ROW_FLAG'][msel] |= anaFlagString('RowFlags.UNABLE_TO_PROCESS')   # flagged as missing data
             continue
 
         spec_OTF = np.squeeze(spec[osel,:])
@@ -609,7 +612,7 @@ def processL08(paramlist):
         ahgroup, ghots, ghtim, ghtint, glast, htflag = getHotInfo(spec, data, mix, dfile=dfile, rowflagfilter=rowflagfilter, verbose=True)
         if type(ahgroup)==type(0):
             print('Encountered problem with HOT groups. Flaging rows.')
-            data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
+            data['ROW_FLAG'][msel] |= anaFlagString('RowFlags.UNABLE_TO_PROCESS')   # flagged as 'UNABLE_TO_PROCESS'
             continue
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
@@ -622,7 +625,7 @@ def processL08(paramlist):
             aghmix.append(np.zeros(n_ghots)+mix)
         else:
             print('No hots available...')
-            data['ROW_FLAG'][msel] |= 1<<19   # flagged as missing data
+            data['ROW_FLAG'][msel] |= anaFlagString('RowFlags.UNABLE_TO_PROCESS')   # flagged as 'UNABLE_TO_PROCESS'
             continue
         
 
@@ -765,7 +768,7 @@ def processL08(paramlist):
                     result = mini.minimize()
                 except:
                     print('Problems with REF fitting for spectrum %i in %s ...'%(i0, dfile), flush=True)
-                    data['ROW_FLAG'][i0] |= 1<<24   # flagged as failed fit
+                    data['ROW_FLAG'][i0] |= anaFlagString('RowFlags.UNABLE_TO_PROCESS')   # flagged as 'UNABLE_TO_PROCESS'
                     continue
                     
 
@@ -848,7 +851,7 @@ def processL08(paramlist):
                     result = mini.minimize()
                 except Exception as e:
                     print('REF fitting, row %i:'%(i0), e, flush=True)
-                    data['ROW_FLAG'][i0] |= 1<<24   # flagged as failed fit
+                    data['ROW_FLAG'][i0] |= anaFlagString('RowFlags.UNABLE_TO_PROCESS')   # flagged as 'UNABLE_TO_PROCESS'
                     continue
                     
 
@@ -976,11 +979,11 @@ def processL08(paramlist):
                 var[i] = np.abs((np.nanmax(tsp) - np.nanmin(tsp)) / np.nanmean(tsp))
                 if (np.abs(var[i]) >= vcut):
                     if checkringflag:
-                        data['ROW_FLAG'][i] |= (1 << 14) # set bit 14
+                        data['ROW_FLAG'][i] |= anaFlagString('RowFlags.RINGING_BIT0') # set bit 14
             else:
                 var[i] = 9999
                 if checkringflag:
-                    data['ROW_FLAG'][i] |= (1 << 13)   # set bit 13
+                    data['ROW_FLAG'][i] |= anaFlagString('RowFlags.UNABLE_TO_PROCESS')   # set bit 13
         else:
             var[i] = 0.0
         # if debug:
