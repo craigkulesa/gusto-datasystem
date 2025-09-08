@@ -181,17 +181,6 @@ def processL09(paramlist, verbose=True):
     
     # define some processing data first (maybe relocat to function later?)
 
-    if 'ACS3' in dfile:
-        # line: CII
-        pixel_cut = 600
-        band = 2
-        add = 'B2'
-    else:
-        # line: NII
-        pixel_cut = 300
-        band = 1
-        add = 'B1'
-
     # values needed for baseline correction 
     # will be moved to config file eventually
     bs_lam = 5e4
@@ -206,6 +195,17 @@ def processL09(paramlist, verbose=True):
     chFlag = data['CHANNEL_FLAG']
     rowFlag = data['ROW_FLAG']
     rflag = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
+
+    if hdr['LINE'] == 'CII':
+        # line: CII
+        pixel_cut = 600
+        band = 2
+        add = 'B2'
+    else:
+        # line: NII
+        pixel_cut = 300
+        band = 1
+        add = 'B1'
     
     n_spec, n_pix = spec.shape
     
@@ -261,11 +261,12 @@ def processL09(paramlist, verbose=True):
             if basemethod == 0:
                 # no baseline fit!
                 basecorr[i0,:] = np.zeros(basecorr[i0,:].size)
+                cbmethod = 'none'
             elif basemethod == 1:
                 # polynomial fitter
                 
                 try:
-                    z = np.polyfit(xx, yy, deg=3)
+                    z = np.polyfit(xx, yy, deg=polyorder)
                     ip4n = np.poly1d(z)
                     std = np.std(yy - ip4n(xx))
                     #print('%4i, %7.3f %7.3f %7.3f'%(ch, std, np.min(psp - ip4n(pxx)), np.max(psp - ip4n(pxx))))
@@ -275,7 +276,7 @@ def processL09(paramlist, verbose=True):
                     traceback.print_exc()                    
                     print('Polyfit not possible for spec # %i in file %s'%(i0, dfile))
                 basecorr[i0,prange[0]:prange[1]] = ip4n(xxwn)   #bswn
-                
+                cbmethod = 'polynomial'
                 pass
             elif basemethod == 2:
                 baseline_fitter = Baseline(x_data=xx)
@@ -288,10 +289,12 @@ def processL09(paramlist, verbose=True):
                 # bswn[:] = np.nan
                 # bswn[np.squeeze(fsel)] = bs
                 basecorr[i0,prange[0]:prange[1]] = bs   #bswn
+                cbmethod = 'aspls'
             else:
                 print('Error: Baseline fitting method %i does not exist. \n')
                 print('Treated as no baseline fit.')
                 basecorr[i0,:] = np.zeros(basecorr[i0,:].size)
+                cbmethod = 'none_err'
             
             spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
     
@@ -334,15 +337,20 @@ def processL09(paramlist, verbose=True):
     hdr.set('', value='', after='RHID2')
     hdr.set('', value='          Level 0.95 Pipeline Processing', after='RHID2')
     hdr.set('', value='', after='RHID2')
-    hdr.set('bs_lam', value=bs_lam, comment='lambda value for ASPLS baseline correction')
-    hdr.set('bs_lam2', value=bs_lam2, comment='lambda value for arplsw rms baseline correction')
-    hdr.set('bs_ratio', value=bs_ratio, comment='ratio value for arplsw rms baseline correction')
-    hdr.set('bs_iterm', value=bs_itermax, comment='max. iterations value for arplsw rms baseline correction')
+    hdr.set('BASEMETH', value=basemethod, comment='Baseline method index')
+    if basemethod==1:
+        hdr.set('polyord', value=polyorder, comment='Order of baseline polynomial')
+    if basemethod==2:
+        hdr.set('bs_lam', value=bs_lam, comment='lambda value for ASPLS baseline correction')
+        hdr.set('bs_lam2', value=bs_lam2, comment='lambda value for arplsw rms baseline correction')
+        hdr.set('bs_ratio', value=bs_ratio, comment='ratio value for arplsw rms baseline correction')
+        #hdr.set('bs_iterm', value=bs_itermax, comment='max. iterations value for arplsw rms baseline correction')
+    hdr.set('BASENAME', value=cbmethod, comment='Baseline method applied')
     hdr.add_comment('L0.95 processing time: %s'%(tred))
     hdr.add_comment('L0.95 version: %s'%(__version__))
     hdr.add_comment('L0.95 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.95 developer: %s'%(__author__))
-    hdr.set('', value='', after='BS_ITERM')
+    hdr.set('', value='', after='BASENAME')
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L09.fits','_L095.fits'))

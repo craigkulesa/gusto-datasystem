@@ -313,7 +313,7 @@ def GL09Pipeline(cfi, scanRange, verbose=False):
                   'addpixelflag': cfi['gprocs']['addpixelflag'],
                   'checkringflag': cfi['gprocs']['checkringflag'],
                   'applychannelfilter': cfi['gprocs']['applychannelfilter'],
-                  'velorange': velorange,
+                  'velorange': velorange, 'usepixelflag': cfi['gprocs']['usepixelflag'],
                   'perclim': float(cfi['gprocs']['perclim'])}
         
         paramlist = [[a, b] for a in dfiles for b in [params]]
@@ -362,6 +362,7 @@ def processL08(paramlist):
     applychannelfilter = params['applychannelfilter']
     velorange = params['velorange']
     perclim = params['perclim']
+    usepixelflag = params['usepixelflag']
     # good pixel ranges
     pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))
     # ringing check ranges

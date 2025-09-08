@@ -815,9 +815,10 @@ def anaFlagString(aa):
     #<RowFlags.NO_HK|MISSING_INT|MIXER_UNPUMPED: 84> <flag 'RowFlags'>
     
     """
-    if aa.isnumeric():
+    try:
+        aa = int(aa)
         return RowFlags(int(aa))
-    else:
+    except:
         aa = aa.replace("|","")
         return string_to_enum_combination(aa)
 
