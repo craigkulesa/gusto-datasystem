@@ -25,16 +25,16 @@ class RowFlags(IntFlag):
     DAC_CAL_FAKED = 1 << 30
 
 class ChanFlags(IntFlag):
-    BADCHAN = auto()
+    BADCHAN = auto()                 # 1
     INTERPOLATED = auto()
     BADCAL = auto()
     SPUR_CANDIDATE = auto()
-    SPUR = auto()
+    SPUR = auto()                    # 5
     FRINGE = auto()
     LINE = auto()
     VARIABLE_SPUR = auto()
     OOB = auto()
-    WINDOW = auto()
+    WINDOW = auto()                  # 10
     IGNORE = auto()
 
 class SeqFlags(IntFlag):

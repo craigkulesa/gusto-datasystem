@@ -425,8 +425,9 @@ def processL08(paramlist):
         print('delta vlsr: ', np.abs(np.diff(vlsr).mean()), np.abs(np.diff(vlsr).min()), np.abs(np.diff(vlsr).max()))
         print('vlsr[0]: ', vlsr[0])
     
-    data['CHANNEL_FLAG'][:,pxrange[1]:] = np.bitwise_or(data['CHANNEL_FLAG'][:,pxrange[1]:] ,(1<<7))
-    data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<7))
+    # changed 9/8/2025: channel_flag was changed to 1 for bad data
+    data['CHANNEL_FLAG'][:,pxrange[1]:] = np.bitwise_or(data['CHANNEL_FLAG'][:,pxrange[1]:] ,(1<<0))
+    data['CHANNEL_FLAG'][:,:pxrange[0]+1] = np.bitwise_or(data['CHANNEL_FLAG'][:,:pxrange[0]+1], (1<<0))
     if applychannelfilter:
         if debug:
             fadd += '_ac'

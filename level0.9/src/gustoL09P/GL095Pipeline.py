@@ -195,6 +195,12 @@ def processL09(paramlist, verbose=True):
     chFlag = data['CHANNEL_FLAG']
     rowFlag = data['ROW_FLAG']
     rflag = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
+    
+    if 'rms' not in data.names:
+        dsh = data['DATA'].shape
+        rms_col = fits.ColDefs([fits.Column(name='rms', format='E', array=np.zeros(dsh[0]))])
+        hdu = fits.BinTableHDU.from_columns(data.columns + rms_col)
+        data = hdu.data
 
     if hdr['LINE'] == 'CII':
         # line: CII
@@ -233,6 +239,8 @@ def processL09(paramlist, verbose=True):
     basecorr = np.zeros(spec_OTF.shape)
     rmsotf = np.zeros(n_OTF)
     rf = np.zeros(n_OTF)
+    
+    aa = np.nanmean(spec_OTF[59,prange[0]:prange[1]])
     
     # print('processing data ...')
     # create the calibrated spectra
@@ -297,7 +305,7 @@ def processL09(paramlist, verbose=True):
                 cbmethod = 'none_err'
             
             spec_OTF[i0,prange[0]:prange[1]] -= basecorr[i0,prange[0]:prange[1]]
-    
+
         else:
             # we have to set the rowflag since no valid data
             rf[i0] = 9
@@ -310,21 +318,23 @@ def processL09(paramlist, verbose=True):
     elif 'DATA' in keys:
         dkey = 'DATA'
         
+    bb = np.nanmean(spec_OTF[59,prange[0]:prange[1]])
+     
     data[dkey][osel,:] = spec_OTF.data
+    cc = np.nanmean(data['DATA'][59,prange[0]:prange[1]])
     data['CHANNEL_FLAG'][osel,:] = spec_OTF.mask
     data['ROW_FLAG'][osel] = rf
     rms[osel] = rmsotf
     basecorrf[osel,:] = basecorr
     
     # add the rms column to the data array
-    if 'rms' not in data.names:
-        rms_col = fits.ColDefs([fits.Column(name='rms', format='E', array=rms)])
-        hdu = fits.BinTableHDU.from_columns(data.columns + rms_col)
-        data = hdu.data
-    else:
-        data['rms'] = rms
+    data['rms'] = rms
+        
+    dd = np.nanmean(data['DATA'][59,prange[0]:prange[1]])
+    print('checks: ', aa, bb, cc, dd)
         
     tred = Time(datetime.datetime.now()).fits
+    
     
     # updating header keywords
     hdr['DLEVEL'] = 0.95
@@ -351,6 +361,7 @@ def processL09(paramlist, verbose=True):
     hdr.add_comment('L0.95 last pipeline update: %s'%(__updated__))
     hdr.add_comment('L0.95 developer: %s'%(__author__))
     hdr.set('', value='', after='BASENAME')
+
     
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L09.fits','_L095.fits'))
