@@ -1,5 +1,0 @@
-path = /home/obs/data/GUSTO/
-L09path = /home/obs/data/GUSTO/level0.9
-band = [1, 2]
-cpus = 2
-scanid = [9523, 9523]

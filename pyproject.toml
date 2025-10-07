@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=62.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "GUSTO_Pipeline"
+version = "0.7.9"
+description = "GUSTO Pipeline package"
+authors = [{name="vtcloud"}, {name="craigkulesa"}]
+license = {file = "LICENSE"}
+readme = "README.rst"
+requires-python = ">=3.9"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ['GUSTO_Pipeline']
+
+[tool.setuptools.package-data]
+"*" = ["*.dat", "*.txt", "config.gusto"]
+
+[project.scripts]
+runGUSTO = "GUSTO_Pipeline.Pipeline:runGUSTO"
+
+[project.urls]
+"Homepage" = "https://github.com/craigkulesa/gusto-datasystem"
+"Bug Tracker" = "https://github.com/craigkulesa/gusto-datasystem/issues"

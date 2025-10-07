@@ -1,0 +1,2 @@
+[console_scripts]
+runGUSTO = Pipeline:runGUSTO

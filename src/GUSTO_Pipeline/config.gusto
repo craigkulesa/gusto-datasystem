@@ -1,0 +1,11 @@
+path = /home/obs/data/GUSTO/
+band = [1, 2]
+cpus = 1
+scanid = [9523, 9523]
+level = 0.9
+polyorder = 3
+rowflagfilter = 0
+loglevel = 0
+calmethod = cal_scaledGainHOTs
+despurmethod = polyRes
+spurchannelfilter = False

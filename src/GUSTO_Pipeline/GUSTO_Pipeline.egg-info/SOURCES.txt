@@ -1,0 +1,8 @@
+LICENSE
+README.rst
+pyproject.toml
+src/GUSTO_Pipeline.egg-info/PKG-INFO
+src/GUSTO_Pipeline.egg-info/SOURCES.txt
+src/GUSTO_Pipeline.egg-info/dependency_links.txt
+src/GUSTO_Pipeline.egg-info/entry_points.txt
+src/GUSTO_Pipeline.egg-info/top_level.txt
