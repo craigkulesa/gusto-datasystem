@@ -2,9 +2,6 @@
 """
 This is the GUSTO L09 Pipeline.
 """
-
-__updated__ = '20251003'
-
 import glob
 import numpy as np
 import numpy.ma as ma
@@ -26,7 +23,6 @@ from .Logger import *
 from .Configuration import *
 from .flagdefs import *
 
-commit_info = ''
 
 def runGitLog():
     try:
@@ -34,6 +30,19 @@ def runGitLog():
         return result.stdout
     except subprocess.CalledProcessError as e:
         return f"Error: {e}"
+
+
+def clear_folder(folder_path):
+    print('Erasing contents of '+folder_path)
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}. Reason: {e}")
 
     
 def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
@@ -57,6 +66,7 @@ def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=
     # save spectra to FITS file
         
 def L09_Pipeline(args, scanRange, verbose=False):
+    global commit_info
     """Function processing the Level 0.8 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
     """
@@ -84,6 +94,8 @@ def L09_Pipeline(args, scanRange, verbose=False):
     inDir = args.path + 'level0.8/'
     outDir = args.path + 'level0.9/'
     os.makedirs(outDir, exist_ok=True)
+    if args.erase:
+        clear_folder(outDir)
 
     commit_info = runGitLog()
     
@@ -221,6 +233,7 @@ def processL08(paramlist):
     """Function processing the Level 0.8 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
     """
+    global commit_info
     TSKY = [33, 45]
     dfile = paramlist[0]
     params = paramlist[1]
@@ -342,12 +355,11 @@ def processL08(paramlist):
     hdr.set('', value='          Level 0.9 Pipeline Processing', after='VLSR')
     hdr.set('', value='', after='VLSR')
     hdr.add_comment('L0.9 processing time: %s'%(tred))
-    hdr.add_comment('L0.9 code update date: %s'%(__updated__))
     hdr.add_comment(commit_info)
     hdr.set('', value='', after='calmethd')
     
     os.makedirs(outDir, exist_ok=True)
-    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('.fits','_L09.fits'))
+    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L08.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=data, header=hdr1)
     

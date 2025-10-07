@@ -14,7 +14,6 @@ from functools import partial
 import subprocess
 from .flagdefs import *
 
-commit_info = ''
 
 def clear_folder(folder_path):
     print('Erasing contents of '+folder_path)
@@ -60,23 +59,18 @@ def makeFileGlob(path, options):
         fileList.append(glob.glob(path+'/*.fits'))
     else:
         for scanID in range(int(options.scanid[0]), int(options.scanid[1])+1):
-            fileList.append(glob.glob(path+'/*_*_'+str(scanID).zfill(5)+'.fits'))
+            fileList.append(glob.glob(path+'/*_*_'+str(scanID).zfill(5)+'_L07.fits'))
     return(flatten(fileList))
 
 
-def L08_Pipeline(args):   
+def L08_Pipeline(args):
+    global commit_info
     dirDataOut = args.path+'level0.8/'
     os.makedirs(dirDataOut, exist_ok=True)
     if args.erase:
         clear_folder(dirDataOut)
 
-    if args.update == True:  # update within level 0.8 directory
-        path = dirDataOut
-        print("Using level 0.8 folder for input and updating files in place")
-    else: # read from level 0.7 directory
-        path = args.path+'level0.7'
-        print("Using level 0.7 folder for input and creating new level 0.8 files")
-
+    path = args.path+'level0.7'
     files = makeFileGlob(path, args)
     commit_info = runGitLog()  # do this only once 
     
@@ -91,11 +85,9 @@ def L08_Pipeline(args):
     
 
 def doStuff(scan, options):
+    global commit_info
     # open fits file, header, then data
-    if options.update == True:
-        hdu    = fits.open(scan, mode='update')
-    else:
-        hdu    = fits.open(scan)
+    hdu    = fits.open(scan)
     header = hdu[0].header
     npix   = header['NPIX']
     line   = header['LINE']
@@ -187,11 +179,8 @@ def doStuff(scan, options):
     header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
     header['COMMENT'] = commit_info
     
-    # Write the changes back to fits in update mode or as new file
-    if(options.update == True):
-        hdu.flush()
-    else:
-        hdu.writeto(scan.replace("level0.7", "level0.8"), overwrite=True)
+    # Write the changes back to fits as new file
+    hdu.writeto(scan.replace("level0.7", "level0.8").replace("L07", "L08"), overwrite=True)
     return None
 
 

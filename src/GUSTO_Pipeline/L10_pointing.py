@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """
-This is the executable for the GUSTO L2 Pipeline.
+This is the source file for the GUSTO L1.0 Pipeline step which corrects the per-pixel
+pointing and converts the frequency axis to Doppler velocity in the LSR frame of reference.
 """
 import glob
 import numpy as np
 import time
 import sys
 import os
+import subprocess
 from multiprocessing.pool import Pool
 from importlib.resources import files
 from astropy import constants as const
@@ -19,7 +21,28 @@ from .DataIO import loadL08Data
 from .Utils import *
 from .Logger import *
 
-offsetsfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
+offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
+
+def runGitLog():
+    try:
+        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 1.0 commit %h by %an %ad', '--', 'L10_pointing.py'], capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return f"Error: {e}"
+
+
+def clear_folder(folder_path):
+    print('Erasing contents of '+folder_path)
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}. Reason: {e}")
+
 
 def L10_Pipeline(args, scanRange, verbose=False):
     """Function processing the Level 0.95 data injecting 
@@ -38,6 +61,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
             array with firat and last scan number
 
     """
+    global commit_info
     if args.debug ==True:
         print('\nExecuting debug mode.\n')
         logger = logging.getLogger()
@@ -51,23 +75,17 @@ def L10_Pipeline(args, scanRange, verbose=False):
     print('Number of cores used for processing: %i\n'%(n_procs))
     ignore = [0]
     
-    # read offsets file
-    offsetsfile = offsetsfile0
-    if not os.path.exists(offsetsfile):
-        print('offsetsfile: ', offsetsfile)
-        print('No file with coordinate offsets available. Terminating pipeline run!')
-        sys.exit(1)
-        
-    offs = np.genfromtxt(offsetsfile, delimiter='\t', skip_header=2, 
-                     dtype=[('mxpix', 'U4'), ('az', '<f8'), ('el', '<f8'), ('comment', 'U16')])
-
+    inDir = args.path + 'level0.9/'
+    outDir = args.path + 'level1/'
+    os.makedirs(outDir, exist_ok=True)
+    if args.erase:
+        clear_folder(outDir)
+    commit_info = runGitLog()
     
     for band in args.band:
         if verbose:
             print('\nProcessing line: ', line)
         # identify the files for processing
-        inDir = args.path + 'level0.9/'
-        outDir = args.path + 'level1/'
         if int(band) == 2:
             filter = 'CII*.fits'
         else:
@@ -85,10 +103,9 @@ def L10_Pipeline(args, scanRange, verbose=False):
                         
         n_ds = len(dfiles)
                     
-        paramlist = [[a, b, c, d, e, f] for a in [band] for b in [inDir] for c in [outDir] for d in dfiles for e in [offs] for f in [args.debug]]
+        paramlist = [[a, b, c, d, e] for a in [band] for b in [inDir] for c in [outDir] for d in dfiles for e in [args.debug]]
         if verbose:
             print('Number of data files: ', n_ds, len(sdirs))
-            #print('Selected data files: ', dfiles)
         
         # setup multiprocessing loop here to process each file in list
         with Pool(n_procs) as pool:
@@ -110,8 +127,9 @@ def processL10(params, verbose=True):
             list of parameters used in process
 
     """
-    
-    line, inDir, outDir, dfile, offsets, debug = params[0], params[1], params[2], params[3], params[4], params[5]
+    global commit_info
+
+    line, inDir, outDir, dfile, debug = params[0], params[1], params[2], params[3], params[4]
     
     # define some processing data first (maybe relocat to function later?)
 
@@ -205,6 +223,7 @@ def processL10(params, verbose=True):
     hdr.set('', value='          Level 1.0 Pipeline Processing', after='CALMETHD')
     hdr.set('', value='', after='CALMETHD')
     hdr.set('L10PTIME', value=tred, comment=('L1.0 pipeline processing time'))
+    hdr.add_comment(commit_info)
     
     # select only the processed good data
     osel = np.argwhere(data['scan_type'] == 'OTF').flatten()
@@ -247,7 +266,7 @@ def getMixerOffsets(band, mixers, type='THEORY', offsetfile=None, verbose=False)
     function returns rec array with mixer offsets
     """
     if offsetfile is None:
-        offsetfile = offsetsfile0
+        offsetfile = offsetfile0
 
     data = np.genfromtxt(offsetfile, delimiter='\t', skip_header=2, 
                          dtype=[('mxpix', 'U4'), ('az', '<f8'), ('el', '<f8'), ('type', 'U16')])

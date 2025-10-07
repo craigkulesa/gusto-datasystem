@@ -38,4 +38,5 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
-filelist.txt
+__pycache__
+GUSTO_Pipeline.egg-info

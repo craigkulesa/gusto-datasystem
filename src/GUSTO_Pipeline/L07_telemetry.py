@@ -23,7 +23,6 @@ CDELT = [5000.0/511.0, 5000.0/1023.0]
 MULT = [108, 144]
 sequencesFile = 'sequences.txt'
 __version__ = '20251006'
-commit_info = ''
 
 
 def flatten(xss):
@@ -442,6 +441,7 @@ def scanSequenceFile(input, options):
 
 
 def L07_Pipeline(args):
+    global commit_info
     dirDataOut = args.path + 'level0.7/'
     input = args.path + sequencesFile
     commit_info = runGitLog()  # lookup git commit info only once
@@ -469,6 +469,7 @@ def L07_Pipeline(args):
 
 
 def processSequence(options, line):
+    global commit_info
     band = options.band
     dirUDP = options.path + 'udp/'
     dirDataIn = options.path + 'level0.5/'
@@ -481,7 +482,7 @@ def processSequence(options, line):
         seqFlag,listREF = checkSequence(fileList)
         if(seqFlag < SeqFlags.NOREFS):  # acceptable, process it
             pointingStream = makeUDP(int(startID), int(endID), dirUDP)
-            output_file = dirDataOut+outputPrefix[int(bandNum)-1]+seqID+'_'+startID+'.fits'
+            output_file = dirDataOut+outputPrefix[int(bandNum)-1]+seqID+'_'+startID+'_L07.fits'
             processFITS(options.path, fileList, output_file, int(bandNum), pointingStream, seqID, seqFlag, listREF, catName)
         else:
             # skip it because seqFlag says it's unusable

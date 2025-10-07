@@ -14,55 +14,8 @@ from enum import Enum, Flag, auto
 from astropy.io import fits
 from .flagdefs import *
 
-
-__version__ = 0.12
-__date__ = '20250927'
-__updated__ = '20250928'
-fheader, tail = os.path.split(inspect.stack()[0][1])
-__pyfile__ = tail
-__path__ = fheader
-
-
 warnings.filterwarnings('ignore', category=Warning,
                         message=' FITSFixedWarning: ', append=True)
-
-def lprint(*args, **kwargs):    
-    print(*args, **kwargs)
-
-
-def getRange(icpar, dtype='float', endpoint=True):
-    """Function reading an input str and convert ranges to 
-    an array of floats. 
-    Uses getValues() and returns a numpy float array if <3 parameters are
-    provided. 
-        
-    Parameters
-    ----------
-    icpar: str
-        parameter str like '[start, stop, step]'
-    """
-    pars = getValues(icpar)    
-    if pars.size < 3:
-        return pars
-    else:
-        # create a grid from the parameters
-        if endpoint:
-            return np.arange(pars[0], pars[1]+pars[2], pars[2])
-        else:
-            return np.arange(pars[0], pars[1], pars[2])
-
-
-def getValues(icpar, dtype='float'):
-    """Function converting str data arrays to numpy float array.
-        
-    Parameters
-    ----------
-    icpar: str
-        parameter str like '[start, stop, step]' or '3.45'
-    """
-    icpars = icpar.replace('[','').replace(']','').replace(' ','').split(',')
-    ipars = np.array((icpars), dtype=dtype)
-    return ipars
 
 
 def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
@@ -78,7 +31,6 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
         record array containing the GUSTO data fron the FITS file
 
     """
-
     mixers  = data['MIXER']
     scanID = data['scanID']
     scan_type = data['scan_type']
@@ -266,12 +218,11 @@ def getHotInfo(spec, data, hdr, mixer, dfile='', verbose=False, rowflagfilter=0)
 
     Returns
     -------
-    The function returns 4 arrays: hgroup, ghots, ghtim, and glast
+    The function returns 4 arrays: hgroup, ghots, ghtim 
     hgroup: the HOT group information for all spectra in data set
     ghots: the averaged HOTs for each HOT group
     ghtim: the average unixtime for each HOT group
     ghtint: the integration time for the averaged hots
-
     """
     n_spec, n_pix = spec.shape
     umixers = np.unique(data['MIXER'])
@@ -381,17 +332,9 @@ def checkRowflag(rowflagvalue, rowflagfilter=0):
     rowflagfilter = RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_UNPUMPED
     print('rowflagfilter input: ', rowflagfilter, 'contained flags: ', enum.show_flag_values(rowflagfilter))
     
-    rowflagvalue = 255
-    rowflagvalue = [80, 255, 4096, 4]
-    
     # enum.show_flag_values(rowflagvalue) works only on single values
     flag_values = [enum.show_flag_values(rfv) for rfv in rowflagvalue]
     print('rowflagvalue input: ', rowflagvalue, 'contained flags: ', flag_values)
-    print()
-    
-    print('checkRowflag: ', checkRowflag(rowflagvalue))
-
-
     """
     if type(rowflagvalue) == type(0):
         rowflagvalue = np.array([rowflagvalue])
