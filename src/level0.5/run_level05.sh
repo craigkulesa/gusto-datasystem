@@ -23,13 +23,11 @@ if [ ! -f $list ]; then
     exit
 fi
 
-mkdir -p $outDir/B1
-mkdir -p $outDir/B2
+mkdir -p $outDir
 
 if [ $erase -eq 1 ]; then
-    echo "Cleaning destination B1 and B2 directories..."
-    rm -f ${outDir}/B1/*
-    rm -f ${outDir}/B2/*
+    echo "Cleaning destination level 0.5 directory..."
+    rm -f ${outDir}/*
 fi
 rm -f x??
 

@@ -53,13 +53,13 @@ def find_mixer(line, mixer):
         return 5
 
     
-def makeFileGlob(path, options):
+def makeFileGlob(path, band, prefix, options):
     fileList = []
     if int(options.scanid[1]) - int(options.scanid[0]) > 28422: # do them all
-        fileList.append(glob.glob(path+'/*.fits'))
+        fileList.append(glob.glob(path+prefix[band-1]+'*.fits'))
     else:
         for scanID in range(int(options.scanid[0]), int(options.scanid[1])+1):
-            fileList.append(glob.glob(path+'/*_*_'+str(scanID).zfill(5)+'_L07.fits'))
+            fileList.append(glob.glob(path+prefix[band-1]+'*_'+str(scanID).zfill(5)+'_*.fits'))
     return(flatten(fileList))
 
 
@@ -70,18 +70,20 @@ def L08_Pipeline(args):
     if args.erase:
         clear_folder(dirDataOut)
 
-    path = args.path+'level0.7'
-    files = makeFileGlob(path, args)
-    commit_info = runGitLog()  # do this only once 
+    commit_info = runGitLog()  # do this only once     
+    path = args.path+'level0.7/'
+    sum_files = 0
     
-    if(args.cpus):
-        pool = Pool(processes=int(args.cpus))
-        print('Number of cores used for processing: %i\n'%(int(args.cpus)))
-    else:
-        pool = Pool()
-    pool.map(partial(doStuff, options=args), files)
+    for band in args.band:
+        files = makeFileGlob(path, int(band), ['NII_', 'CII_'], args)
+        sum_files += len(files)
+        if(args.cpus):
+            pool = Pool(processes=int(args.cpus))
+        else:
+            pool = Pool()
+        pool.map(partial(doStuff, options=args), files)
 
-    return len(files)
+    return sum_files
     
 
 def doStuff(scan, options):

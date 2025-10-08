@@ -14,16 +14,6 @@ import argparse
 import subprocess
 from .flagdefs import *
 
-acsPrefix = ['ACS5_', 'ACS3_']
-outputPrefix = ['NII_', 'CII_']
-bandPrefix = ['B1/', 'B2/']
-RAD2DEG = 57.295779513 
-C2K = 273.15
-CDELT = [5000.0/511.0, 5000.0/1023.0] 
-MULT = [108, 144]
-sequencesFile = 'sequences.txt'
-__version__ = '20251006'
-
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -92,10 +82,13 @@ def makeSequences(input, output):
         print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
 
 
-def makeFileGlob(startID, endID, bandNum, dirDataIn):
+def makeFileGlob(path, band, prefix, options):
     fileList = []
-    for scanID in range(startID, endID+1):
-        fileList.append(glob.glob(dirDataIn+bandPrefix[bandNum-1]+acsPrefix[bandNum-1]+'*_'+str(scanID).zfill(5)+'.fits'))
+    if int(options.scanid[1]) - int(options.scanid[0]) > 28422: # do them all
+        fileList.append(glob.glob(path+prefix[band-1]+'*.fits'))
+    else:
+        for scanID in range(int(options.scanid[0]), int(options.scanid[1])+1):
+            fileList.append(glob.glob(path+prefix[band-1]+'*_'+str(scanID).zfill(5)+'_*.fits'))
     return(flatten(fileList))
 
 
@@ -114,10 +107,10 @@ def checkSequence(fileList):
     foundLowerREF = False
     
     for x in fileList:
-        scanID.append(int(x[-10:-5]))
-        type.append(x[-14:-11])
-        if x[-14:-11] == 'REF':  
-            isHOTREF.append(int(x[-10:-5]))  # add this scanID to list
+        scanID.append(int(x[-14:-9]))
+        type.append(x[-18:-15])
+        if x[-18:-15] == 'REF':  
+            isHOTREF.append(int(x[-14:-9]))  # add this scanID to list
     for y in range(0,4):
         num[y] = type.count(typeStr[y])
 
@@ -221,6 +214,11 @@ def splitConcatenate(array, dim=4):
 
 
 def processFITS(data_path, input_files, output_file, bandNum, pointingStream, seqID, seqFlag, listREF, catName):
+    RAD2DEG = 57.295779513 
+    C2K = 273.15
+    CDELT = [5000.0/511.0, 5000.0/1023.0] 
+    MULT = [108, 144]
+
     with fits.open(input_files[0]) as hdul1:
         nrows1 = hdul1[1].data.shape[0]
         columns = hdul1[1].columns
@@ -402,7 +400,6 @@ def processFITS(data_path, input_files, output_file, bandNum, pointingStream, se
     now = datetime.now()
     header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
     header['DLEVEL'] = 0.7
-    header['VERSION'] = __version__
     header['SEQ_ID'] = (int(seqID), 'Sequence ID')
     header['SEQ_FLAG'] = seqFlag
     header['COMMENT'] = commit_info
@@ -443,7 +440,8 @@ def scanSequenceFile(input, options):
 def L07_Pipeline(args):
     global commit_info
     dirDataOut = args.path + 'level0.7/'
-    input = args.path + sequencesFile
+    input = args.path + 'sequences.txt'
+
     commit_info = runGitLog()  # lookup git commit info only once
     
     if not os.path.exists(input) or os.path.getsize(input) == 0:
@@ -459,7 +457,9 @@ def L07_Pipeline(args):
     inRange = scanSequenceFile(input, args)
     # now multi-process the processed list
     if(args.cpus):
-        n_procs = int(float(args.cpus)/2)
+        n_procs = int(float(args.cpus)/2)  # make it half of what we else everywhere else
+        if n_procs < 1:  # but not less than 1
+            n_procs=1
         pool = Pool(processes=n_procs)
         print('Number of cores used for processing: %i\n'%(n_procs))
     else:
@@ -470,15 +470,18 @@ def L07_Pipeline(args):
 
 def processSequence(options, line):
     global commit_info
+    outputPrefix = ['NII_', 'CII_']
     band = options.band
     dirUDP = options.path + 'udp/'
     dirDataIn = options.path + 'level0.5/'
     dirDataOut = options.path + 'level0.7/'
-
     (seqID, startID, endID, obsType, catName) = line[0:5]
+    options.scanid[0] = startID
+    options.scanid[1] = endID
+    
     for bandNum in band:
         print("Processing Band", bandNum, "sequence", seqID, "from", startID, "-", endID)
-        fileList = makeFileGlob(int(startID), int(endID), int(bandNum), dirDataIn)
+        fileList = makeFileGlob(dirDataIn, int(bandNum), ['ACS5_', 'ACS3_'], options)
         seqFlag,listREF = checkSequence(fileList)
         if(seqFlag < SeqFlags.NOREFS):  # acceptable, process it
             pointingStream = makeUDP(int(startID), int(endID), dirUDP)

@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
    else if(argc == 3)
      sprintf(outputPath, "%s", argv[2]);
    
-   printf("Using output directories: %s/B1 and %s/B2\n", outputPath, outputPath);
+   printf("Using output directory: %s\n", outputPath);
    
    c.len = readQCfile();
    get_git_commit_info("./src/callback.c", commit_info);

@@ -81,6 +81,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
     if args.erase:
         clear_folder(outDir)
     commit_info = runGitLog()
+    sum_files = 0
     
     for band in args.band:
         if verbose:
@@ -101,11 +102,11 @@ def L10_Pipeline(args, scanRange, verbose=False):
             if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
                 dfiles.append(sdirs[i])
                         
-        n_ds = len(dfiles)
+        sum_files += len(dfiles)
                     
         paramlist = [[a, b, c, d, e] for a in [band] for b in [inDir] for c in [outDir] for d in dfiles for e in [args.debug]]
         if verbose:
-            print('Number of data files: ', n_ds, len(sdirs))
+            print('Number of data files: ', len(dfiles), len(sdirs))
         
         # setup multiprocessing loop here to process each file in list
         with Pool(n_procs) as pool:
@@ -113,7 +114,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
             for result in pool.imap(processL10, paramlist):
                 print(f'Processed: {result}', flush=True)
         
-    return n_ds
+    return sum_files
 
 
 

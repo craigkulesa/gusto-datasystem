@@ -591,9 +591,9 @@ void callback(char *filein, char *dirOut){
 
       char fitsfile[32];
       if(UNIT == 4) // band 2
-	 sprintf(fitsfile, "%s/B2/ACS%d_%s_%05d.fits", dirOut, UNIT-1, prefix, scanID);
+	 sprintf(fitsfile, "%s/ACS%d_%s_%05d_L05.fits", dirOut, UNIT-1, prefix, scanID);
       else if (UNIT == 6) // band 1
-	 sprintf(fitsfile, "%s/B1/ACS%d_%s_%05d.fits", dirOut, UNIT-1, prefix, scanID);
+	 sprintf(fitsfile, "%s/ACS%d_%s_%05d_L05.fits", dirOut, UNIT-1, prefix, scanID);
       if (DEBUG)
          printf("%s\n", fitsfile);
       append_to_fits_table(fitsfile, fits_header, array); 

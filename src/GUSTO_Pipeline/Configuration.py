@@ -14,7 +14,6 @@ def getConfiguration(verbose=False):
     parser = configargparse.ArgParser(default_config_files=[cfg_file0, '~/.config.gusto'], prog='runGUSTO', ignore_unknown_config_file_keys=True)
     parser.add('-c', '--config', required=False, is_config_file=True, help='config file path')
     parser.add('-e', '--erase', required=False, action=argparse.BooleanOptionalAction, help='erase contents of output folder before starting', default=False)
-    parser.add('-u', '--update', required=False, help="\tUpdate L07 fits file in place for L08, vs making a new file", action=argparse.BooleanOptionalAction, default=False)
     parser.add('-v', '--verbose', required=False, action=argparse.BooleanOptionalAction, help='sets verbose output', default=False)
     parser.add('-d', '--debug', required=False, action=argparse.BooleanOptionalAction, help='sets debugging output', default=False)
     parser.add('-p', '--path', required=False, help="\tOverarching data path")

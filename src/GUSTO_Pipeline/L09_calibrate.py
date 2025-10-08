@@ -85,6 +85,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
     
     # get lines for processing
     band = args.band
+    sum_files = 0
     
     # these are for the Feb 25 data sets
     ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
@@ -120,7 +121,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
             if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
                 dfiles.append(sdirs[i])
                         
-        n_ds = len(dfiles)
+        sum_files += len(dfiles)        
         pxrange = [90, 700]
         rowflagfilter = 4294967295
         calmethod = args.calmethod
@@ -134,15 +135,18 @@ def L09_Pipeline(args, scanRange, verbose=False):
         paramlist = [[a, b] for a in dfiles for b in [params]]
 
         if verbose:
-            print('Number of data files: ', n_ds, len(sdirs))
+            print('Number of data files: ', len(dfiles), len(sdirs))
             print('Selected data files: ', dfiles)
         
         # setup multiprocessing loop here to process each file in list
         with Pool(n_procs) as pool:
             for result in pool.imap(processL08, paramlist):
-                print(f'Processed: {result}', flush=True)
-        
-    return n_ds
+                if result != 0:
+                    print(f'Processed: {result}', flush=True)
+                else:
+                    sum_files -= 1
+        print()
+    return sum_files
 
 
 
