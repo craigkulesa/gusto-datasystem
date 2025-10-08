@@ -9,7 +9,6 @@ import inspect
 
 def init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger'):
     # create logger
-    logging.basicConfig()
     logger = logging.getLogger(loggername)
     logger.setLevel(loglevel)
     
@@ -18,10 +17,10 @@ def init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger'):
         logfile = 'GUSTO_%s.log'%(time.strftime("%Y%m%d%H%M%S"))
     fh = logging.FileHandler(logfile)
     fh.setLevel(loglevel)
-    
-    # create console handler with a higher log level
+
+    # create console handler with a high log level
     ch = logging.StreamHandler()
-    ch.setLevel(loglevel)
+    ch.setLevel(logging.WARNING)
     
     # create formatter and add it to the handlers
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

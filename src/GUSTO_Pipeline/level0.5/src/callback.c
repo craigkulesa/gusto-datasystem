@@ -430,10 +430,8 @@ void callback(char *filein, char *dirOut){
            corr.Ihi==0 ||  corr.Qhi==0 || corr.Ilo==0 || corr.Qlo==0 || \
            (corr.corrtime*256.)/(FS_FREQ*1000000.)<0.1 || (corr.corrtime*256.)/(FS_FREQ*1000000.)>10.0 )
       {
-         printf("######################## ERROR ###########################\n");
-         printf("#                  Data are no good!                     #\n");
-         printf("######################## ERROR ###########################\n");
-         printf("CORRTIME was %.6f\n", (corr.corrtime*256.)/(FS_FREQ*1000000.));
+         printf("\tERROR: Data are no good! \n");
+         printf("\tCORRTIME was %.6f\n", (corr.corrtime*256.)/(FS_FREQ*1000000.));
 	 error = TRUE;
          break;
       }
@@ -464,9 +462,7 @@ void callback(char *filein, char *dirOut){
 	rowflag |= (1 << DAC_CAL_FAKED);
 	VIhi = VQhi = 2.10;
 	VIlo = VQlo = 1.90;
-	printf("######################## WARN ###########################\n");
-	printf("#                no valid DAC values!                   #\n");
-	printf("######################## WARN ###########################\n");
+	printf("\tWARNING:  no valid DAC values!\n");
       }
       
       if (DEBUG)
@@ -636,7 +632,7 @@ void callback(char *filein, char *dirOut){
    int seconds = end.tv_sec - begin.tv_sec;
    int microseconds = end.tv_usec - begin.tv_usec;
    double elapsed = seconds + microseconds*1e-6;
-   if (!error)
+   if (!error && DEBUG)
       printf("AVG FFTW %.1f ms in %d spectra\n", 1000.*elapsed/(sz/bps), sz/bps);
    fflush(stdout);
 

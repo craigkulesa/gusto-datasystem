@@ -27,19 +27,31 @@ mkdir -p $outDir
 
 if [ $erase -eq 1 ]; then
     echo "Cleaning destination level 0.5 directory..."
-    rm -f ${outDir}/*
+    rm -rf ${outDir}
+    mkdir -p ${outDir}
 fi
 rm -f x??
 
 if [ $cpus -eq 1 ]; then
     echo "Running corrspec on $list in uniprocessor mode"
-    time ./src/corrspec $list $outDir
+    ./src/corrspec $list $outDir
 else
     total_lines=$(wc -l <$list)
     ((lines_each = (total_lines + cpus - 1) / cpus))
     split -l $lines_each $list x
     for file in x??; do
 	echo "Running corrspec on $file in parallel"
-	time ./src/corrspec $file $outDir &
+	./src/corrspec $file $outDir &
+    done
+    # because this returns immediately, hold in a loop and wait for processes to stop
+    # before returning to pipeline or shell prompt
+    while true; do
+	if pgrep -x "corrspec" > /dev/null; then
+            echo "$(date): corrspec is still running..."
+	else
+            echo "$(date): corrspec is done."
+	    break
+	fi
+	sleep 5
     done
 fi
