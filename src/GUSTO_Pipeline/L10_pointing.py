@@ -18,7 +18,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 from astropy.time import Time
 
-from .DataIO import loadL08Data
+from .DataIO import loadSDFITS
 from .Logger import *
 
 offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
@@ -135,7 +135,7 @@ def processL10(params, verbose=True):
     # define some processing data first (maybe relocat to function later?)
 
     #logger.info('loading: ', os.path.join(inDir,dfile), ' for line: ', line)
-    spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
+    spec, data, hdr, hdr1 = loadSDFITS(os.path.join(inDir,dfile), verbose=False)
     
     umixers = np.unique(data['MIXER'])
     band = hdr['BAND']

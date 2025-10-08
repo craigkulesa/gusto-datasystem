@@ -17,8 +17,7 @@ from astropy.io import fits
 from multiprocessing.pool import Pool
 from PyAstronomy import pyasl
 
-from .DataIO import loadL08Data
-#from .Utils import *
+from .DataIO import loadSDFITS
 from .Logger import *
 from .Configuration import *
 from .flagdefs import *
@@ -575,7 +574,7 @@ def processL08(paramlist):
     rowflagfilter = params['rowflagfilter']
     #pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))      # good pixel ranges
 
-    spec, data, hdr, hdr1 = loadL08Data(os.path.join(inDir,dfile), verbose=False)
+    spec, data, hdr, hdr1 = loadSDFITS(os.path.join(inDir,dfile), verbose=False)
     band = hdr['band']
     Tsky = TSKY[band-1]
     if params['spurchannelfilter']:
