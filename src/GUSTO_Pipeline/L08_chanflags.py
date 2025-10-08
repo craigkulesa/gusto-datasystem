@@ -53,19 +53,22 @@ def find_mixer(line, mixer):
         return 5
 
     
-def makeFileGlob(path, band, prefix, options):
-    fileList = []
-    if int(options.scanid[1]) - int(options.scanid[0]) > 28422: # do them all
-        fileList.append(glob.glob(path+prefix[band-1]+'*.fits'))
-    else:
-        for scanID in range(int(options.scanid[0]), int(options.scanid[1])+1):
-            fileList.append(glob.glob(path+prefix[band-1]+'*_'+str(scanID).zfill(5)+'_*.fits'))
-    return(flatten(fileList))
+def makeFileGlob(inDir, prefix, suffix, scanRange):
+    ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
+    filter=prefix+'*.'+suffix
+    sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
+    dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
+    dfiles = []
+    for i,ds in enumerate(dsc):
+        if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
+            dfiles.append(sdirs[i])            
+    return dfiles
 
 
-def L08_Pipeline(args):
+def L08_Pipeline(args, scanRange):
     global commit_info
     dirDataOut = args.path+'level0.8/'
+    prefix = ['NII_', 'CII_'] 
     os.makedirs(dirDataOut, exist_ok=True)
     if args.erase:
         clear_folder(dirDataOut)
@@ -75,7 +78,7 @@ def L08_Pipeline(args):
     sum_files = 0
     
     for band in args.band:
-        files = makeFileGlob(path, int(band), ['NII_', 'CII_'], args)
+        files = makeFileGlob(path, prefix[int(band)-1], 'fits', scanRange)
         sum_files += len(files)
         if(args.cpus):
             pool = Pool(processes=int(args.cpus))

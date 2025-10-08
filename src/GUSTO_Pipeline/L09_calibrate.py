@@ -381,6 +381,17 @@ def checkRowflag(rowflagvalue, rowflagfilter=0):
 checkRowflags = np.vectorize(checkRowflag)
 
 
+def makeFileGlob(inDir, prefix, suffix, scanRange):
+    ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
+    filter=prefix+'*.'+suffix
+    sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
+    dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
+    dfiles = []
+    for i,ds in enumerate(dsc):
+        if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
+            dfiles.append(sdirs[i])            
+    return dfiles
+
 
 
     #########################################################
@@ -395,6 +406,7 @@ checkRowflags = np.vectorize(checkRowflag)
         
 def L09_Pipeline(args, scanRange, verbose=False):
     global commit_info
+    prefix = ['NII_', 'CII_'] 
     """Function processing the Level 0.8 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
     """
@@ -411,15 +423,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
 
     print('Number of cores used for processing: %i'%(n_procs))
     
-    # get lines for processing
-    band = args.band
-    sum_files = 0
-    
-    # these are for the Feb 25 data sets
-    ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
-    
-    # load ranges for 2nd pixel masking
-    
+    sum_files = 0    
     inDir = args.path + 'level0.8/'
     outDir = args.path + 'level0.9/'
     os.makedirs(outDir, exist_ok=True)
@@ -428,27 +432,9 @@ def L09_Pipeline(args, scanRange, verbose=False):
 
     commit_info = runGitLog()
     
-    for bandNum in band:
-        if verbose:
-            print('\nProcessing band:', int(bandNum))
-        # identify the files for processing
-        if int(bandNum) == 1:
-            filter='NII*.fits'
-        else:
-            filter='CII*.fits'
-        print('outDir: ', outDir)
-        print('filter: ', os.path.join(inDir,filter))
-        
-        sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
-        dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
-        
-        sdirs.sort(key=lambda sdirs: dsc)
-        
-        dfiles = []
-        for i,ds in enumerate(dsc):
-            if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
-                dfiles.append(sdirs[i])
-                        
+    for band in args.band:
+        print('Processing band', band)
+        dfiles = makeFileGlob(inDir, prefix[int(band)-1], 'fits', scanRange)
         sum_files += len(dfiles)        
         pxrange = [90, 700]
         rowflagfilter = 4294967295
@@ -456,7 +442,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
         despurmethod = args.despurmethod
         spurchannelfilter = args.spurchannelfilter
         
-        params = {'band': int(bandNum), 'inDir': inDir, 'outDir': outDir,
+        params = {'band': int(band), 'inDir': inDir, 'outDir': outDir,
                   'calmethod': calmethod, 'despurmethod': despurmethod,
                   'spurchannelfilter': spurchannelfilter, 'debug': args.debug, 'verbose': verbose,
                   'pxrange': pxrange, 'rowflagfilter': rowflagfilter}

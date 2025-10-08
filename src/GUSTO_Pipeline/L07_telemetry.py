@@ -15,10 +15,6 @@ import subprocess
 from .flagdefs import *
 
 
-def flatten(xss):
-    return [x for xs in xss for x in xs]
-
-
 def runGitLog():
     try:
         result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 0.7 commit %h by %an %ad', '--', 'L07_telemetry.py'], capture_output=True, text=True, check=True)
@@ -82,14 +78,16 @@ def makeSequences(input, output):
         print(f"{seqNum:05d}", f"{startID:05d}", f"{endID:05d}", seqType, obj, file=seqFile)
 
 
-def makeFileGlob(path, band, prefix, options):
-    fileList = []
-    if int(options.scanid[1]) - int(options.scanid[0]) > 28422: # do them all
-        fileList.append(glob.glob(path+prefix[band-1]+'*.fits'))
-    else:
-        for scanID in range(int(options.scanid[0]), int(options.scanid[1])+1):
-            fileList.append(glob.glob(path+prefix[band-1]+'*_'+str(scanID).zfill(5)+'_*.fits'))
-    return(flatten(fileList))
+def makeFileGlob(inDir, prefix, suffix, scanRange):
+    ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
+    filter=prefix+'*.'+suffix
+    sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
+    dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
+    dfiles = []
+    for i,ds in enumerate(dsc):
+        if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
+            dfiles.append(sdirs[i])            
+    return dfiles
 
 
 def checkSequence(fileList):
@@ -470,23 +468,24 @@ def L07_Pipeline(args):
 
 def processSequence(options, line):
     global commit_info
+    inputPrefix = ['ACS5_', 'ACS3_']
     outputPrefix = ['NII_', 'CII_']
-    band = options.band
     dirUDP = options.path + 'udp/'
     dirDataIn = options.path + 'level0.5/'
     dirDataOut = options.path + 'level0.7/'
     (seqID, startID, endID, obsType, catName) = line[0:5]
-    options.scanid[0] = startID
+    options.scanid[0] = startID 
     options.scanid[1] = endID
     
-    for bandNum in band:
-        print("Processing Band", bandNum, "sequence", seqID, "from", startID, "-", endID)
-        fileList = makeFileGlob(dirDataIn, int(bandNum), ['ACS5_', 'ACS3_'], options)
+    for band in options.band:
+        print("Processing Band", band, "sequence", seqID, "from", startID, "-", endID)
+        scanRange = [int(x) for x in options.scanid]
+        fileList = makeFileGlob(dirDataIn, inputPrefix[int(band)-1], 'fits', scanRange)
         seqFlag,listREF = checkSequence(fileList)
         if(seqFlag < SeqFlags.NOREFS):  # acceptable, process it
             pointingStream = makeUDP(int(startID), int(endID), dirUDP)
-            output_file = dirDataOut+outputPrefix[int(bandNum)-1]+seqID+'_'+startID+'_L07.fits'
-            processFITS(options.path, fileList, output_file, int(bandNum), pointingStream, seqID, seqFlag, listREF, catName)
+            output_file = dirDataOut+outputPrefix[int(band)-1]+seqID+'_'+startID+'_L07.fits'
+            processFITS(options.path, fileList, output_file, int(band), pointingStream, seqID, seqFlag, listREF, catName)
         else:
             # skip it because seqFlag says it's unusable
             print("Sequence", seqID, "NOT OK, flag is", seqFlag)

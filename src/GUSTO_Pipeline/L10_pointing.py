@@ -43,6 +43,18 @@ def clear_folder(folder_path):
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
 
+            
+def makeFileGlob(inDir, prefix, suffix, scanRange):
+    ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
+    filter=prefix+'*.'+suffix
+    sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
+    dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
+    dfiles = []
+    for i,ds in enumerate(dsc):
+        if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
+            dfiles.append(sdirs[i])            
+    return dfiles
+
 
 def L10_Pipeline(args, scanRange, verbose=False):
     """Function processing the Level 0.95 data injecting 
@@ -62,6 +74,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
 
     """
     global commit_info
+    prefix = ['NII_', 'CII_'] 
     if args.debug ==True:
         print('\nExecuting debug mode.\n')
         logger = logging.getLogger()
@@ -73,7 +86,6 @@ def L10_Pipeline(args, scanRange, verbose=False):
         n_procs = multiprocessing.cpu_count()
         
     print('Number of cores used for processing: %i\n'%(n_procs))
-    ignore = [0]
     
     inDir = args.path + 'level0.9/'
     outDir = args.path + 'level1/'
@@ -84,24 +96,8 @@ def L10_Pipeline(args, scanRange, verbose=False):
     sum_files = 0
     
     for band in args.band:
-        if verbose:
-            print('\nProcessing line: ', line)
-        # identify the files for processing
-        if int(band) == 2:
-            filter = 'CII*.fits'
-        else:
-            filter = 'NII*.fits'
-        
-        sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
-        dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
-        
-        sdirs.sort(key=lambda sdirs: dsc)
-        
-        dfiles = []
-        for i,ds in enumerate(dsc):
-            if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
-                dfiles.append(sdirs[i])
-                        
+        print('\nProcessing Band', band)
+        dfiles = makeFileGlob(inDir, prefix[int(band)-1], 'fits', scanRange)
         sum_files += len(dfiles)
                     
         paramlist = [[a, b, c, d, e] for a in [band] for b in [inDir] for c in [outDir] for d in dfiles for e in [args.debug]]

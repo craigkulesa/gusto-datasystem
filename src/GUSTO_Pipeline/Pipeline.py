@@ -32,7 +32,7 @@ def runGUSTO(verbose=False):
     loglevel = 'INFO'
     logfile = os.path.join(logDir,'pipeline_%s.log'%(time.strftime("%Y%m%d%H%M%S")))
     logger = init_logger(loglevel=loglevel, logfile=logfile, loggername='pipelineLogger')
-    logger.warning('Started logging.')  # this will go to console, info messages only go to logfile
+    logger.warning('Started logging to '+logfile)  # this will go to console, info messages only go to logfile
 
     levels = ['0.5', '0.7', '0.8', '0.9', '1.0']
     isl = args.level[0]
@@ -62,13 +62,13 @@ def runGUSTO(verbose=False):
         
     if '0.7' in exlevels:
         print('Executing Level 0.7: generating telemetry headers and making sequence files')
-        n_files = L07_Pipeline(args)
-        print('Level 0.7 to 0.8 done. ', n_files, ' SDFITS files were processed.\n')
+        n_files = L07_Pipeline(args)  # it will generate scanRange on its own
+        print('Level 0.7 to 0.8 done. ', n_files, ' sequences were processed.\n')
         print('#############################################################################')
         
     if '0.8' in exlevels:
         print('Executing Level 0.8: channel flags for spurs and row flags for bad fringing')
-        n_files = L08_Pipeline(args)
+        n_files = L08_Pipeline(args, scanRange)
         print('Level 0.8 to 0.9 done. ', n_files, ' SDFITS files were processed.\n')
         print('#############################################################################')
         
