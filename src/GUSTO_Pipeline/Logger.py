@@ -6,12 +6,6 @@ import time
 import os
 import inspect
 
-__version__ = 0.9
-__date__ = '20240919'
-__updated__ = '20251003'
-fheader, tail = os.path.split(inspect.stack()[0][1])
-__pyfile__ = tail
-__path__ = fheader
 
 def init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger'):
     # create logger

@@ -48,3 +48,50 @@ class SeqFlags(IntFlag):
 
 B2Unlocked = [(13756, 14114)]
 B1Unlocked = [(13756, 14114)]
+
+
+def string_to_enum_combination(istring):
+    """Converts a string of color names to an enum combination.
+    
+    """
+    if type(istring)==type('m'):
+        inames = istring.split()
+    else:
+        inames = str(istring).split()
+    print(inames)
+    cflags = RowFlags(0)  # Initialize with no value
+    for name in inames:
+        if '|' in name:
+            continue
+        else:
+            try:
+                flag = RowFlags[name.replace("'","").replace('"','').split('.')[1].upper()]
+                cflags |= flag
+            except KeyError:
+                raise ValueError(f"Invalid flag: {name}")
+    return cflags
+
+
+def anaFlagString(aa):
+    r"""Function .
+
+    Parameters
+    ----------
+    aa : int or string
+            rowflagfilter integer or string representation of allowed flags
+
+    Examples
+    --------
+    aa = 'RowFlags.NO_HK | RowFlags.MISSING_INT | RowFlags.MIXER_UNPUMPED'
+    enum_combination = anaFlagString(aa)
+    
+    print(repr(enum_combination), type(enum_combination))
+    #<RowFlags.NO_HK|MISSING_INT|MIXER_UNPUMPED: 84> <flag 'RowFlags'>
+    
+    """
+    if aa.isnumeric():
+        return RowFlags(int(aa))
+    else:
+        aa = aa.replace("|","")
+        return string_to_enum_combination(aa)
+

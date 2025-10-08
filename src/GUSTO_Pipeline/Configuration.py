@@ -4,7 +4,6 @@ import argparse
 from importlib.resources import files
 import logging
 import configargparse
-from .Utils import *
 
 cfg_file0 = files('GUSTO_Pipeline') / 'config.gusto'
 

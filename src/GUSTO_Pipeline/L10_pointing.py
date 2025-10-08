@@ -9,6 +9,7 @@ import time
 import sys
 import os
 import subprocess
+from datetime import datetime
 from multiprocessing.pool import Pool
 from importlib.resources import files
 from astropy import constants as const
@@ -18,7 +19,6 @@ from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 from astropy.time import Time
 
 from .DataIO import loadL08Data
-from .Utils import *
 from .Logger import *
 
 offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
@@ -217,7 +217,7 @@ def processL10(params, verbose=True):
         
     hdr['DLEVEL'] = 1.0
 
-    tred = Time(datetime.datetime.now()).fits
+    tred = Time(datetime.now()).fits
     hdr['PROCTIME'] = tred
     
     hdr.set('', value='', after='CALMETHD')
