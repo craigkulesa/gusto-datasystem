@@ -21,6 +21,7 @@ def getConfiguration(verbose=False):
     parser.add('-l', '--level', required=False, help='Pipeline step range to process: single number or start stop for multiple steps', nargs="+")
     parser.add('-j', '--cpus', required=False, help='set number of CPUs to use')
     parser.add('-s', '--scanid', required=True, help='scanID range', nargs=2)
+    parser.add('--polyorder', required=False, help='Baseline polynomial order', default='1')
     parser.add('--calmethod', required=False, help='Calibration method to use', default='cal_scaledGainHOTs')
     parser.add('--despurmethod', required=False, help='despur method to use', default='polyRes')
     parser.add('--spurchannelfilter', required=False, action=argparse.BooleanOptionalAction, help='apply filter for spur masks', default=False)

@@ -403,8 +403,9 @@ def L09_Pipeline(args, scanRange, verbose=False):
         calmethod = args.calmethod
         despurmethod = args.despurmethod
         spurchannelfilter = args.spurchannelfilter
+        polyorder = args.polyorder
         
-        params = {'band': int(band), 'inDir': inDir, 'outDir': outDir,
+        params = {'band': int(band), 'inDir': inDir, 'outDir': outDir, 'polyorder': polyorder, 
                   'calmethod': calmethod, 'despurmethod': despurmethod,
                   'spurchannelfilter': spurchannelfilter, 'debug': args.debug, 'verbose': verbose,
                   'pxrange': pxrange, 'rowflagfilter': rowflagfilter}
@@ -426,7 +427,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
 
 
 
-def cal_scaledGainHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac):
+def cal_scaledGainHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed=999999
@@ -496,7 +497,7 @@ def cal_scaledGainHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac):
     y_fit = Ta[band*40:band*60]
     y_fit = np.append(y_fit, Ta[band*75:band*95], axis=0)
     y_fit = np.append(y_fit, Ta[band*250:band*300], axis=0)
-    fit = np.polyfit(x_fit, y_fit, 1)
+    fit = np.polyfit(x_fit, y_fit, polyorder)
     baseline = np.poly1d(fit)
     Ta = Ta - baseline(xaxis)
     
@@ -517,7 +518,7 @@ def processL08(paramlist):
     TSKY = [33, 45]
     dfile = paramlist[0]
     params = paramlist[1]
-    band, inDir, outDir, calmethod, debug = params['band'], params['inDir'], params['outDir'], params['calmethod'], params['debug']
+    band, inDir, outDir, polyorder, calmethod, debug = params['band'], params['inDir'], params['outDir'], params['polyorder'], params['calmethod'], params['debug']
     verbose = params['verbose']
     rowflagfilter = params['rowflagfilter']
     #pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))      # good pixel ranges
@@ -604,7 +605,7 @@ def processL08(paramlist):
         # create the calibrated spectra
         for i0 in range(n_OTF):
             # fixme: make this conditional.  if calmethod == 'cal_scaledGainHOTs'
-            ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_scaledGainHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac)
+            ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_scaledGainHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
             
         # now we have to save the data in a FITS file
         data['DATA'][osel,:] = ta.data        
@@ -619,11 +620,12 @@ def processL08(paramlist):
     tred = Time(datetime.now()).fits
     
     # updating header keywords
-    hdr.set('DLEVEL', value = 0.9, after='PROCTIME')
+    hdr.set('DLEVEL', value = 0.9)
     hdr.set('rwflfilt', value=rowflagfilter, comment='applied rowflag filter for useful spectra')
     hdr.set('rhID1', value=rhIDs[0], comment='scan ID for first REFHOT/REF')
     if len(rhIDs) > 1:
         hdr.set('rhID2', value=rhIDs[1], comment='scan ID for second REFHOT/REF')
+    hdr.set('polyordr', value=int(params['polyorder']), comment='order of baseline polynomial fit')
     hdr.set('spurfltr', value=params['spurchannelfilter'], comment='was a spur channel filter pre-applied')
     hdr.set('despur', value=params['despurmethod'], comment='despur processing method applied')
     hdr.set('calmethd', value=calmethod, comment='calibration processing method applied')
