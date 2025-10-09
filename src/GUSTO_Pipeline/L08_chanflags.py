@@ -29,7 +29,6 @@ def L08_Pipeline(args, scanRange):
         else:
             pool = Pool()
         pool.map(partial(doStuff, options=args), files)
-
     return sum_files
     
 
@@ -53,19 +52,17 @@ def doStuff(scan, options):
     thresh = [[.1, .1, .1, .1], [.01, .1, .1, .0004]]
     spurs = [[[31,36],[66,69],[100,101],[133,136],[147,152],[165,168]], [[66,70],[134,136],[201,203],[266,272],[294,303],[331,335]]]
     oobs = [[[0,31],[410,511]], [[0,62],[820,1023]]]
+    xdata = np.arange(0,l0[band])
+    data  = np.zeros(l0[band])
     
     for i in range(nrow):
-        CHANNEL_FLAG[i] = 0
+        # first set the channel flags
+        CHANNEL_FLAG[i] = 0 # resetting flags -- this is safe because we are the first user
         for spur in spurs[band]:
             CHANNEL_FLAG[i][spur[0]:spur[1]]  |= ChanFlags.VARIABLE_SPUR
         for oob in oobs[band]:
             CHANNEL_FLAG[i][oob[0]:oob[1]]    |= ChanFlags.OOB 
-
-    # compute fringing rowflag
-    xdata = np.arange(0,l0[band])
-    data  = np.zeros(l0[band])
-    for i in range(nrow):
-        # compute standard deviation
+        # set fringing rowflag by computing standard deviation
         ydata = spec[i][x0[band]:x1[band]]
         z = np.polyfit(xdata, ydata, 5)
         p = np.poly1d(z)
@@ -77,8 +74,7 @@ def doStuff(scan, options):
             else:
                 ROW_FLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits
         except:
-            print("Error in thresholding")
-            ROW_FLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits if there's an error
+            print("L08: Error in thresholding -- this should NOT HAPPEN!")
             
     header['DLEVEL'] = 0.8
     header['COMMENT'] = commit_info
