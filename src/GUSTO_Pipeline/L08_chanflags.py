@@ -9,14 +9,6 @@ from .flagdefs import *
 from .DataIO import *
 
 
-def find_mixer(line, mixer):
-    if(line=='NII'):
-        mixers=[2,3,4,6]
-    elif(line=='CII'):
-        mixers=[2,3,5,8]
-    return mixers.index(mixer)
-
-
 def L08_Pipeline(args, scanRange):
     global commit_info
     dirDataOut = args.path+'level0.8/'
@@ -43,11 +35,10 @@ def L08_Pipeline(args, scanRange):
 
 def doStuff(scan, options):
     global commit_info
-    # open fits file, header, then data
+
     hdu    = fits.open(scan)
     header = hdu[0].header
-    npix   = header['NPIX']
-    line   = header['LINE']
+    band   = int(header['BAND'])-1 # indexed to 0
     data   = hdu[1].data
     spec   = data['DATA']
     mixer  = data['MIXER']
@@ -55,85 +46,40 @@ def doStuff(scan, options):
     ROW_FLAG  = data['ROW_FLAG']
     CHANNEL_FLAG = data['CHANNEL_FLAG']
 
-    if 'HISTORY' in header:
-        history_list = header['HISTORY']
-
-    # LO Interference
-    # MHz       Channel
-    # 317-342   31-36   66-70
-    # 649-659   66-69   134-136
-    # 972       100-101 201-203
-    #
-    # Iridium
-    # 1314      133-136 266-272
-    # 1458      147-152 294-303
-    # 1610      165-168 331-335
-
-    # RESET CHANNEL FLAGS -- no prior processing has set any of these yet
+    x0 = [12, 25]
+    x1 = [24, 50]
+    l0 = [12, 25]
+    mixers = [[2,3,4,6], [2,3,5,8]]
+    thresh = [[.1, .1, .1, .1], [.01, .1, .1, .0004]]
+    spurs = [[[31,36],[66,69],[100,101],[133,136],[147,152],[165,168]], [[66,70],[134,136],[201,203],[266,272],[294,303],[331,335]]]
+    oobs = [[[0,31],[410,511]], [[0,62],[820,1023]]]
+    
     for i in range(nrow):
         CHANNEL_FLAG[i] = 0
-
-    if(line=='NII'):
-        x0=12
-        x1=24
-        l0=12
-        mixers=[2,3,4,6]
-        thresh=[.1, .1, .1, .1]
-        
-        for i in range(nrow):
-            CHANNEL_FLAG[i][31:36]   |= ChanFlags.VARIABLE_SPUR    # LO 1 330 MHz 
-            CHANNEL_FLAG[i][66:69]   |= ChanFlags.VARIABLE_SPUR    # LO 2 656 MHz 
-            CHANNEL_FLAG[i][100:101] |= ChanFlags.VARIABLE_SPUR    # LO 3 980 MHz 
-            CHANNEL_FLAG[i][133:136] |= ChanFlags.VARIABLE_SPUR    # Iridium 1314 MHz 
-            CHANNEL_FLAG[i][147:152] |= ChanFlags.VARIABLE_SPUR    # Iridium 1458 MHz 
-            CHANNEL_FLAG[i][165:168] |= ChanFlags.VARIABLE_SPUR    # Iridium 1 1616-1625 MHz Bit 
-            CHANNEL_FLAG[i][0:31]    |= ChanFlags.OOB    # Out of band 0-300MHz (lower)
-            CHANNEL_FLAG[i][410:511] |= ChanFlags.OOB    # Out of band 4000-5000MHz (upper)
-
-        hdu[0].header.add_history('known bad NII channels flagged')
-
-    elif(line=='CII'):
-        x0=25
-        x1=50
-        l0=25
-        mixers=[2,3,5,8]
-        thresh=[.01, .1, .1, .0004]
-        
-        for i in range(nrow):
-            CHANNEL_FLAG[i][66:70]   |= ChanFlags.VARIABLE_SPUR    # LO 1 330 MHz Bit 
-            CHANNEL_FLAG[i][134:136] |= ChanFlags.VARIABLE_SPUR    # LO 2 656 MHz Bit 
-            CHANNEL_FLAG[i][201:203] |= ChanFlags.VARIABLE_SPUR    # LO 3 980 MHz Bit 
-            CHANNEL_FLAG[i][266:272] |= ChanFlags.VARIABLE_SPUR    # Iridium 1314 MHz 
-            CHANNEL_FLAG[i][294:303] |= ChanFlags.VARIABLE_SPUR    # Iridium 1458 MHz 
-            CHANNEL_FLAG[i][331:335] |= ChanFlags.VARIABLE_SPUR    # Iridium 1 1616-1625 MHz 
-            CHANNEL_FLAG[i][0:62]    |= ChanFlags.OOB    # Out of band 0-300MHz (lower)
-            CHANNEL_FLAG[i][820:1023]|= ChanFlags.OOB    # Out of band 4000-5000MHz (upper)
-
-        hdu[0].header.add_history('known suspect CII channels flagged')
-
-    else:
-        hdu[0].header.add_history('error, no NII or CII line found')
+        for spur in spurs[band]:
+            CHANNEL_FLAG[i][spur[0]:spur[1]]  |= ChanFlags.VARIABLE_SPUR
+        for oob in oobs[band]:
+            CHANNEL_FLAG[i][oob[0]:oob[1]]    |= ChanFlags.OOB 
 
     # compute fringing rowflag
-    xdata = np.arange(0,l0)
-    data  = np.zeros(l0)
+    xdata = np.arange(0,l0[band])
+    data  = np.zeros(l0[band])
     for i in range(nrow):
         # compute standard deviation
-        ydata = spec[i][x0:x1]
+        ydata = spec[i][x0[band]:x1[band]]
         z = np.polyfit(xdata, ydata, 5)
         p = np.poly1d(z)
-        for j in range(l0):
+        for j in range(l0[band]):
             data[j] = ydata[j] - p(j)
-
         try:
-            if(np.std(data) > thresh[find_mixer(line, mixer[i])]):
+            if(np.std(data) > thresh[band][mixers[band].index(mixer[i])]):
                 ROW_FLAG[i] |=  (RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # set ringing bits
             else:
                 ROW_FLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits
         except:
+            print("Error in thresholding")
             ROW_FLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits if there's an error
             
-    header.add_history('badly fringing rows flagged')
     header['DLEVEL'] = 0.8
     header['COMMENT'] = commit_info
     tred = Time(datetime.now()).fits
