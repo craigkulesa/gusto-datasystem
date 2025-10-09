@@ -3,21 +3,23 @@
 1. Decide which pipeline steps you intend to run.  If you want to start with level 0.5, you will need a C compiler, CFITSIO, GNU make, and influxdb installed with the GUSTO flight telemetry database.  If you start with level 0.7, you still need influxdb.  If you start at level 0.8 or later, you only need python.
 2. Install the pertinent GUSTO data into your local data folder.  The pipeline assumes a data tree structure that looks like this:
 
-| <data root directory>
-| |--> lags
-| |--> level0.5
-| |--> level0.7
-| |--> level0.9
-| |--> level1
-| |--> level2
-| |--> logs
+```   
+root data directory
+  ├── lags
+  ├── level0.5
+  ├── level0.7
+  ├── level0.8
+  ├── level0.9
+  ├── level1
+  ├── log
+  └── udp
+```
 
 The pipeline will create any missing folders and will optionally erase the contents of a folder before performing operations in it.
 
 3.  Change to the root directory of the pipeline (../gusto-datasystem) and run:
 
-.. code-block:: python
-``$ pip3 install -e .``
+	`$ pip3 install -e .`
 
 The "-e" switch makes the installation `editable` which means that edits to the code in the local repository are used when executing the pipeline.
 
@@ -30,6 +32,7 @@ To run the pipeline, you execute `runGUSTO`.  The combination of the default con
 There are a number of configuration options.  All can be specified in the configuration file and on the command line.  The command line takes highest precedence.
 
 Current arguments are, in no special order:
+
        -c (config) points to an alterative configuration file
        -e (erase) will erase the contents of any reused destination folders before starting
        -j specifies the number of CPUs to use (without it, python will best-guess)
@@ -86,7 +89,7 @@ Below is the output from the `maximal` command shown in the last example:
       Processing  310  files, please wait...
       Processing Band  2
       Processing  351  files, please wait...
-Level 0.5 to 0.7 done.  661  lag files were processed.
+	Level 0.5 to 0.7 done.  661  lag files were processed.
 
       #############################################################################
       Executing Level 0.7: generating telemetry headers and making sequence files
