@@ -1,10 +1,9 @@
-"""Command line argument parser for GUSTO Level 0.9 pipeline
+"""Command line argument parser for GUSTO pipeline
 """
 import argparse
-from importlib.resources import files
-import logging
 import configargparse
-import subprocess
+import logging
+from importlib.resources import files
 
 cfg_file0 = files('GUSTO_Pipeline') / 'config.gusto'
 
