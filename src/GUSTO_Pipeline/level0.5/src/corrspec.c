@@ -25,7 +25,7 @@ void get_git_commit_info(const char *filename, char *commit_info) {
     char hash[BUFSIZ];
 
     // Construct the command to get the commit hash
-    snprintf(command, sizeof(command), "git log -1 --format=%%cd --date=format-local:'%%Y-%%m-%%d %%H:%%M:%%S %%Z' --pretty=format:\"Commit %%h by %%an %%ad\" -- %s", filename);
+    snprintf(command, sizeof(command), "git log -1 --format=%%cd --date=format-local:'%%Y-%%m-%%d %%H:%%M:%%S %%Z' --pretty=format:\"Level 0.5 commit %%h by %%an %%ad\" -- %s", filename);
     fp = popen(command, "r");
     if (fp == NULL) {
         perror("popen");
@@ -36,7 +36,7 @@ void get_git_commit_info(const char *filename, char *commit_info) {
     hash[strcspn(hash, "\n")] = 0; // Remove trailing newline
 
     // Combine hash and date into the commit_info string
-    snprintf(commit_info, BUFSIZ+sizeof(filename), "%s %s", filename, hash);
+    snprintf(commit_info, BUFSIZ, "%s", hash);
 }
 
 

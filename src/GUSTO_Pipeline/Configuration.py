@@ -4,6 +4,7 @@ import argparse
 from importlib.resources import files
 import logging
 import configargparse
+import subprocess
 
 cfg_file0 = files('GUSTO_Pipeline') / 'config.gusto'
 
@@ -29,5 +30,3 @@ def getConfiguration(verbose=False):
     print(parser.format_values())
     
     return args
-
-

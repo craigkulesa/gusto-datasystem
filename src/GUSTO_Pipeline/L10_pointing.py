@@ -4,7 +4,6 @@ This is the source file for the GUSTO L1.0 Pipeline step which corrects the per-
 pointing and converts the frequency axis to Doppler velocity in the LSR frame of reference.
 """
 import numpy as np
-import time
 import os
 import subprocess
 from datetime import datetime
@@ -20,13 +19,6 @@ from .DataIO import *
 from .Logger import *
 
 offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
-
-def runGitLog():
-    try:
-        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 1.0 commit %h by %an %ad', '--', 'L10_pointing.py'], capture_output=True, text=True, check=True)
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        return f"Error: {e}"
 
 
 def L10_Pipeline(args, scanRange, verbose=False):
@@ -65,7 +57,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
     os.makedirs(outDir, exist_ok=True)
     if args.erase:
         clear_folder(outDir)
-    commit_info = runGitLog()
+    commit_info = runGitLog('1.0', 'L10_pointing.py')
     sum_files = 0
     
     for band in args.band:
@@ -181,16 +173,13 @@ def processL10(params, verbose=True):
 #    hdr.set('CTYPE3', value='DEC--GLS', comment=(''), after='CDELT2')
         
     hdr['DLEVEL'] = 1.0
-
     tred = Time(datetime.now()).fits
-    hdr['PROCTIME'] = tred
     
     hdr.set('', value='', after='CALMETHD')
     hdr.set('', value='          Level 1.0 Pipeline Processing', after='CALMETHD')
     hdr.set('', value='', after='CALMETHD')
-    hdr.set('L10PTIME', value=tred, comment=('L1.0 pipeline processing time'))
     hdr.add_comment(commit_info)
-    
+    hdr.add_history('Level 1.0 processed at %s'%(tred))
     # select only the processed good data
     osel = np.argwhere(data['scan_type'] == 'OTF').flatten()
     odata = data[osel]

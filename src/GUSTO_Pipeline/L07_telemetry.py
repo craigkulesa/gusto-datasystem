@@ -1,5 +1,6 @@
 from influxdb import InfluxDBClient
 from astropy.io import fits
+from astropy.time import Time
 from multiprocessing import Pool
 from functools import partial
 from struct import unpack
@@ -13,14 +14,6 @@ from .flagdefs import *
 from .DataIO import *
 
 
-def runGitLog():
-    try:
-        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 0.7 commit %h by %an %ad', '--', 'L07_telemetry.py'], capture_output=True, text=True, check=True)
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        return f"Error: {e}"
-
-    
 def makeSequences(input, output):
     print("Making new sequences file")
     newSeq = True
@@ -381,12 +374,13 @@ def processFITS(data_path, input_files, output_file, bandNum, pointingStream, se
     header['VLSR'] = (info[1], 'Commanded catalog velocity (km/s LSR)')
     
     # modify or add some last second items
-    now = datetime.now()
-    header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
+    tred = Time(datetime.now()).fits
     header['DLEVEL'] = 0.7
     header['SEQ_ID'] = (int(seqID), 'Sequence ID')
     header['SEQ_FLAG'] = seqFlag
     header['COMMENT'] = commit_info
+    header.add_history('Level 0.7 processed at %s'%(tred))
+
     # now write it out
     hdu = fits.BinTableHDU.from_columns(columns, nrows=nrows, name="DATA_TABLE")
     for colname in columns.names:
@@ -413,7 +407,7 @@ def L07_Pipeline(args):
     dirDataOut = args.path + 'level0.7/'
     input = args.path + 'sequences.txt'
 
-    commit_info = runGitLog()  # lookup git commit info only once
+    commit_info = runGitLog('0.7', 'L07_telemetry.py')  # lookup git commit info only once
     
     if not os.path.exists(input) or os.path.getsize(input) == 0:
         makeSequences(args.path+"dataLog.txt", args.path + sequencesFile)

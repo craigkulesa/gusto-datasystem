@@ -1,25 +1,12 @@
 import os
-import sys
-import glob
 from datetime import datetime
-import shutil
-import configargparse
-import argparse
 from astropy.io import fits
+from astropy.time import Time
 import numpy as np
 from multiprocessing import Pool
 from functools import partial
-import subprocess
 from .flagdefs import *
 from .DataIO import *
-
-
-def runGitLog():
-    try:
-        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 0.8 commit %h by %an %ad', '--', 'L08_chanflags.py'], capture_output=True, text=True, check=True)
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        return f"Error: {e}"
 
 
 def find_mixer(line, mixer):
@@ -27,12 +14,7 @@ def find_mixer(line, mixer):
         mixers=[2,3,4,6]
     elif(line=='CII'):
         mixers=[2,3,5,8]
-
-    # return index in mixer list of given mixer number
-    if mixer in mixers:
-        return mixers.index(mixer)
-    else:
-        return 5
+    return mixers.index(mixer)
 
 
 def L08_Pipeline(args, scanRange):
@@ -43,7 +25,7 @@ def L08_Pipeline(args, scanRange):
     if args.erase:
         clear_folder(dirDataOut)
 
-    commit_info = runGitLog()  # do this only once     
+    commit_info = runGitLog('0.8', 'L08_chanflags.py')  # do this only once     
     path = args.path+'level0.7/'
     sum_files = 0
     
@@ -143,16 +125,19 @@ def doStuff(scan, options):
         for j in range(l0):
             data[j] = ydata[j] - p(j)
 
-        if(np.std(data) > thresh[find_mixer(line, mixer[i])]):
-            ROW_FLAG[i] |=  (RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # set ringing bits
-        else:
-            ROW_FLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits
-      
-    hdu[0].header.add_history('badly fringing rows flagged')
+        try:
+            if(np.std(data) > thresh[find_mixer(line, mixer[i])]):
+                ROW_FLAG[i] |=  (RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # set ringing bits
+            else:
+                ROW_FLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits
+        except:
+            ROW_FLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits if there's an error
+            
+    header.add_history('badly fringing rows flagged')
     header['DLEVEL'] = 0.8
-    now = datetime.now()
-    header['PROCTIME'] = now.strftime("%Y%m%d_%H%M%S")
     header['COMMENT'] = commit_info
+    tred = Time(datetime.now()).fits
+    header.add_history('Level 0.8 processed at %s'%(tred))
     
     # Write the changes back to fits as new file
     hdu.writeto(scan.replace("level0.7", "level0.8").replace("L07", "L08"), overwrite=True)

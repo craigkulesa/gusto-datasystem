@@ -4,7 +4,6 @@ This is the GUSTO L09 Pipeline.
 """
 import numpy as np
 import numpy.ma as ma
-#import time
 import os
 import subprocess
 import logging
@@ -19,14 +18,6 @@ from .DataIO import *
 from .Logger import *
 from .Configuration import *
 from .flagdefs import *
-
-
-def runGitLog():
-    try:
-        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level 0.9 commit %h by %an %ad', '--', 'L09_calibrate.py'], capture_output=True, text=True, check=True)
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        return f"Error: {e}"
 
 
 def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
@@ -401,7 +392,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
     if args.erase:
         clear_folder(outDir)
 
-    commit_info = runGitLog()
+    commit_info = runGitLog('0.9', 'L09_calibrate.py')
     
     for band in args.band:
         print('Processing band', band)
@@ -629,9 +620,6 @@ def processL08(paramlist):
     
     # updating header keywords
     hdr.set('DLEVEL', value = 0.9, after='PROCTIME')
-    hdr['PROCTIME'] = tred
-    
-    hdr.set('L09_TIME', value=tred, comment=('L0.9 pipeline processing time'))
     hdr.set('rwflfilt', value=rowflagfilter, comment='applied rowflag filter for useful spectra')
     hdr.set('rhID1', value=rhIDs[0], comment='scan ID for first REFHOT/REF')
     if len(rhIDs) > 1:
@@ -643,10 +631,10 @@ def processL08(paramlist):
     hdr.set('', value='', after='VLSR')
     hdr.set('', value='          Level 0.9 Pipeline Processing', after='VLSR')
     hdr.set('', value='', after='VLSR')
-    hdr.add_comment('L0.9 processing time: %s'%(tred))
     hdr.add_comment(commit_info)
     hdr.set('', value='', after='calmethd')
-    
+    hdr.add_history('Level 0.9 processed at %s'%(tred))
+
     os.makedirs(outDir, exist_ok=True)
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L08.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)

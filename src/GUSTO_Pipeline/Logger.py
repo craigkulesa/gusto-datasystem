@@ -1,10 +1,9 @@
-"""Logging functionality for gusto L09 pipline
+"""Logging functionality for gusto pipeline
 """
 
 import logging
 import time
 import os
-import inspect
 
 
 def init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger'):
@@ -32,33 +31,3 @@ def init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger'):
     logger.addHandler(ch)
     
     return logger
-    
-    
-    
-if __name__ == '__main__':
-    
-    class Auxiliary:
-        def __init__(self):
-            self.logger = logging.getLogger('spam_application.auxiliary.Auxiliary')
-            self.logger.info('creating an instance of Auxiliary')
-        def do_something(self):
-            self.logger.info('doing something')
-            a = 1 + 1
-            self.logger.info('done doing something')
-        
-    def some_function():
-        module_logger = logging.getLogger('pipelineLogger')
-        module_logger.info('received a call to "some_function"')
-    
-    logger = init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger')
-    
-    
-    logger.info('creating an instance of auxiliary_module.Auxiliary')
-    a = Auxiliary()
-    logger.info('created an instance of auxiliary_module.Auxiliary')
-    logger.info('calling auxiliary_module.Auxiliary.do_something')
-    a.do_something()
-    logger.info('finished auxiliary_module.Auxiliary.do_something')
-    logger.info('calling auxiliary_module.some_function()')
-    some_function()
-    logger.info('done with auxiliary_module.some_function()')

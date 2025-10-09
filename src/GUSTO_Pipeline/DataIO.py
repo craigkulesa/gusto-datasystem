@@ -5,11 +5,13 @@ GUSTO Pipeline data file handling class for GUSTO SDFITS
 import warnings
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
+from importlib.resources import files
 import os
 import shutil
 import glob
 import numpy as np
 import numpy.ma as ma
+import subprocess
 
 warnings.filterwarnings('ignore', category=Warning,
                         message=' FITSFixedWarning: ', append=True)
@@ -38,6 +40,16 @@ def makeFileGlob(inDir, prefix, suffix, scanRange):
         if (ds >= scanRange[0]) & (ds <= scanRange[1]) & (ds not in ignore):
             dfiles.append(sdirs[i])            
     return dfiles
+
+
+
+def runGitLog(level, file):
+    gitdir = files('GUSTO_Pipeline')
+    try:
+        result = subprocess.run(['git', 'log', '-1', '--format=%cd', '--date=format-local:%Y-%m-%d %H:%M:%S %Z', '--pretty=format:Level '+level+' commit %h by %an %ad', '--', file], cwd=gitdir, capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return f"Error: {e}"
 
 
 
