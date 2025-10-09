@@ -5,6 +5,7 @@ from multiprocessing import Pool
 from functools import partial
 from struct import unpack
 from datetime import datetime
+from tqdm import tqdm
 
 import os
 import numpy as np
@@ -12,10 +13,12 @@ import subprocess
 
 from .flagdefs import *
 from .DataIO import *
+from .Logger import *
 
+logger = logging.getLogger('pipelineLogger')
 
 def makeSequences(input, output):
-    print("Making new sequences file")
+    logger.info("Making new sequences file")
     newSeq = True
     startID = oldscanID = oldobj = obj = oldseqType= ''
     seqType = 'APS'
@@ -92,7 +95,7 @@ def checkSequence(fileList):
         num[y] = type.count(typeStr[y])
 
     if(num[REF] == 0):
-        print("ERROR: no REFs found")
+        logger.info("ERROR: no REFs found")
         seqFlag |= SeqFlags.NOREFS
     elif(num[REF] > 0 and num[REF] < 2 and num[OTF] > 0):
         index = type.index('OTF')
@@ -108,9 +111,9 @@ def checkSequence(fileList):
         elif foundUpperREF == False:
             seqFlag |= SeqFlags.MISSING_TRAILING_REF
         else:
-            print("ERROR: inconsistent REF count")
+            logger.info("ERROR: inconsistent REF count")
     if(num[OTF] == 0 and num[APS] == 0):
-        print("ERROR: no data!")
+        logger.info("ERROR: no data!")
         seqFlag |= SeqFlags.NODATA
     if(num[HOT] != num[REF] + num[OTF]):
         seqFlag |= SeqFlags.MISSING_HOT
@@ -131,11 +134,11 @@ def makeUDP(startID, stopID, dir):
                     data=unpack('<2I5f2I15d',chunk)
                     output.append(list(data))  # convert tuple to list to modify the time
         except Exception as error:
-            print(error)
+            logger.info(error)
     for entry in output:  # convert integer timespec to floating point unixtime
         entry[0] = entry[0]+entry[1]/1.0e9
     if len(output) == 0:
-        print("ERROR: No UDP data available for this sequence")
+        logger.info("ERROR: No UDP data available for this sequence")
         return np.array([0])
     return np.array(output)
 
@@ -151,7 +154,7 @@ def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=1800
         query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC"
         results = client.query(query, epoch='ms')
     if results.items() == []:  
-        print("WARNING:  Nothing from influx query", queryStr, "returned.")
+        logger.info("WARNING:  Nothing from influx query", queryStr, "returned.")
         if queryStr == 'B2_AD590_' or queryStr == 'B1_AD590_':
             seqFlag |= SeqFlags.MAYBE_HUNG_LO
         else:
@@ -201,7 +204,7 @@ def processFITS(data_path, input_files, output_file, bandNum, pointingStream, se
         columns = hdul1[1].columns
         header = hdul1[0].header
         if header['DLEVEL'] != 0.5:
-            print("ERROR: Input data is not at level 0.5.  Exiting.")
+            logger.info("ERROR: Input data is not at level 0.5.  Exiting.")
             return
         data = {col.name: [] for col in columns}
         for col in columns:
@@ -271,7 +274,7 @@ def processFITS(data_path, input_files, output_file, bandNum, pointingStream, se
         gmon = splitConcatenate(gmon)
     except Exception as e:
         skipHKinsert = True
-        print("WARNING: ", e, "Some columns will have zeroed bias data.")
+        logger.info("WARNING: ", e, "Some columns will have zeroed bias data.")
 
     # Now we can loop through all the rows and assign the closest HK in time.
     # While we are here, update data types and row flags.
@@ -412,7 +415,7 @@ def L07_Pipeline(args):
     if not os.path.exists(input) or os.path.getsize(input) == 0:
         makeSequences(args.path+"dataLog.txt", args.path + sequencesFile)
     else:
-        print("Sequences file seemingly exists, skipping step...")
+        logger.info("Sequences file seemingly exists, skipping step...")
 
     os.makedirs(dirDataOut, exist_ok=True)
     if args.erase:
@@ -426,10 +429,10 @@ def L07_Pipeline(args):
         if n_procs < 1:  # but not less than 1
             n_procs=1
         pool = Pool(processes=n_procs)
-        print('Number of cores used for processing: %i\n'%(n_procs))
+        logger.info('Number of cores used for processing: %i\n'%(n_procs))
     else:
         pool = Pool()
-    pool.map(partial(processSequence, args), inRange)
+    list(tqdm(pool.imap_unordered(partial(processSequence, args), inRange), total=len(inRange), colour='yellow', leave=False))
     return len(inRange)
 
 
@@ -445,7 +448,7 @@ def processSequence(options, line):
     options.scanid[1] = endID
     
     for band in options.band:
-        print("Processing Band", band, "sequence", seqID, "from", startID, "-", endID)
+        logger.info(f"Processing Band {band} sequence {seqID} from {startID} - {endID}")
         scanRange = [int(x) for x in options.scanid]
         fileList = makeFileGlob(dirDataIn, inputPrefix[int(band)-1], 'fits', scanRange)
         seqFlag,listREF = checkSequence(fileList)
@@ -455,6 +458,5 @@ def processSequence(options, line):
             processFITS(options.path, fileList, output_file, int(band), pointingStream, seqID, seqFlag, listREF, catName)
         else:
             # skip it because seqFlag says it's unusable
-            print("Sequence", seqID, "NOT OK, flag is", seqFlag)
-
+            logger.info(f"Sequence {seqID} NOT OK, flag is {seqFlag}")
 

@@ -1,7 +1,6 @@
 """
 GUSTO Pipeline data file handling class for GUSTO SDFITS
 """
-
 import warnings
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
@@ -31,7 +30,8 @@ def clear_folder(folder_path):
 
             
 def makeFileGlob(inDir, prefix, suffix, scanRange):
-    ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
+    #ignore = [10086, 13638, 17751, 27083, 28089, 4564, 7165, 7167]
+    ignore = [0]
     filter=prefix+'*.'+suffix
     sdirs = sorted(glob.glob(os.path.join(inDir,filter)))
     dsc = [int(os.path.split(sdir)[1].split('_')[2].split('.')[0]) for sdir in sdirs]
