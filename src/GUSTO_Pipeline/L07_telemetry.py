@@ -95,7 +95,7 @@ def checkSequence(fileList):
         num[y] = type.count(typeStr[y])
 
     if(num[REF] == 0):
-        logger.info("ERROR: no REFs found")
+        logger.debug("ERROR: no REFs found")
         seqFlag |= SeqFlags.NOREFS
     elif(num[REF] > 0 and num[REF] < 2 and num[OTF] > 0):
         index = type.index('OTF')
@@ -111,9 +111,9 @@ def checkSequence(fileList):
         elif foundUpperREF == False:
             seqFlag |= SeqFlags.MISSING_TRAILING_REF
         else:
-            logger.info("ERROR: inconsistent REF count")
+            logger.debug("ERROR: inconsistent REF count")
     if(num[OTF] == 0 and num[APS] == 0):
-        logger.info("ERROR: no data!")
+        logger.debug("ERROR: no data!")
         seqFlag |= SeqFlags.NODATA
     if(num[HOT] != num[REF] + num[OTF]):
         seqFlag |= SeqFlags.MISSING_HOT
@@ -138,7 +138,7 @@ def makeUDP(startID, stopID, dir):
     for entry in output:  # convert integer timespec to floating point unixtime
         entry[0] = entry[0]+entry[1]/1.0e9
     if len(output) == 0:
-        logger.info("ERROR: No UDP data available for this sequence")
+        logger.debug("ERROR: No UDP data available for this sequence")
         return np.array([0])
     return np.array(output)
 
@@ -193,12 +193,24 @@ def splitConcatenate(array, dim=4):
     return newarray
 
 
-def processFITS(data_path, input_files, output_file, bandNum, pointingStream, seqID, seqFlag, listREF, catName):
+def processFITS(data_path, input_files, output_file, band, pointingStream, seqID, seqFlag, listREF, catName):
     RAD2DEG = 57.295779513 
     C2K = 273.15
     CDELT = [5000.0/511.0, 5000.0/1023.0] 
     MULT = [108, 144]
+    x0 = [12, 25]
+    x1 = [24, 50]
+    l0 = [12, 25]
+    mixers = [2,3,4,6], [2,3,5,8]
+    thresh = [.1, .1, .1, .1], [.01, .1, .1, .0004]
+    spurs = [[31,36],[66,69],[100,101],[133,136],[147,152],[165,168]], [[66,70],[134,136],[201,203],[266,272],[294,303],[331,335]]
+    oobs = [[0,31],[410,511]], [[0,62],[820,1023]]
+    xdata = np.arange(0,l0[band-1])
+    ldata  = np.zeros(l0[band-1])
+    pIdx = [0,0,1,2,3,0,4,0,0,0], [0,0,1,2,0,3,0,0,4,0]
+    imonRange = [31.0, 41.0]
 
+    
     with fits.open(input_files[0]) as hdul1:
         nrows1 = hdul1[1].data.shape[0]
         columns = hdul1[1].columns
@@ -229,39 +241,38 @@ def processFITS(data_path, input_files, output_file, bandNum, pointingStream, se
     MIXER = data['MIXER']
     TYPE = data['scan_type']
     ROWFLAG = data['ROW_FLAG']
+    CHANNEL_FLAG = data['CHANNEL_FLAG']
     PSAT = data['PSat']
     VMON = data['Vmon']
     IMON = data['Imon']
     GMON = data['Gmon']
     SCANID = data['scanID']
-    pList = ((2,3,4,6), (2,3,5,8))
-    pIdx = (0,0,1,2,3,0,4,0,0,0), (0,0,1,2,0,3,0,0,4,0)
-    index = 0
+    spec   = data['DATA']
     psat = []
     vmon = []
     imon = []
     gmon = []
 
     # because the data are not in time order, we need to make an array of HK data first
-    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), 'PSatI_B'+str(bandNum)+'M', seqFlag, getAll=True)
-    for i in pList[bandNum-1]:
-        qStr = 'PSatI_B'+str(bandNum)+'M'+str(i)
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), 'PSatI_B'+str(band)+'M', seqFlag, getAll=True)
+    for i in mixers[band-1]:
+        qStr = 'PSatI_B'+str(band)+'M'+str(i)
         points = results.get_points(measurement=qStr)
         for point in points:
             psat.append((float(point['time']/1000.0), point['cur']))
     results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME), 'bias', seqFlag, getAll=True)
-    for i in pList[bandNum-1]:
-        qStr = 'biasVltB'+str(bandNum)+'M'+str(i)
+    for i in mixers[band-1]:
+        qStr = 'biasVltB'+str(band)+'M'+str(i)
         points = results.get_points(measurement=qStr)
         for point in points:
             vmon.append((float(point['time']/1000.0), point['volts']))
-        qStr = 'biasCurB'+str(bandNum)+'M'+str(i)
+        qStr = 'biasCurB'+str(band)+'M'+str(i)
         points = results.get_points(measurement=qStr)
         for point in points:
             imon.append((float(point['time']/1000.0), point['cur']))
-    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME),'B'+str(bandNum)+'_GMONI_', seqFlag, getAll=True)
-    for i in pList[bandNum-1]:
-        qStr = 'B'+str(bandNum)+'_GMONI_'+str(i)
+    results,seqFlag = getInflux(min(UNIXTIME), max(UNIXTIME),'B'+str(band)+'_GMONI_', seqFlag, getAll=True)
+    for i in mixers[band-1]:
+        qStr = 'B'+str(band)+'_GMONI_'+str(i)
         points = results.get_points(measurement=qStr)
         for point in points:
             gmon.append((float(point['time']/1000.0), point['cur']))
@@ -274,39 +285,57 @@ def processFITS(data_path, input_files, output_file, bandNum, pointingStream, se
         gmon = splitConcatenate(gmon)
     except Exception as e:
         skipHKinsert = True
-        logger.info("WARNING: ", e, "Some columns will have zeroed bias data.")
+        logger.debug("WARNING: ", e, "Some columns will have zeroed bias data.")
 
     # Now we can loop through all the rows and assign the closest HK in time.
-    # While we are here, update data types and row flags.
-    index=0
-    imonRange = (31.0, 41.0)
+    # While we are here, update data types, row flags, and channel flags (formerly L08).
+    i=0
     for item in TYPE:
-        if item == 'HOT' and SCANID[index] in listREF:
-            TYPE[index] = 'REFHOT'
-        curTime = UNIXTIME[index]
+        if item == 'HOT' and SCANID[i] in listREF:
+            TYPE[i] = 'REFHOT'
+        curTime = UNIXTIME[i]
         if skipHKinsert == False:
             closest = np.argmin(np.abs(psat[:,0] - curTime))
-            PSAT[index] = psat[closest][pIdx[bandNum-1][MIXER[index]]]
+            PSAT[i] = psat[closest][pIdx[band-1][MIXER[i]]]
             closest = np.argmin(np.abs(vmon[:,0] - curTime))
-            VMON[index] = vmon[closest][pIdx[bandNum-1][MIXER[index]]]-0.35
+            VMON[i] = vmon[closest][pIdx[band-1][MIXER[i]]]-0.35
             closest = np.argmin(np.abs(imon[:,0] - curTime))
-            IMON[index] = imon[closest][pIdx[bandNum-1][MIXER[index]]]
+            IMON[i] = imon[closest][pIdx[band-1][MIXER[i]]]
             closest = np.argmin(np.abs(gmon[:,0] - curTime))
-            GMON[index] = gmon[closest][pIdx[bandNum-1][MIXER[index]]]
-        if bandNum == 2 and isKnownBad(SCANID[index], B2Unlocked):
-            ROWFLAG[index] |= RowFlags.LO_SYNTH_UNLOCKED
-        if IMON[index] < min(imonRange) or IMON[index] > max(imonRange):
-            ROWFLAG[index] |= RowFlags.MIXER_MISPUMPED
-            if IMON[index] > 60 or IMON[index] < 0.0:
-                ROWFLAG[index] |= RowFlags.MIXER_UNPUMPED
-        index += 1
+            GMON[i] = gmon[closest][pIdx[band-1][MIXER[i]]]
+        if band == 2 and isKnownBad(SCANID[i], B2Unlocked):
+            ROWFLAG[i] |= RowFlags.LO_SYNTH_UNLOCKED
+        if IMON[i] < min(imonRange) or IMON[i] > max(imonRange):
+            ROWFLAG[i] |= RowFlags.MIXER_MISPUMPED
+            if IMON[i] > 60 or IMON[i] < 0.0:
+                ROWFLAG[i] |= RowFlags.MIXER_UNPUMPED
+        # the rest of this used to be in L08 
+        CHANNEL_FLAG[i][:] = 0 # resetting flags -- we are the first user
+        for spur in spurs[band-1]:
+            CHANNEL_FLAG[i][spur[0]:spur[1]]  |= ChanFlags.VARIABLE_SPUR
+        for oob in oobs[band-1]:
+            CHANNEL_FLAG[i][oob[0]:oob[1]]    |= ChanFlags.OOB 
+        # set fringing rowflag by computing standard deviation
+        ydata = spec[i][x0[band-1]:x1[band-1]]
+        z = np.polyfit(xdata, ydata, 5)
+        p = np.poly1d(z)
+        for j in range(l0[band-1]):
+            ldata[j] = ydata[j] - p(j)
+        try:
+            if(np.std(ldata) > thresh[band-1][mixers[band-1].index(MIXER[i])]):
+                ROWFLAG[i] |=  (RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # set ringing bits
+            else:
+                ROWFLAG[i] &= ~(RowFlags.RINGING_BIT1 | RowFlags.RINGING_BIT0)  # clear ringing bits
+        except:
+            logger.warning("L07: Error thresholding for ringing bits -- this should NOT HAPPEN!")
+        i += 1
     
     
     # Now onto the primary HDU, lots to fill in here
     header['CUNIT1'] = ('MHz', 'Spectral unit')
     header['CRPIX1'] = (0.0, 'Index location')
     header['CRVAL1'] = (0.0, 'Start of spectra (MHz)')
-    header['CDELT1'] = (CDELT[bandNum-1], 'Channel width (MHz)')
+    header['CDELT1'] = (CDELT[band-1], 'Channel width (MHz)')
 
     hktemp_names = ("CRADLE02","CRYCSEBK","CRYOPORT","CALMOTOR","CRADLE03","QAVCCTRL",
                     "COOLRTRN","FERADIAT", "CRYCSEFT","CRADLE04","THOT","OAVCCTRL",
@@ -372,8 +401,8 @@ def processFITS(data_path, input_files, output_file, bandNum, pointingStream, se
     info = getIFinfo(np.mean(UNIXTIME), data_path)
     header['OBJECT'] = (catName, 'Name of the target object')
     header['IF0'] = (info[0], 'IF Frequency (MHz) of catalog velocity')
-    header['SYNTFREQ'] = (info[bandNum+2], 'Synthesizer frequency (MHz)')
-    header['SYNTMULT'] = (MULT[bandNum-1], 'Synthesizer multiplier')
+    header['SYNTFREQ'] = (info[band+2], 'Synthesizer frequency (MHz)')
+    header['SYNTMULT'] = (MULT[band-1], 'Synthesizer multiplier')
     header['VLSR'] = (info[1], 'Commanded catalog velocity (km/s LSR)')
     
     # modify or add some last second items
@@ -405,7 +434,7 @@ def scanSequenceFile(input, options):
     return inRange
 
 
-def L07_Pipeline(args):
+def L07_Pipeline(args, scanRange, verbose):
     global commit_info
     dirDataOut = args.path + 'level0.7/'
     input = args.path + 'sequences.txt'
@@ -415,17 +444,15 @@ def L07_Pipeline(args):
     if not os.path.exists(input) or os.path.getsize(input) == 0:
         makeSequences(args.path+"dataLog.txt", args.path + sequencesFile)
     else:
-        logger.info("Sequences file seemingly exists, skipping step...")
+        logger.debug("Sequences file seemingly exists, skipping step...")
 
     os.makedirs(dirDataOut, exist_ok=True)
     if args.erase:
         clear_folder(dirDataOut)
 
-    # scan to find the elements in the right scanID range
-    inRange = scanSequenceFile(input, args)
-    # now multi-process the processed list
+    inRange = scanSequenceFile(input, args)  # scan to find elements in the scanID range
     if(args.cpus):
-        n_procs = int(float(args.cpus)/2)  # make it half of what we else everywhere else
+        n_procs = int(float(args.cpus)/2)  # make it half of what we use everywhere else
         if n_procs < 1:  # but not less than 1
             n_procs=1
         pool = Pool(processes=n_procs)
@@ -448,7 +475,7 @@ def processSequence(options, line):
     options.scanid[1] = endID
     
     for band in options.band:
-        logger.info(f"Processing Band {band} sequence {seqID} from {startID} - {endID}")
+        logger.debug(f"Processing Band {band} sequence {seqID} from {startID} - {endID}")
         scanRange = [int(x) for x in options.scanid]
         fileList = makeFileGlob(dirDataIn, inputPrefix[int(band)-1], 'fits', scanRange)
         seqFlag,listREF = checkSequence(fileList)
@@ -458,5 +485,5 @@ def processSequence(options, line):
             processFITS(options.path, fileList, output_file, int(band), pointingStream, seqID, seqFlag, listREF, catName)
         else:
             # skip it because seqFlag says it's unusable
-            logger.info(f"Sequence {seqID} NOT OK, flag is {seqFlag}")
+            logger.debug(f"Sequence {seqID} NOT OK, flag is {seqFlag}")
 

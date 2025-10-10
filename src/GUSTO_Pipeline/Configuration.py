@@ -8,7 +8,7 @@ from importlib.resources import files
 cfg_file0 = files('GUSTO_Pipeline') / 'config.gusto'
 
 def getConfiguration(verbose=False):
-    r"""Function parsing the command line input.
+    """Function parsing the command line input.
     """    
     parser = configargparse.ArgParser(default_config_files=[cfg_file0, '~/.config.gusto'], prog='runGUSTO', ignore_unknown_config_file_keys=True)
     parser.add('-c', '--config', required=False, is_config_file=True, help='config file path')
@@ -26,7 +26,6 @@ def getConfiguration(verbose=False):
     parser.add('--spurchannelfilter', required=False, action=argparse.BooleanOptionalAction, help='apply filter for spur masks', default=False)
     
     args = parser.parse_args()
-    print(args)
     print(parser.format_values())
     
     return args

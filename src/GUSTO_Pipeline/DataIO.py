@@ -5,6 +5,7 @@ import warnings
 from astropy.io import fits
 from astropy.utils.exceptions import AstropyWarning
 from importlib.resources import files
+from .Logger import *
 import os
 import shutil
 import glob
@@ -15,9 +16,10 @@ import subprocess
 warnings.filterwarnings('ignore', category=Warning,
                         message=' FITSFixedWarning: ', append=True)
 
+logger = logging.getLogger('pipelineLogger')
 
 def clear_folder(folder_path):
-    print('Erasing contents of '+folder_path)
+    logger.warning('Erasing '+folder_path)
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
         try:
@@ -26,7 +28,7 @@ def clear_folder(folder_path):
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
         except Exception as e:
-            print(f"Failed to delete {file_path}. Reason: {e}")
+            logger.warning(f"Failed to delete {file_path}. Reason: {e}")
 
             
 def makeFileGlob(inDir, prefix, suffix, scanRange):
@@ -69,7 +71,7 @@ def loadSDFITS(ifile, verbose=False, usemask=False):
     converted into a numpy masked array.
     """
     if verbose:
-        print('Loading SDFITS data ...')
+        logging.info('Loading SDFITS data ...')
     
     with fits.open(ifile) as hdu:
         data   = hdu[1].data

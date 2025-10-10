@@ -1,12 +1,11 @@
-#!/usr/bin/env python3
 """
-This is the GUSTO L09 Pipeline.
+This is the GUSTO Level 0.9 Pipeline.
 """
 import numpy as np
 import numpy.ma as ma
 import os
 import subprocess
-import logging
+from tqdm import tqdm
 from datetime import datetime
 from astropy import units as u
 from astropy.time import Time
@@ -19,6 +18,7 @@ from .Logger import *
 from .Configuration import *
 from .flagdefs import *
 
+logger = logging.getLogger('pipelineLogger')
 
 def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
     mask = np.zeros(len(data), dtype=bool)
@@ -62,7 +62,7 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     otfID = np.unique(scanID[otsel])
     if len(otfID) > 1:
         otfID = otfID[1:]
-        print('reducing number of OTF IDs to 1')
+        logger.debug('reducing number of OTF IDs to 1')
     return otfID, rfsID, rhsID, hotID
 
 
@@ -147,7 +147,7 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
 
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
     if (len(otfID)>1):
-        print('getCalSpectra mixer %i: Too many OTF scan IDs for processing: '%mixer, otfID)
+        logger.debug('getCalSpectra mixer %i: Too many OTF scan IDs for processing: '%(mixer))
         return -999, 0, 0, 0, 0, 0, 0, [0,0], 0
 
     bef = rhsID[rhsID<otfID]
@@ -159,13 +159,13 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
     elif (len(aft)>0):
         rhIDaft = aft[np.argmin(aft)]
         rhIDs = [rhIDaft]
-        print('getCalSpectra: Only REFHOT after OTF available')
+        logger.debug('getCalSpectra: Only REFHOT after OTF available')
     elif (len(bef)>0):
         rhIDbef = bef[np.argmax(bef)]
         rhIDs = [rhIDbef]
-        print('getCalSpectra: Only REFHOT before OTF available')
+        logger.debug('getCalSpectra: Only REFHOT before OTF available')
     else:
-        print('getCalSpectra: Not enough REFHOT scans available (before/after OTF): ', bef, aft)
+        logger.debug('getCalSpectra: Not enough REFHOT scans available (before/after OTF)')
         return -999, 0, 0, 0, 0, 0, 0, [0,0], 0
 
     Tsyss = []
@@ -269,7 +269,7 @@ def getHotInfo(spec, data, hdr, mixer, dfile='', verbose=False, rowflagfilter=0)
     # the first OTF scan ID should be the one determining the sequence
     if uots.size == 0 or uots.size > 1:
         # bad sequence with none or too many OTFs
-        print("SEQUENCE HAS THE WRONG NUMBER OF OTFs")
+        logger.debug("SEQUENCE HAS THE WRONG NUMBER OF OTFs")
         return 0,0,0,0
     
     uflag = np.zeros(n_spec)    
@@ -367,14 +367,14 @@ checkRowflags = np.vectorize(checkRowflag)
     # save spectra to FITS file
         
 def L09_Pipeline(args, scanRange, verbose=False):
-    global commit_info
+    global commit_info, logger
     prefix = ['NII_', 'CII_'] 
-    """Function processing the Level 0.8 data. Input are uncalibrated 
+    """Function processing the Level 0.7 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
     """
     
     if args.debug ==True:
-        print('\nExecuting debug mode.\n')
+        logger.debug('Executing debug mode.')
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)
         n_procs = 1
@@ -383,10 +383,10 @@ def L09_Pipeline(args, scanRange, verbose=False):
     else:
         n_procs = multiprocessing.cpu_count()
 
-    print('Number of cores used for processing: %i'%(n_procs))
+    logger.info('Number of cores used for processing: %i'%(n_procs))
     
     sum_files = 0    
-    inDir = args.path + 'level0.8/'
+    inDir = args.path + 'level0.7/'
     outDir = args.path + 'level0.9/'
     os.makedirs(outDir, exist_ok=True)
     if args.erase:
@@ -395,7 +395,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
     commit_info = runGitLog('0.9', 'L09_calibrate.py')
     
     for band in args.band:
-        print('Processing band', band)
+        logger.info(f'Processing band %s'%(band))
         dfiles = makeFileGlob(inDir, prefix[int(band)-1], 'fits', scanRange)
         sum_files += len(dfiles)        
         pxrange = [90, 700]
@@ -412,16 +412,13 @@ def L09_Pipeline(args, scanRange, verbose=False):
         paramlist = [[a, b] for a in dfiles for b in [params]]
 
         if verbose:
-            print('Number of data files: ', len(dfiles), len(sdirs))
-            print('Selected data files: ', dfiles)
+            logger.debug('Number of data files: %i'%(len(dfiles)))
+            logger.debug('Selected data files: %s'%(dfiles))
         
         # setup multiprocessing loop here to process each file in list
         with Pool(n_procs) as pool:
-            for result in pool.imap(processL08, paramlist):
-                if result != 0:
-                    print(f'Processed: {result}', flush=True)
-                else:
-                    sum_files -= 1
+            list(tqdm(pool.imap_unordered(processL07, paramlist), total=len(dfiles), colour='yellow', leave=False))
+            
         print()
     return sum_files
 
@@ -510,8 +507,8 @@ def cal_scaledGainHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, 
     return Ta, cflags, Tsys_median, rms
 
 
-def processL08(paramlist):
-    """Function processing the Level 0.8 data. Input are uncalibrated 
+def processL07(paramlist):
+    """Function processing the Level 0.7 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
     """
     global commit_info
@@ -523,6 +520,7 @@ def processL08(paramlist):
     rowflagfilter = params['rowflagfilter']
     #pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))      # good pixel ranges
 
+    logger.debug(f'Loading file: {dfile}')
     spec, data, hdr, hdr1 = loadSDFITS(os.path.join(inDir,dfile), verbose=False)
     band = hdr['band']
     Tsky = TSKY[band-1]
@@ -552,17 +550,17 @@ def processL08(paramlist):
                 (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(rflag[msel])
 
         if not check:
-            print('mix, dfile')
-            print('check: ', check)
-            print('specs: ', spec.shape)
-            print('REFs: ', np.argwhere(data['scan_type']=='REF').size, (np.argwhere(data['scan_type']=='REF').size > 3))
-            print('HOTs: ', np.argwhere(data['scan_type']=='HOT').size, (np.argwhere(data['scan_type']=='HOT').size > 3))
-            print('REFHOTs: ', np.argwhere(data['scan_type']=='REFHOT').size, (np.argwhere(data['scan_type']=='REFHOT').size > 3))
-            print('OTFs: ', np.argwhere(data['scan_type']=='OTF').size, (np.argwhere(data['scan_type']=='OTF').size > 5))
-            print('other: ', (otfID.size>0), (rfsID.size>0), (rhsID.size>0), (hotID.size>0))
-            print('IDs: ', otfID, rfsID, rhsID, hotID)
-            print('rowflagfilter: ', rowflagfilter, np.any(checkRowflag(data['ROW_FLAG'][msel], rowflagfilter=rowflagfilter)))
-            print('GUSTO Pipeline: Not enough data available for processing. ROW_FLAGs are set appropriately. ')
+            logger.debug(f'{mix} {dfile}')
+            logger.debug(f'check: {check}')
+            logger.debug(f'specs: {spec.shape}')
+            logger.debug(f"REFs: {np.argwhere(data['scan_type']=='REF').size} {(np.argwhere(data['scan_type']=='REF').size > 3)}")
+            logger.debug(f"HOTs: {np.argwhere(data['scan_type']=='HOT').size} {(np.argwhere(data['scan_type']=='HOT').size > 3)}")
+            logger.debug(f"REFHOTs: {np.argwhere(data['scan_type']=='REFHOT').size} {(np.argwhere(data['scan_type']=='REFHOT').size > 3)}")
+            logger.debug(f"OTFs: {np.argwhere(data['scan_type']=='OTF').size} {(np.argwhere(data['scan_type']=='OTF').size > 5)}")
+            logger.debug(f'other: {(otfID.size>0)} {(rfsID.size>0)} {(rhsID.size>0)} {(hotID.size>0)}')
+            logger.debug(f'IDs: {otfID} {rfsID} {rhsID} {hotID}')
+            logger.debug(f"rowflagfilter: {rowflagfilter} {np.any(checkRowflag(data['ROW_FLAG'][msel], rowflagfilter=rowflagfilter))}")
+            logger.debug('GUSTO Pipeline: Not enough data available for processing. ROW_FLAGs are set appropriately. ')
             data['ROW_FLAG'][msel] |= RowFlags.BAD_PHASE   # flagged as missing data
             datavalid[k] = False
             return 0
@@ -570,7 +568,7 @@ def processL08(paramlist):
         tsys, refs, rhots, rtime, htime, Thot, rhIDs, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter=rowflagfilter, Tsky=Tsky, verbose=True)
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
-            print('No Tsys available! Stopped processing of mixer %i in dfile %s'%(mix, dfile), tsys)
+            logger.debug('No Tsys available! Stopped processing of mixer %i in dfile %s'%(mix, dfile))
             datavalid[k] = False
             continue
                 
@@ -581,7 +579,7 @@ def processL08(paramlist):
         if len(osel) > 2:
             pass
         else:
-            print('WARNING: No OTF spectra available for mixer: ', mix)
+            logger.debug('WARNING: No OTF spectra available for mixer: %i'%(mix))
             datavalid[k] = False
             data['ROW_FLAG'][msel] |= RowFlags.BAD_DATA   # flagged as missing data
             continue
@@ -596,7 +594,7 @@ def processL08(paramlist):
         ta = ma.zeros([n_OTF, n_opix])
         ahgroup, ghots, ghtim, ghtint = getHotInfo(spec, data, hdr, mix, dfile=dfile, rowflagfilter=rowflagfilter, verbose=True)
         if type(ahgroup)==type(0):
-            print('Encountered problem with HOT groups. Flaging rows.')
+            logger.debug('Encountered problem with HOT groups. Flaging rows.')
             data['ROW_FLAG'][msel] |= RowFlags.BAD_DATA   # flagged as missing data
             continue
 
@@ -614,7 +612,7 @@ def processL08(paramlist):
         data['rms'][osel] = rms_OTF
         
     if np.any(datavalid) == False:
-        print('Not enough data available for saving. ')
+        logger.debug('Not enough data available for saving. ')
         return 0
 
     tred = Time(datetime.now()).fits
@@ -638,9 +636,10 @@ def processL08(paramlist):
     hdr.add_history('Level 0.9 processed at %s'%(tred))
 
     os.makedirs(outDir, exist_ok=True)
-    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L08.fits','_L09.fits'))
+    ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L07.fits','_L09.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=data, header=hdr1)
+    logger.debug(f'Processed and saved file: {ofile}')
     
     return dfile
 

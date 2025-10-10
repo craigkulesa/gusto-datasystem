@@ -1,10 +1,8 @@
 """Logging functionality for gusto pipeline
 """
-
 import logging
 import time
 import os
-
 
 def init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger'):
     # create logger
@@ -19,10 +17,10 @@ def init_logger(loglevel='DEBUG', logfile=None, loggername='pipelineLogger'):
 
     # create console handler with a high log level
     ch = logging.StreamHandler()
-    ch.setLevel(logging.WARNING)
+    ch.setLevel(logging.INFO)
     
     # create formatter and add it to the handlers
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S' )
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
     

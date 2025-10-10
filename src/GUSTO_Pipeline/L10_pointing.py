@@ -6,6 +6,7 @@ pointing and converts the frequency axis to Doppler velocity in the LSR frame of
 import numpy as np
 import os
 import subprocess
+from tqdm import tqdm 
 from datetime import datetime
 from multiprocessing.pool import Pool
 from importlib.resources import files
@@ -19,7 +20,7 @@ from .DataIO import *
 from .Logger import *
 
 offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
-
+logger = logging.getLogger('pipelineLogger')
 
 def L10_Pipeline(args, scanRange, verbose=False):
     """Function processing the Level 0.95 data injecting 
@@ -38,10 +39,10 @@ def L10_Pipeline(args, scanRange, verbose=False):
             array with firat and last scan number
 
     """
-    global commit_info
+    global commit_info, logger
     prefix = ['NII_', 'CII_'] 
     if args.debug ==True:
-        print('\nExecuting debug mode.\n')
+        logger.info('Executing debug mode')
         logger = logging.getLogger()
         logger.setLevel(10)
         n_procs = 1
@@ -50,7 +51,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
     else:
         n_procs = multiprocessing.cpu_count()
         
-    print('Number of cores used for processing: %i\n'%(n_procs))
+    logger.info('Number of cores used for processing: %i\n'%(n_procs))
     
     inDir = args.path + 'level0.9/'
     outDir = args.path + 'level1/'
@@ -61,27 +62,24 @@ def L10_Pipeline(args, scanRange, verbose=False):
     sum_files = 0
     
     for band in args.band:
-        print('\nProcessing Band', band)
+        logger.info(f'Processing Band {band}')
         dfiles = makeFileGlob(inDir, prefix[int(band)-1], 'fits', scanRange)
         sum_files += len(dfiles)
                     
         paramlist = [[a, b, c, d, e] for a in [band] for b in [inDir] for c in [outDir] for d in dfiles for e in [args.debug]]
         if verbose:
-            print('Number of data files: ', len(dfiles), len(sdirs))
+            logger.debug(f'Number of data files: {len(dfiles)} {len(sdirs)}')
         
         # setup multiprocessing loop here to process each file in list
         with Pool(n_procs) as pool:
-            # execute tasks in order
-            for result in pool.imap(processL10, paramlist):
-                print(f'Processed: {result}', flush=True)
+            list(tqdm(pool.imap_unordered(processL09, paramlist), total=len(dfiles), colour='yellow', leave=False))
         
     return sum_files
 
 
 
-def processL10(params, verbose=True):
-    """Function applying the actual baseline fit
-
+def processL09(params, verbose=True):
+    """Function applying the actual pointing correction to Level 0.9 data
 
     Parameters
     ----------
@@ -188,7 +186,8 @@ def processL10(params, verbose=True):
     ofile = os.path.join(outDir, os.path.split(dfile)[1].replace('_L09.fits','_L10.fits'))
     fits.writeto(ofile, data=None, header=hdr, overwrite=True)
     fits.append(ofile, data=odata, header=hdr1)
-
+    logger.debug(f'Processed and saved file: {ofile}')
+    
     return dfile
 
 
