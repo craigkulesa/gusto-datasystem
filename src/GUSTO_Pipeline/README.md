@@ -23,7 +23,15 @@ The pipeline will create any missing folders and will optionally erase the conte
 
 The "-e" switch makes the installation `editable` which means that edits to the code in the local repository are used when executing the pipeline.
 
-4.  Inspect the installed `config.gusto` file and either leave it in place or make a copy for your local edits.  Generally the defaults are OK but you will almost certainly need to alter the `path` setting to your data root directory.  The pipeline will look for the config.gusto file in the source tree or a .config.gusto file in the user's home directory.
+4. There are a few Python dependencies: pyastronomy, astropy, influxdb (for level 0.7 only), configargparse, and tqdm.  You can install them using your system's package manager (apt, yum, pkgsrc, brew, etc.) , or set up a virtual environment to bypass the system python packages:
+
+```
+	$ python3 -m venv venv
+	$ . ./venv/bin/activate
+	$ pip3 install pyastronomy tqdm astropy influxdb configargparse
+```
+
+5.  Inspect the installed `config.gusto` file and either leave it in place or make a copy for your local edits.  Generally the defaults are OK but you will almost certainly need to alter the `path` setting to your data root directory.  The pipeline will look for the config.gusto file in the source tree or a .config.gusto file in the user's home directory.
 
 ## Usage 
 
@@ -51,9 +59,9 @@ Current arguments are, in no special order:
 
 Minimal (most parameters come from config file or defaults):
 
-	runGUSTO -c /tmp/config.gusto -b 1 -s 14000 15000 -l 0.7 0.8
+	runGUSTO -c /tmp/config.gusto -b 1 -s 14000 15000 -l 0.7
 
-will process Band 1 data from scanIDs 14000 to 15000, performing the Level 0.7 and level 0.8 steps before stopping.  It will read from an externally specified config file.
+will process Band 1 data from scanIDs 14000 to 15000, performing the Level 0.7 step before stopping.  It will read from an externally specified config file.
 
 Maximal (command line overrides most things):
 
@@ -66,123 +74,66 @@ will erase output folders before writing, uses 4 CPUs for operation, processes d
 
 Below is the output from the `maximal` command shown in the last example:
 
-      2025-10-08 22:49:29,589 - pipelineLogger - WARNING - Started logging to /home/obs/data/GUSTO/log/pipeline_20251008224929.log
-      08-10-2025 22:49:29 Executing GUSTO Pipeline.
-      Namespace(config=None, erase=True, verbose=False, debug=False, path='/home/obs/data/GUSTO/', band=['1', '2'], level=['0.5', '1.0'], cpus='4', scanid=['14920', '14930'], polyorder='3', calmethod='cal_scaledGainHOTs', despurmethod='polyRes', spurchannelfilter=False)
-      Command Line Args:   -e -b 1 2 -s 14920 14930 -j 4 -l 0.5 1.0
-      Config File (/home/obs/src/gusto-datasystem/src/GUSTO_Pipeline/config.gusto):
-      path:              /home/obs/data/GUSTO/
-      polyorder:         3
-      calmethod:         cal_scaledGainHOTs
-      despurmethod:      polyRes
-      spurchannelfilter: False
+```
+09-10-2025 19:55:09 Executing GUSTO Pipeline.
+Command Line Args:   -e -b 1 2 -s 14920 14930 -j 4 -l 0.5 1.0
+Config File (/home/obs/src/gusto-datasystem/src/GUSTO_Pipeline/config.gusto):
+  path:              /home/obs/data/GUSTO/
+  polyorder:         3
+  calmethod:         cal_scaledGainHOTs
+  despurmethod:      polyRes
+  spurchannelfilter: False
+  
+2025-10-09 19:55:09 - INFO - Started logging to /home/obs/data/GUSTO/log/pipeline_20251009195509.log
+2025-10-09 19:55:09 - INFO - Executing pipeline levels: ['0.5', '0.7', '0.9', '1.0']
+2025-10-09 19:55:09 - INFO - Scan range for data processing: [14920, 14930]
+#############################################################################
 
+2025-10-09 19:55:09 - INFO - Starting GUSTO Pipeline Level 0.5
+2025-10-09 19:55:09 - WARNING - Erasing /home/obs/data/GUSTO/level0.5
+2025-10-09 19:55:09 - INFO - Number of cores used for processing: 4
+2025-10-09 19:55:09 - INFO - Processing Band 1
+2025-10-09 19:55:10 - INFO - Processing 310 files, please wait...
+2025-10-09 19:55:20 - INFO - Processing Band 2
+2025-10-09 19:55:21 - INFO - Processing 351 files, please wait...
+2025-10-09 19:55:36 - INFO - Pipeline step done. 661 sequences or files were processed.
+2025-10-09 19:55:36 - INFO - Execution time: 0.01h  0.45m   27.19s
 
-      Executing pipeline levels:  ['0.5', '0.7', '0.8', '0.9', '1.0']
-      Scan range for data processing:  [14920, 14930]
-      #############################################################################
-      Executing Level 0.5: generating power spectra from lags and saving as SDFITS
-      Erasing contents of /home/obs/data/GUSTO/level0.5
-      Number of cores used for processing: 4
+#############################################################################
 
-      Processing Band  1
-      Processing  310  files, please wait...
-      Processing Band  2
-      Processing  351  files, please wait...
-	Level 0.5 to 0.7 done.  661  lag files were processed.
+2025-10-09 19:55:36 - INFO - Starting GUSTO Pipeline Level 0.7
+2025-10-09 19:55:36 - WARNING - Erasing /home/obs/data/GUSTO/level0.7/
+2025-10-09 19:55:36 - INFO - Number of cores used for processing: 2
+2025-10-09 19:55:42 - INFO - Pipeline step done. 6 sequences or files were processed.
+2025-10-09 19:55:42 - INFO - Execution time: 0.00h  0.11m   6.41s
 
-      #############################################################################
-      Executing Level 0.7: generating telemetry headers and making sequence files
-      Sequences file seemingly exists, skipping step...
-      Erasing contents of /home/obs/data/GUSTO/level0.7/
-      Processing Band 1 sequence 05702 from 14920 - 14922
-      Processing Band 2 sequence 05702 from 14920 - 14922
-      Processing Band 1 sequence 05704 from 14924 - 14926
-      Processing Band 2 sequence 05704 from 14924 - 14926
-      Processing Band 1 sequence 05707 from 14930 - 14932
-      ERROR: no data!
-      Sequence 05707 NOT OK, flag is 68
-      Processing Band 2 sequence 05707 from 14930 - 14932
-      ERROR: no data!
-      Sequence 05707 NOT OK, flag is 68
-      Processing Band 1 sequence 05703 from 14922 - 14924
-      Processing Band 2 sequence 05703 from 14922 - 14924
-      Processing Band 1 sequence 05705 from 14926 - 14928
-      Processing Band 2 sequence 05705 from 14926 - 14928
-      Processing Band 1 sequence 05706 from 14928 - 14930
-      Processing Band 2 sequence 05706 from 14928 - 14930
-      Number of cores used for processing: 2
+#############################################################################
 
-      Level 0.7 to 0.8 done.  6  sequences were processed.
+2025-10-09 19:55:42 - INFO - Starting GUSTO Pipeline Level 0.9
+2025-10-09 19:55:42 - INFO - Number of cores used for processing: 4
+2025-10-09 19:55:42 - WARNING - Erasing /home/obs/data/GUSTO/level0.9/
+2025-10-09 19:55:42 - INFO - Processing band 1
+2025-10-09 19:56:28 - INFO - Processing band 2
+2025-10-09 19:57:55 - INFO - Pipeline step done. 10 sequences or files were processed.
+2025-10-09 19:57:55 - INFO - Execution time: 0.04h  2.22m   133.03s
 
-      #############################################################################
-      Executing Level 0.8: channel flags for spurs and row flags for bad fringing
-      Erasing contents of /home/obs/data/GUSTO/level0.8/
-      Level 0.8 to 0.9 done.  10  SDFITS files were processed.
+#############################################################################
 
-      #############################################################################
+2025-10-09 19:57:55 - INFO - Starting GUSTO Pipeline Level 1.0
+2025-10-09 19:57:55 - INFO - Number of cores used for processing: 4
+2025-10-09 19:57:55 - WARNING - Erasing /home/obs/data/GUSTO/level1/
+2025-10-09 19:57:55 - INFO - Processing Band 1
+2025-10-09 19:57:56 - INFO - Processing Band 2
+2025-10-09 19:57:57 - INFO - Pipeline step done. 10 sequences or files were processed.
+2025-10-09 19:57:57 - INFO - Execution time: 0.00h  0.03m   1.96s
 
-      Wed Oct  8 22:50:02 2025: Executing 0.9: calibrating spectra
-      Number of cores used for processing: 4
-      Erasing contents of /home/obs/data/GUSTO/level0.9/
-      Processing band 1
-      Processed: /home/obs/data/GUSTO/level0.8/NII_05702_14920_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/NII_05703_14922_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/NII_05704_14924_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/NII_05705_14926_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/NII_05706_14928_L08.fits
-      getCalSpectra: Only REFHOT after OTF available
-      getCalSpectra: Only REFHOT after OTF available
-      getCalSpectra: Only REFHOT after OTF available
-      getCalSpectra: Only REFHOT before OTF available
-      getCalSpectra: Only REFHOT before OTF available
-      getCalSpectra: Only REFHOT before OTF available
+#############################################################################
 
-      Processing band 2
-      Processed: /home/obs/data/GUSTO/level0.8/CII_05702_14920_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/CII_05703_14922_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/CII_05704_14924_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/CII_05705_14926_L08.fits
-      Processed: /home/obs/data/GUSTO/level0.8/CII_05706_14928_L08.fits
-      getCalSpectra: Only REFHOT after OTF available
-      getCalSpectra: Only REFHOT after OTF available
-      getCalSpectra: Only REFHOT before OTF available
-      getCalSpectra: Only REFHOT before OTF available
-      getCalSpectra: Only REFHOT before OTF available
-      getCalSpectra: Only REFHOT before OTF available
-
-      Level 0.9 pipeline done.
-
-      Execution time: 0.04h  2.20m   131.85s
-      Processed 10 files.
-
-      #############################################################################
-      Executing Level 1.0 pipeline: coordinate corrections
-      Number of cores used for processing: 4
-
-      Erasing contents of /home/obs/data/GUSTO/level1/
-
-      Processing Band 1
-      Processed: /home/obs/data/GUSTO/level0.9/NII_05702_14920_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/NII_05703_14922_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/NII_05704_14924_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/NII_05705_14926_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/NII_05706_14928_L09.fits
-
-      Processing Band 2
-      Processed: /home/obs/data/GUSTO/level0.9/CII_05702_14920_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/CII_05703_14922_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/CII_05704_14924_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/CII_05705_14926_L09.fits
-      Processed: /home/obs/data/GUSTO/level0.9/CII_05706_14928_L09.fits
-      Level 0.9 to 1.0 done.  10 SDFITS files were processed.
-
-      #############################################################################
-
-      08-10-2025 22:52:16 Done running GUSTO Pipeline.
-
-
+09-10-2025 19:57:57 Done running GUSTO Pipeline.
+```
 
 ## Special notes for current version 
 - If you are using the influx database from DR1 Rev A or earlier, please download and install the new version (reduced size = 260 MB) with interpolated calibration load THOT values when they are missing: [see link to calibration folder](http://soral.as.arizona.edu/GUSTO/calibration/) and look at the instructions for installing it from the Level 0.5 pipeline readme.
-- Finally, either delete any old sequences.txt file for the L07 pipeline to regenerate, or download a new sequences.txt from the calibration folder, above
+- As of October 2025, the level 0.5-level 1 SDFITS format has changed slightly.  In the data table, there are two new columns for Tsys and rms which are ignored at levels 0.5-0.7 and filled in at level 0.9.  If you are processing data with the new pipeline, either generate new level 0.5 data yourself or use a new starting dataset for level 0.5 or 0.7 (October 2025 or newer).
+- After sufficient refactoring, the level 0.8 pipeline has been absorbed into level 0.7 -- there were only 2 dozen lines to add.  
+- The sequences file changd in June 2025.  If you are using an older version, either delete any old sequences.txt file for the L07 pipeline to regenerate, or download a new sequences.txt from the calibration folder, above.
