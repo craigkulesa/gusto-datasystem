@@ -134,7 +134,7 @@ def makeUDP(startID, stopID, dir):
                     data=unpack('<2I5f2I15d',chunk)
                     output.append(list(data))  # convert tuple to list to modify the time
         except Exception as error:
-            logger.info(error)
+            logger.debug(error)
     for entry in output:  # convert integer timespec to floating point unixtime
         entry[0] = entry[0]+entry[1]/1.0e9
     if len(output) == 0:
@@ -154,7 +154,7 @@ def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=1800
         query = f"SELECT * FROM /^{queryStr}*/ WHERE time > {startTime:d} AND time < {endTime:d} ORDER BY time DESC"
         results = client.query(query, epoch='ms')
     if results.items() == []:  
-        logger.info("WARNING:  Nothing from influx query", queryStr, "returned.")
+        logger.debug(f"WARNING:  Nothing from influx query {queryStr} returned.")
         if queryStr == 'B2_AD590_' or queryStr == 'B1_AD590_':
             seqFlag |= SeqFlags.MAYBE_HUNG_LO
         else:
@@ -186,7 +186,10 @@ def isKnownBad(number, ranges):
 # split and rearrange an influx query into a table with time and mixer data in columns
 def splitConcatenate(array, dim=4):
     array = np.array(array)
-    chunks = np.split(array, dim)
+    try:
+        chunks = np.split(array, dim)
+    except:
+        chunks = np.array_split(array, dim)
     newarray = np.concatenate(chunks, axis=1)
     chop = list(range(2, newarray.shape[1], 2))
     newarray = np.delete(newarray, chop, axis=1)
@@ -285,7 +288,7 @@ def processFITS(data_path, input_files, output_file, band, pointingStream, seqID
         gmon = splitConcatenate(gmon)
     except Exception as e:
         skipHKinsert = True
-        logger.debug("WARNING: ", e, "Some columns will have zeroed bias data.")
+        logger.debug(f"WARNING: {e} Some columns will have zeroed bias data.")
 
     # Now we can loop through all the rows and assign the closest HK in time.
     # While we are here, update data types, row flags, and channel flags (formerly L08).
