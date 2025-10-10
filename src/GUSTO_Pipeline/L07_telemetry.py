@@ -5,6 +5,7 @@ from multiprocessing import Pool
 from functools import partial
 from struct import unpack
 from datetime import datetime
+from importlib.resources import files
 from tqdm import tqdm
 
 import os
@@ -164,7 +165,8 @@ def getInflux(startTime, endTime, queryStr, seqFlag, getAll=False, lookBack=1800
 
 def getIFinfo(startTime, path):
     try:
-        data = np.genfromtxt(path+"IF.txt", delimiter=None, dtype=None, usecols=(0,1,3,5,6,7), encoding=None, names=True)
+        inputFile = files('GUSTO_Pipeline') / 'calib/IF.txt'
+        data = np.genfromtxt(inputFile, delimiter=None, dtype=None, usecols=(0,1,3,5,6,7), encoding=None, names=True)
     except Exception as e:
         raise Exception(f"Error reading CSV file: {e}")
 
@@ -440,12 +442,13 @@ def scanSequenceFile(input, options):
 def L07_Pipeline(args, scanRange, verbose):
     global commit_info
     dirDataOut = args.path + 'level0.7/'
-    input = args.path + 'sequences.txt'
+    sequencesFile = args.path + 'sequences.txt'
+    dataLogFile = files('GUSTO_Pipeline') / 'calib/dataLog.txt'
 
     commit_info = runGitLog('0.7', 'L07_telemetry.py')  # lookup git commit info only once
     
-    if not os.path.exists(input) or os.path.getsize(input) == 0:
-        makeSequences(args.path+"dataLog.txt", args.path + sequencesFile)
+    if not os.path.exists(sequencesFile) or os.path.getsize(sequencesFile) == 0:
+        makeSequences(dataLogFile, sequencesFile)
     else:
         logger.debug("Sequences file seemingly exists, skipping step...")
 
@@ -453,7 +456,7 @@ def L07_Pipeline(args, scanRange, verbose):
     if args.erase:
         clear_folder(dirDataOut)
 
-    inRange = scanSequenceFile(input, args)  # scan to find elements in the scanID range
+    inRange = scanSequenceFile(sequencesFile, args)  # scan to find elements in the scanID range
     if(args.cpus):
         n_procs = int(float(args.cpus)/2)  # make it half of what we use everywhere else
         if n_procs < 1:  # but not less than 1
