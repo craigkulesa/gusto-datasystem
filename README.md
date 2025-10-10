@@ -17,4 +17,7 @@ At level 0.9, the bandpasses are normalized by calibration frames and a second r
 #### Level 2 maps
 Based on the spectral quality factors assigned before level 1, the level 2 processor assigns weights to each spectrum, and remaps the "random" sampling of the on-the-fly (drift scanning) observations into a regularly sampled grid.   The product of the level 2 processor are 3D FITS cubes with a tile size of the order of 1-2 square degrees. 
 ## Further reading
+
+Please see the [README.md](src/GUSTO_Pipeline/README.md) file in the `src/GUSTO_Pipeline` folder for installation and usage. 
+
 The [GUSTO Science Data Management Plan is available here](http://soral.as.arizona.edu/mediawiki/documents/GUSTO/GUSTO-UA-DOC-00043_GUSTO%20Science%20Data%20Management%20Plan_Rev_A.pdf).
