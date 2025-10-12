@@ -27,5 +27,8 @@ def getConfiguration(verbose=False):
     
     args = parser.parse_args()
     print(parser.format_values())
-    
+
+    if not args.path.endswith('/'):
+        args.path=args.path+'/'
+        
     return args
