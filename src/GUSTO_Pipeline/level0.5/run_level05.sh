@@ -32,6 +32,10 @@ if [ $erase -eq 1 ]; then
 fi
 rm -f x??
 
+cd src
+make
+cd ..
+
 if [ $cpus -eq 1 ]; then
     echo "Running corrspec on $list in uniprocessor mode"
     ./src/corrspec $list $outDir

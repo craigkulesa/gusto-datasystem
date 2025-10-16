@@ -30,5 +30,4 @@ def getConfiguration(verbose=False):
 
     if not args.path.endswith('/'):
         args.path=args.path+'/'
-        
     return args

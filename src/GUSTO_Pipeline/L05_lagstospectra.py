@@ -10,19 +10,18 @@ def L05_Pipeline(args, scanRange, verbose=False):
     global logger
     L05_basedir = str(files('GUSTO_Pipeline') / 'level0.5')
     prefix = ['ACS5_', 'ACS3_']
-    dirDataOut = args.path+'level0.5'
-    os.makedirs(dirDataOut, exist_ok=True)
+    outDir = args.path+'level0.5'
+    os.makedirs(outDir, exist_ok=True)
     inDir = args.path+'lags/'
     sum_files = 0
     if args.erase:
-        clear_folder(dirDataOut)
+        clear_folder(outDir)
     if args.cpus:
         cpuStr = '-j '+args.cpus
         logger.info('Number of cores used for processing: %i'%int(args.cpus))
     else:
         cpuStr = ''
-    outPath = args.path+'level0.5'
-    
+
     for band in args.band:
         logger.info(f"Processing Band {band}")
         fileList = makeFileGlob(inDir, prefix[int(band)-1], 'dat', scanRange)
@@ -30,7 +29,7 @@ def L05_Pipeline(args, scanRange, verbose=False):
             file.write("\n".join(fileList))
         logger.info(f"Processing {len(fileList)} files, please wait...")
         try:
-            result=subprocess.run(['./run_level05.sh', cpuStr, '-f '+L05_basedir+'/filelist.txt', '-o '+outPath], cwd=L05_basedir, capture_output=True, text=True, check=True)
+            result=subprocess.run(['./run_level05.sh', cpuStr, '-f '+L05_basedir+'/filelist.txt', '-o '+outDir], cwd=L05_basedir, capture_output=True, text=True, check=True)
             logger.debug(result.stdout)
         except subprocess.CalledProcessError as e:
             logger.info(f"Error: {e}")
