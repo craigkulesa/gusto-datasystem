@@ -2,13 +2,9 @@
 This is the GUSTO Pipeline run script.
 """
 from .Logger import *
-from .L05_lagstospectra import *
-from .L07_telemetry import *
-from .L09_calibrate import *
-from .L10_pointing import *
 from .Configuration import *
 from datetime import datetime
-
+import importlib
 
 def runGUSTO(verbose=False):
     r"""Function executing the GUSTO pipeline.
@@ -34,7 +30,8 @@ def runGUSTO(verbose=False):
 
     # now figure out what levels we need to run
     levels = ['0.5', '0.7', '0.9', '1.0']
-    funcs = [L05_Pipeline, L07_Pipeline, L09_Pipeline, L10_Pipeline]
+    funcNames = ['L05_Pipeline', 'L07_Pipeline', 'L09_Pipeline', 'L10_Pipeline']
+    modules = ['.L05_lagstospectra', '.L07_telemetry', '.L09_calibrate', '.L10_pointing']
     
     isl = args.level[0]
     if isl not in levels:
@@ -58,7 +55,9 @@ def runGUSTO(verbose=False):
         if step in exlevels:
             logger.info(f'Starting GUSTO Pipeline Level {step}')
             stt = time.time()
-            n_files = funcs[index](args, scanRange, verbose=verbose)
+            pipelineModule = importlib.import_module(modules[index], package='GUSTO_Pipeline')
+            pipelineDef = getattr(pipelineModule, funcNames[index])
+            n_files = pipelineDef(args, scanRange, verbose=verbose)
             ent = time.time()
             logger.info(f'Pipeline step done. {n_files} sequences or files were processed.')
             logger.info('Execution time: %.2fh  %.2fm   %.2fs'%((ent-stt)/3600.,(ent-stt)/60.,ent-stt))
