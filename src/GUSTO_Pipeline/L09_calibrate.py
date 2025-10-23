@@ -367,7 +367,7 @@ checkRowflags = np.vectorize(checkRowflag)
     # save spectra to FITS file
         
 def L09_Pipeline(args, scanRange, verbose=False):
-    global commit_info, logger
+    global logger
     prefix = ['NII_', 'CII_'] 
     """Function processing the Level 0.7 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
@@ -408,7 +408,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
         params = {'band': int(band), 'inDir': inDir, 'outDir': outDir, 'polyorder': polyorder, 
                   'calmethod': calmethod, 'despurmethod': despurmethod,
                   'spurchannelfilter': spurchannelfilter, 'debug': args.debug, 'verbose': verbose,
-                  'pxrange': pxrange, 'rowflagfilter': rowflagfilter}
+                  'pxrange': pxrange, 'rowflagfilter': rowflagfilter, 'commit_info': commit_info}
         paramlist = [[a, b] for a in dfiles for b in [params]]
 
         if verbose:
@@ -511,13 +511,12 @@ def processL07(paramlist):
     """Function processing the Level 0.7 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
     """
-    global commit_info
     TSKY = [33, 45]
     dfile = paramlist[0]
     params = paramlist[1]
-    band, inDir, outDir, polyorder, calmethod, debug = params['band'], params['inDir'], params['outDir'], params['polyorder'], params['calmethod'], params['debug']
-    verbose = params['verbose']
-    rowflagfilter = params['rowflagfilter']
+    band, inDir, outDir, polyorder, calmethod, debug, verbose, rowflagfilter, commit_info = \
+        params['band'], params['inDir'], params['outDir'], params['polyorder'], params['calmethod'], \
+        params['debug'], params['verbose'], params['rowflagfilter'], params['commit_info']
     #pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))      # good pixel ranges
 
     logger.debug(f'Loading file: {dfile}')

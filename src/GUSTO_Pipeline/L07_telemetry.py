@@ -17,6 +17,7 @@ from .DataIO import *
 from .Logger import *
 
 logger = logging.getLogger('pipelineLogger')
+commit_info = ''
 
 def makeSequences(input, output):
     logger.info("Making new sequences file")

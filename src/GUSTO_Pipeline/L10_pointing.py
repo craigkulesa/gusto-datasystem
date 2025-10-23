@@ -39,7 +39,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
             array with firat and last scan number
 
     """
-    global commit_info, logger
+    global logger
     prefix = ['NII_', 'CII_'] 
     if args.debug ==True:
         logger.info('Executing debug mode')
@@ -66,7 +66,7 @@ def L10_Pipeline(args, scanRange, verbose=False):
         dfiles = makeFileGlob(inDir, prefix[int(band)-1], 'fits', scanRange)
         sum_files += len(dfiles)
                     
-        paramlist = [[a, b, c, d, e] for a in [band] for b in [inDir] for c in [outDir] for d in dfiles for e in [args.debug]]
+        paramlist = [[a, b, c, d, e, f] for a in [band] for b in [inDir] for c in [outDir] for d in dfiles for e in [args.debug] for f in [commit_info]]
         if verbose:
             logger.debug(f'Number of data files: {len(dfiles)} {len(sdirs)}')
         
@@ -87,9 +87,8 @@ def processL09(params, verbose=True):
             list of parameters used in process
 
     """
-    global commit_info
 
-    line, inDir, outDir, dfile, debug = params[0], params[1], params[2], params[3], params[4]
+    line, inDir, outDir, dfile, debug, commit_info = params[0], params[1], params[2], params[3], params[4], params[5]
     spec, data, hdr, hdr1 = loadSDFITS(os.path.join(inDir,dfile), verbose=False)
     
     umixers = np.unique(data['MIXER'])
