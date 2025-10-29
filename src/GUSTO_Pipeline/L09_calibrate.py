@@ -175,6 +175,8 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
     for rhID in rhIDs:
         rsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (rflags))
         hsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (rflags))
+        if not any(hsel) or not any(rsel):
+            continue
         htime = stime[hsel].mean()
         rtime = stime[rsel].mean()
         osel = np.argwhere((mixer == mixers) & (scan_type == 'OTF') & (rflags))
