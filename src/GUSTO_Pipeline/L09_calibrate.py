@@ -60,13 +60,10 @@ def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     # identify the OTF spectra
     otsel = (mixers == mixer) & (scan_type == 'OTF') & (rflags)
     otfID = np.unique(scanID[otsel])
-    if len(otfID) > 1:
-        otfID = otfID[1:]
-        logger.debug('reducing number of OTF IDs to 1')
     return otfID, rfsID, rhsID, hotID
 
 
-def getWeights(spec, hdr, selectS, selectR, cutoff=0.33):
+def getWeights(spec, hdr, selectS, selectR, cutoff=0.3):
     """Function getWeights imports a scanID and selections for S and R and computes
     the rms of (S-R)/R and returns weights accordingly. 
 
@@ -146,12 +143,13 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
     stime = data['UNIXTIME']
 
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
-    if (len(otfID)>1):
-        logger.debug('getCalSpectra mixer %i: Too many OTF scan IDs for processing: '%(mixer))
-        return -999, 0, 0, 0, 0, 0, 0, [0,0], 0
 
-    bef = rhsID[rhsID<otfID]
-    aft = rhsID[rhsID>otfID]
+    try:
+        bef = rhsID[rhsID<otfID]
+        aft = rhsID[rhsID>otfID]
+    except:
+        bef = rhsID[rhsID<otfID[0]]
+        aft = rhsID[rhsID>otfID[0]]
     if (len(bef)>0) & (len(aft)>0):
         rhIDbef = bef[np.argmax(bef)]
         rhIDaft = aft[np.argmin(aft)]
@@ -166,7 +164,7 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
         logger.debug('getCalSpectra: Only REFHOT before OTF available')
     else:
         logger.debug('getCalSpectra: Not enough REFHOT scans available (before/after OTF)')
-        return -999, 0, 0, 0, 0, 0, 0, [0,0], 0
+        return -999, 0, 0, 0, 0, 0, [0,0], 0
 
     Tsyss = []
     REFs = []
@@ -179,9 +177,9 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
         hsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (rflags))
         htime = stime[hsel].mean()
         rtime = stime[rsel].mean()
-        osel = np.argwhere((mixer == mixers) & (scan_type == 'OTF') & (rflags) & (abs(stime - rtime) < 900))
+        osel = np.argwhere((mixer == mixers) & (scan_type == 'OTF') & (rflags))
         closest = np.argmin(np.abs(stime[osel] - rtime))
-        ohsel = np.argwhere((mixer == mixers) & (scan_type == 'HOT') & (rflags) & (abs(stime - htime) < 900))
+        ohsel = np.argwhere((mixer == mixers) & (scan_type == 'HOT') & (rflags))
         hot_closest = np.argmin(np.abs(stime[ohsel] - htime))
         
         weights = getWeights(spec, hdr, rsel, osel[closest]) # compare REFs w/ closest OTF 
@@ -267,7 +265,7 @@ def getHotInfo(spec, data, hdr, mixer, dfile='', verbose=False, rowflagfilter=0)
     uhts = np.unique(htscans)
 
     # the first OTF scan ID should be the one determining the sequence
-    if uots.size == 0 or uots.size > 1:
+    if uots.size == 0 or uots.size > 3:
         # bad sequence with none or too many OTFs
         logger.debug("SEQUENCE HAS THE WRONG NUMBER OF OTFs")
         return 0,0,0,0
@@ -571,8 +569,7 @@ def processL07(paramlist):
             datavalid[k] = False
             continue
                 
-        otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
-        osel = np.argwhere((otfID == data['scanID']) & (rfsID.size>=1) & (rhsID.size>=1) & 
+        osel = np.argwhere((np.isin(data['scanID'], otfID)) & (rfsID.size>=1) & (rhsID.size>=1) & 
                            (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & 
                            (rflag)).flatten()
         if len(osel) > 2:
