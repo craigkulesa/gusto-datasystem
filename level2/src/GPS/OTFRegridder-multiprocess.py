@@ -48,7 +48,7 @@ directory = '/Volumes/GUSTO/Data/level1.0/'
 #build a second 3D array for counting denominator to divide by when done
 spacing = 2.0/60 # 2 arcmin spatial spacing
 vel_spacing = 2 # km/s
-linename = "NII"
+linename = "CII"
 
 #GPS
 #source_name="GPS"
@@ -58,21 +58,29 @@ linename = "NII"
 #b_vector = np.arange(-1.5,1.5,spacing)
 #v_vector = np.arange(-250,250,vel_spacing)
 
+#NGC6357
+#source_name="NGC6357"
+#l_start=352
+#l_end=354
+#l_vector = np.arange(l_start,l_end,spacing)
+#b_vector = np.arange(-1.5,2.5,spacing)
+#v_vector = np.arange(-250,250,vel_spacing)
+
 #LMC
-source_name="LMC"
-l_start=278.5
-l_end=281
-l_vector = np.arange(l_start,l_end,spacing)
-b_vector = np.arange(-32.1,-30,spacing)
-v_vector = np.arange(0,500,vel_spacing)
+#source_name="LMC"
+#l_start=278.5
+#l_end=281
+#l_vector = np.arange(l_start,l_end,spacing)
+#b_vector = np.arange(-32.1,-30,spacing)
+#v_vector = np.arange(0,500,vel_spacing)
 
 #NGC3603
-#source_name="NGC3603"
-#l_start=290
-#l_end=293
-#l_vector = np.arange(l_start,l_end,spacing)
-#b_vector = np.arange(-2,1,spacing)
-#v_vector = np.arange(-200,300,vel_spacing)
+source_name="NGC3603"
+l_start=291
+l_end=292
+l_vector = np.arange(l_start,l_end,spacing)
+b_vector = np.arange(-1.0,0.0,spacing)
+v_vector = np.arange(50,250,vel_spacing)
 
 l_grid, b_grid, v_grid = np.meshgrid(l_vector,b_vector,v_vector,indexing='ij')
 intensity_sum = np.zeros_like(v_grid,dtype='float64')
@@ -103,7 +111,7 @@ def worker(input_q,output_q):
         npix    = hdr['NPIX']            
         IF_pix  = hdr['CRPIX1']
         IF_val  = hdr['CRVAL1']
-        IF_del  = 4.887586
+        IF_del  = hdr['CDELT1']
         IF_freq = (np.arange(npix)-IF_pix)*IF_del+IF_val
         VLSR    = hdr['VLSR']        
         
@@ -229,9 +237,9 @@ if __name__ == '__main__':
 
     print("Generating outputs...")
     intensity=intensity_sum/(count_sum*vel_spacing)
-    start_range=50
-    end_range=200
-    for idx in range(start_range,end_range):
+#    start_range=50
+#    end_range=200
+    for idx in range(len(v_vector)):
         #print(idx,v_vector[idx])
         plt.figure(figsize=(2,2),dpi=100)
         plt.clf()
@@ -247,7 +255,7 @@ if __name__ == '__main__':
         plt.gca().set_aspect('equal', adjustable='datalim')
         plt.colorbar(output)
         #plt.show()
-        plt.savefig(f'{source_name}-{linename}-2-{(idx-start_range):03d}.png',dpi=100)
+        plt.savefig(f'{source_name}-{linename}-2-{(idx):03d}.png',dpi=100)
 
     # open a new blank FITS file
     hdr = fits.Header()
