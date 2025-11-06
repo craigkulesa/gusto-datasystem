@@ -77,10 +77,11 @@ linename = "CII"
 #NGC3603
 source_name="NGC3603"
 l_start=291
-l_end=292
+l_end=292.2
 l_vector = np.arange(l_start,l_end,spacing)
 b_vector = np.arange(-1.0,0.0,spacing)
-v_vector = np.arange(50,250,vel_spacing)
+v_vector = np.arange(80,300,vel_spacing)
+t_max = 3
 
 l_grid, b_grid, v_grid = np.meshgrid(l_vector,b_vector,v_vector,indexing='ij')
 intensity_sum = np.zeros_like(v_grid,dtype='float64')
@@ -128,6 +129,7 @@ def worker(input_q,output_q):
         #osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
         #osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==5) | (data['MIXER']==8)) & (data['rms']<5)).flatten()
         if (linename == "CII"):
+            #osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==8))).flatten()
             osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==5) | (data['MIXER']==8))).flatten()
         if (linename == "NII"):
             osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==2) | (data['MIXER']==3) | (data['MIXER']==6))).flatten()
@@ -176,8 +178,9 @@ def worker(input_q,output_q):
                 if wrapped_l<180: wrapped_l += 360
                 l_index = (l_vector >= wrapped_l-spacing/2) & (l_vector < wrapped_l+spacing/2)
                 b_index = (b_vector >= c_l_b.b.value[i0]-spacing/2) & (b_vector < c_l_b.b.value[i0]+spacing/2)
-                full_std_dev = np.ma.std(spec_OTF[i0,:])
-                weight = 1.0/(full_std_dev ** 2)
+                #full_std_dev = np.ma.std(spec_OTF[i0,:])
+                #weight = 1.0/(full_std_dev ** 2)
+                weight = 1.0/(data_OTF['rms'][i0]**2)
                 #if (l_index[10] & b_index[71]):
                 #    print(dsc,i0,data_OTF['MIXER'][i0],hex(data_OTF['ROW_FLAG'][i0]),np.ma.sum(spec_OTF[i0,:]),full_std_dev,weight)
                 #    plt.plot(vlsr,spec_OTF[i0])
@@ -239,25 +242,8 @@ if __name__ == '__main__':
     intensity=intensity_sum/(count_sum*vel_spacing)
 #    start_range=50
 #    end_range=200
-    for idx in range(len(v_vector)):
-        #print(idx,v_vector[idx])
-        plt.figure(figsize=(2,2),dpi=100)
-        plt.clf()
-        output = plt.pcolormesh(l_grid[:,:,1],b_grid[:,:,1],intensity[:,:,idx],vmin=-1,vmax=2)
-        plt.gca().invert_xaxis()
-        plt.xlabel("Galactic Longitude",color='black')
-        plt.ylabel("Galactic Latitude",color='black')
-        plt.gca().set_facecolor('black')
-        if (linename == "CII"):
-            plt.gca().title.set_text("line:CII mixers:5,8 vel:%.0f to %.0f km/s" % (v_vector[idx], v_vector[idx+1]))
-        if (linename == "NII"):
-            plt.gca().title.set_text("line:NII mixers:2,3,6 vel:%.0f to %.0f km/s" % (v_vector[idx], v_vector[idx+1]))
-        plt.gca().set_aspect('equal', adjustable='datalim')
-        plt.colorbar(output)
-        #plt.show()
-        plt.savefig(f'{source_name}-{linename}-2-{(idx):03d}.png',dpi=100)
 
-    # open a new blank FITS file
+        # open a new blank FITS file
     hdr = fits.Header()
     hdr['NAXIS']   = 3
     hdr['DATAMIN'] = np.nanmin(intensity)
@@ -292,4 +278,25 @@ if __name__ == '__main__':
     # Write the data cube and header to a FITS file
     hdu = fits.PrimaryHDU(data=intensity, header=hdr)
     datestring = datetime.today().strftime('%Y%m%d')
-    hdu.writeto(f'{source_name}-{linename}-{datestring}.fits', overwrite=True)
+    hdu.writeto(f'{source_name}-{linename}-rms-{datestring}.fits', overwrite=True)
+
+    
+    for idx in range(len(v_vector)-1):
+        #print(idx,v_vector[idx])
+        plt.figure(figsize=(2,2),dpi=100)
+        plt.clf()
+        output = plt.pcolormesh(l_grid[:,:,1],b_grid[:,:,1],intensity[:,:,idx],vmin=-1,vmax=t_max)
+        plt.gca().invert_xaxis()
+        plt.xlabel("Galactic Longitude",color='black')
+        plt.ylabel("Galactic Latitude",color='black')
+        plt.gca().set_facecolor('black')
+        if (linename == "CII"):
+            #plt.gca().title.set_text("line:CII mixers:8 vel:%.0f to %.0f km/s" % (v_vector[idx], v_vector[idx+1]))
+            plt.gca().title.set_text("line:CII mixers:5,8 vel:%.0f to %.0f km/s" % (v_vector[idx], v_vector[idx+1]))
+        if (linename == "NII"):
+            plt.gca().title.set_text("line:NII mixers:2,3,6 vel:%.0f to %.0f km/s" % (v_vector[idx], v_vector[idx+1]))
+        plt.gca().set_aspect('equal', adjustable='datalim')
+        plt.colorbar(output)
+        #plt.show()
+        plt.savefig(f'{source_name}-{linename}-rms-{(idx):03d}.png',dpi=100)
+
