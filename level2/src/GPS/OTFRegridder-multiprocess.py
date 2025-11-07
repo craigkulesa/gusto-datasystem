@@ -58,13 +58,23 @@ linename = "CII"
 #b_vector = np.arange(-1.5,1.5,spacing)
 #v_vector = np.arange(-250,250,vel_spacing)
 
+#NGC6334
+source_name="NGC6334"
+l_start=350.5
+l_end=354
+l_vector = np.arange(l_start,l_end,spacing)
+b_vector = np.arange(-1.5,2.5,spacing)
+v_vector = np.arange(-250,250,vel_spacing)
+t_max = 4
+
 #NGC6357
 #source_name="NGC6357"
 #l_start=352
 #l_end=354
 #l_vector = np.arange(l_start,l_end,spacing)
 #b_vector = np.arange(-1.5,2.5,spacing)
-#v_vector = np.arange(-250,250,vel_spacing)
+#v_vector = np.arange(0,250,vel_spacing)
+#t_max = 4
 
 #LMC
 #source_name="LMC"
@@ -75,13 +85,13 @@ linename = "CII"
 #v_vector = np.arange(0,500,vel_spacing)
 
 #NGC3603
-source_name="NGC3603"
-l_start=291
-l_end=292.2
-l_vector = np.arange(l_start,l_end,spacing)
-b_vector = np.arange(-1.0,0.0,spacing)
-v_vector = np.arange(80,300,vel_spacing)
-t_max = 3
+#source_name="NGC3603"
+#l_start=291
+#l_end=292.2
+#l_vector = np.arange(l_start,l_end,spacing)
+#b_vector = np.arange(-1.0,0.0,spacing)
+#v_vector = np.arange(-250,116,vel_spacing)
+#t_max = 3
 
 l_grid, b_grid, v_grid = np.meshgrid(l_vector,b_vector,v_vector,indexing='ij')
 intensity_sum = np.zeros_like(v_grid,dtype='float64')
@@ -108,15 +118,24 @@ def worker(input_q,output_q):
         rowFlag = data['ROW_FLAG']
         n_spec, n_pix = spec.shape
         
-        # compute velocity                                                           
+        # new level 1 files are already in V_lsr, no longer need this code
+        ## compute velocity                                                           
         npix    = hdr['NPIX']            
-        IF_pix  = hdr['CRPIX1']
-        IF_val  = hdr['CRVAL1']
-        IF_del  = hdr['CDELT1']
-        IF_freq = (np.arange(npix)-IF_pix)*IF_del+IF_val
-        VLSR    = hdr['VLSR']        
+        #IF_pix  = hdr['CRPIX1']
+        #IF_val  = hdr['CRVAL1']
+        #IF_del  = hdr['CDELT1']
+        #IF_freq = (np.arange(npix)-IF_pix)*IF_del+IF_val
+        #VLSR    = hdr['VLSR']        
+        #
+        #IF_vlsr0= hdr['IF0']
+        #vlsr    = (IF_vlsr0 - IF_freq)/line_freq*constants.c.value/1.e3 + VLSR # Vlsr in km/s 
         
-        IF_vlsr0= hdr['IF0']
+        # new level 1 V_lsr import
+        VLSR_pix  = hdr['CRPIX1']
+        VLSR_val  = hdr['CRVAL1']
+        VLSR_del  = hdr['CDELT1']
+        vlsr = (np.arange(npix)-VLSR_pix)*VLSR_del+VLSR_val
+        
         line_freq = hdr['LINEFREQ']
         
         if (linename == "CII") & (line_freq < 1900500):
@@ -124,7 +143,6 @@ def worker(input_q,output_q):
         if (linename == "NII") & (line_freq > 1900500):
             continue
         
-        vlsr    = (IF_vlsr0 - IF_freq)/line_freq*constants.c.value/1.e3 + VLSR # Vlsr in km/s 
         
         #osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
         #osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==5) | (data['MIXER']==8)) & (data['rms']<5)).flatten()
