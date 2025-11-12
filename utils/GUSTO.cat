@@ -1,0 +1,90 @@
+# $LastChangedDate: 2017-01-12 12:03:03 -0700 (Thu, 12 Jan 2017) $
+# $Rev: 230 $ $Author: peters $
+
+11:11:52.9  -61:18:55   J2000  TARGET     -24 LSR   # 167.9704 deg RA, -61.3153
+11:11:52.9  -61:18:55   J2000  Target     -24 LSR   # 167.9704 deg RA, -61.3153
+11:11:52.9  -61:18:55   J2000  NGC3576     -24 LSR   # 167.9704 deg RA, -61.3153
+
+08:59:04.3   -47:30:25   J2000  RCW38	    +2 LSR   # 134.768 deg RA, -47.507 
+  337.360    -20.900 GALACTIC  NGC7293      5 LSR
+
+  287.686   -0.7883  GALACTIC  etaCar     -20 LSR
+  287.380   -0.680   GALACTIC  etaCar2    -26 LSR    # PS coordinate (~Region 3)
+  286.2     +0.1     GALACTIC  etaCar5    -20 LSR    # Region 5 (Zhang et al, 2001)
+17:19:58   -35:57:47    J2000  NGC6334    -1.6 LSR   # 259.992 -35.963
+  168.787  -61.281      J2000  NGC3603     3.0 LSR   # 259.992 -35.963
+	   
+05:38:42    -69:05:40   J2000  30Dor       280 HEL   # 84.675  -69.094
+05:38:42    -69:05:40   J2000  LMC         250 LSR   # 84.675  -69.094
+
+   308.92  +0.12      GALACTIC  GL4176      -50 LSR
+   309.91  +0.37      GALACTIC  GL4182      -57 LSR
+   322.16  +0.62      GALACTIC  RCW92       -57 LSR
+   348.18  -0.47      GALACTIC  RCW120      -10 LSR
+
+   300.0  0.0         GALACTIC G300   -50 LSR
+   301.0  0.0         GALACTIC G301   -50 LSR
+   302.0  0.0         GALACTIC G302   -50 LSR
+   303.0  0.0         GALACTIC G303   -50 LSR
+   304.0  0.0         GALACTIC G304   -50 LSR
+   305.0  0.0         GALACTIC G305   -50 LSR
+   306.0  0.0         GALACTIC G306   -50 LSR
+   307.0  0.0         GALACTIC G307   -50 LSR
+   308.0  0.0         GALACTIC G308   -50 LSR
+   309.0  0.0         GALACTIC G309   -50 LSR
+   310.0  0.0         GALACTIC G310   -50 LSR
+   311.0  0.0         GALACTIC G311   -50 LSR
+   312.0  0.0         GALACTIC G312   -50 LSR
+   313.0  0.0         GALACTIC G313   -50 LSR
+   314.0  0.0         GALACTIC G314   -50 LSR
+   315.0  0.0         GALACTIC G315   -50 LSR
+   316.0  0.0         GALACTIC G316   -50 LSR
+   317.0  0.0         GALACTIC G317   -50 LSR
+   318.0  0.0         GALACTIC G318   -50 LSR
+   319.0  0.0         GALACTIC G319   -50 LSR
+   320.0  0.0         GALACTIC G320   -50 LSR
+   321.0  0.0         GALACTIC G321   -50 LSR
+   322.0  0.0         GALACTIC G322   -50 LSR
+   323.0  0.0         GALACTIC G323   -50 LSR
+   324.0  0.0         GALACTIC G324   -50 LSR
+   325.0  0.0         GALACTIC G325   -50 LSR
+   326.0  0.0         GALACTIC G326   -50 LSR
+   327.0  0.0         GALACTIC G327   -50 LSR
+   328.0  0.0         GALACTIC G328   -50 LSR
+   329.0  0.0         GALACTIC G329   -50 LSR
+   330.0  0.0         GALACTIC G330   -50 LSR
+   331.0  0.0         GALACTIC G331   -50 LSR
+   332.0  0.0         GALACTIC G332   -50 LSR
+   333.0  0.0         GALACTIC G333   -50 LSR
+   334.0  0.0         GALACTIC G334   -50 LSR
+   335.0  0.0         GALACTIC G335   -50 LSR
+   336.0  0.0         GALACTIC G336   -50 LSR
+   337.0  0.0         GALACTIC G337   -50 LSR
+   338.0  0.0         GALACTIC G338   -50 LSR
+   339.0  0.0         GALACTIC G339   -50 LSR
+   340.0  0.0         GALACTIC G340    0 LSR
+   341.0  0.0         GALACTIC G341    0 LSR
+   342.0  0.0         GALACTIC G342    0 LSR
+   343.0  0.0         GALACTIC G343    0 LSR
+   344.0  0.0         GALACTIC G344    0 LSR
+   345.0  0.0         GALACTIC G345    0 LSR
+   346.0  0.0         GALACTIC G346    0 LSR
+   347.0  0.0         GALACTIC G347    0 LSR
+   348.0  0.0         GALACTIC G348    0 LSR
+   349.0  0.0         GALACTIC G349    0 LSR
+   350.0  0.0         GALACTIC G350    0 LSR
+   351.0  0.0         GALACTIC G351    0 LSR
+   352.0  0.0         GALACTIC G352    0 LSR
+   353.0  0.0         GALACTIC G353    0 LSR
+   354.0  0.0         GALACTIC G354    0 LSR
+   355.0  0.0         GALACTIC G355    0 LSR
+   356.0  0.0         GALACTIC G356    0 LSR
+   357.0  0.0         GALACTIC G357    0 LSR
+   358.0  0.0         GALACTIC G358    0 LSR
+   359.0  0.0         GALACTIC G359    0 LSR
+   0.0  0.0           GALACTIC G000    0 LSR
+   1.0  0.0           GALACTIC G001    0 LSR
+   2.0  0.0           GALACTIC G002    0 LSR
+   3.0  0.0           GALACTIC G003    0 LSR
+   4.0  0.0           GALACTIC G004    0 LSR
+   
