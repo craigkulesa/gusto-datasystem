@@ -5,6 +5,6 @@ scanid = [14920, 14930]
 level = 0.9
 polyorder = 3
 rowflagfilter = 0
-calmethod = cal_scaledGainHOTs
+calmethod = cal_weightedHOTs
 despurmethod = polyRes
 spurchannelfilter = False

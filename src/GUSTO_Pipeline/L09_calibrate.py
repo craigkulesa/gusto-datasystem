@@ -108,7 +108,7 @@ def getWeights(spec, hdr, selectS, selectR, cutoff=0.3):
     return weights
 
 
-def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=False):
+def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky, verbose=False):
     """Function calculating the calibration spectrum for a single mixer.
 
     Parameters
@@ -136,35 +136,22 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
     scanID = data['scanID']
     
     Thot   = float(hdr['THOT'])
-    seqflag = int(hdr['SEQ_FLAG'])
     scan_type = data['scan_type']
     rflags = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
-    ch_flag = data['CHANNEL_FLAG']   # spectral pixel (or channel) mask
     stime = data['UNIXTIME']
-
+    rfIDs = []
+    
     otfID, rfsID, rhsID, hotID = getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=rowflagfilter, verbose=verbose)
-
     try:
-        bef = rhsID[rhsID<otfID]
-        aft = rhsID[rhsID>otfID]
+        bef = rfsID[rfsID<otfID]
+        aft = rfsID[rfsID>otfID]
     except:
-        bef = rhsID[rhsID<otfID[0]]
-        aft = rhsID[rhsID>otfID[0]]
-    if (len(bef)>0) & (len(aft)>0):
-        rhIDbef = bef[np.argmax(bef)]
-        rhIDaft = aft[np.argmin(aft)]
-        rhIDs = [rhIDbef, rhIDaft]
-    elif (len(aft)>0):
-        rhIDaft = aft[np.argmin(aft)]
-        rhIDs = [rhIDaft]
-        logger.debug('getCalSpectra: Only REFHOT after OTF available')
-    elif (len(bef)>0):
-        rhIDbef = bef[np.argmax(bef)]
-        rhIDs = [rhIDbef]
-        logger.debug('getCalSpectra: Only REFHOT before OTF available')
-    else:
-        logger.debug('getCalSpectra: Not enough REFHOT scans available (before/after OTF)')
-        return -999, 0, 0, 0, 0, 0, [0,0], 0
+        bef = rfsID[rfsID<otfID[0]]
+        aft = rfsID[rfsID>otfID[0]]
+    if (len(bef)>0):
+        rfIDs.append(bef[np.argmax(bef)])
+    if (len(aft)>0): 
+        rfIDs.append(aft[np.argmin(aft)])
 
     Tsyss = []
     REFs = []
@@ -172,29 +159,42 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
     rtimes = []
     htimes = []
     yfac = []
-    for rhID in rhIDs:
-        rsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (rflags))
-        hsel = np.argwhere((rhID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (rflags))
-        if not any(hsel) or not any(rsel):
-            continue
-        htime = stime[hsel].mean()
-        rtime = stime[rsel].mean()
+
+    for rfID in rfIDs:
+        doWeight = True
+        rsel = np.argwhere((rfID == scanID) & (mixer == mixers) & (scan_type == 'REF') & (rflags))
         osel = np.argwhere((mixer == mixers) & (scan_type == 'OTF') & (rflags))
-        closest = np.argmin(np.abs(stime[osel] - rtime))
+        hsel = np.argwhere((rfID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (rflags))
         ohsel = np.argwhere((mixer == mixers) & (scan_type == 'HOT') & (rflags))
-        hot_closest = np.argmin(np.abs(stime[ohsel] - htime))
+        if not rsel.size:   # no REFs?  Skip it and keep going.  This shouldn't happen, BTW
+            logger.debug(f'getCalSpectra: No REFs found in scanID {rfID}')
+            continue
+        rtime = stime[rsel].mean()
+        if not hsel.size:  # no REFHOTS?  Steal the closest HOT in time from the OTF
+            hot_closest = np.argmin(np.abs(stime[ohsel] - rtime)) 
+            hsel = np.argwhere((mixer == mixers) & (np.abs(stime - stime[ohsel[hot_closest]]) < 6.) & (scan_type == 'HOT') & (rflags))
+            logger.debug(f'getCalSpectra: Missing REFHOT in scanID {rfID}, substitite w/ OTF HOT at indexes: {hsel.flatten()}')
+            doWeight = False
+        htime = stime[hsel].mean()
         
+        closest = np.argmin(np.abs(stime[osel] - rtime))
+        hot_closest = np.argmin(np.abs(stime[ohsel] - htime))
+
         weights = getWeights(spec, hdr, rsel, osel[closest]) # compare REFs w/ closest OTF 
         spec_r = np.average(spec[rsel,:], axis=0, weights=weights)
 
-        weights = getWeights(spec, hdr, hsel, ohsel[hot_closest]) # compare REFHOTs w/ closest OTF HOT
-        spec_h = np.average(spec[hsel,:], axis=0, weights=weights)
+        if doWeight:
+            weights = getWeights(spec, hdr, hsel, ohsel[hot_closest]) # compare REFHOTs w/ closest OTF HOT
+            spec_h = np.average(spec[hsel,:], axis=0, weights=weights)
+        else:  # if we stole a HOT, just average them w/o weights, because the above logic breaks (FIX ME)
+            spec_h = np.average(spec[hsel,:], axis=0)
 
         # determine yfactor
         # estimate Tsys for each Device, correct for backend gain slope of 1.3x
         y_factor  = spec_h/spec_r
         y_fixed = (y_factor-1.)/1.3 + 1.
 
+        # misnomer: this is actually the receiver temperature Trec (K DSB), not Tsys (K SSB)
         tsys = np.squeeze((Thot - Tsky*y_fixed[:])/(y_fixed[:] - 1.))
 
         Tsyss.append(tsys)
@@ -208,7 +208,7 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter=0, Tsky=45., verbose=Fal
     yfac = np.ma.array(yfac).squeeze()
     REFs = np.ma.array(REFs).squeeze()
     RHOTs = np.ma.array(RHOTs).squeeze()
-    return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, rhIDs, yfac
+    return Tsyss, REFs, RHOTs, rtimes, htimes, Thot, rfIDs, yfac
 
 
 def getHotInfo(spec, data, hdr, mixer, dfile='', verbose=False, rowflagfilter=0):
@@ -248,34 +248,13 @@ def getHotInfo(spec, data, hdr, mixer, dfile='', verbose=False, rowflagfilter=0)
     hcnt = 0   # counter counting the total number of hots
     hgrp = 0   # counter for hot groups
 
-    # determine the first hot or refhot scan based on time
-    lasthot = np.min(unixtime[np.argwhere((data['MIXER']==umixers[mx])&((data['scan_type']=='HOT')|(data['scan_type']=='HOT')))])
-    lasthot = np.min(np.argwhere(unixtime == lasthot))
-    firstref = True if (np.argwhere((data['MIXER']==umixers[mx])&(data['scan_type']=='REF')).min() < 10) else False
-
-    # added check for REFHOT duplicates at beginning and at end of sequence
-    # there should only be one REFHOT at the beginning and one at
-    # the end
     rflags = checkRowflag(data['ROW_FLAG'], rowflagfilter=rowflagfilter)
     rhscans = data['scanID'][(data['scan_type']=='REFHOT')&(rflags)&(data['MIXER']==mixer)]
-    rfscans = data['scanID'][(data['scan_type']=='REF')&(rflags)&(data['MIXER']==mixer)]
-    otscans = data['scanID'][(data['scan_type']=='OTF')&(rflags)&(data['MIXER']==mixer)]
-    htscans = data['scanID'][(data['scan_type']=='HOT')&(rflags)&(data['MIXER']==mixer)]
     urhs = np.unique(rhscans)
-    urfs = np.unique(rfscans)
-    uots = np.unique(otscans)
-    uhts = np.unique(htscans)
 
-    # the first OTF scan ID should be the one determining the sequence
-    if uots.size == 0 or uots.size > 3:
-        # bad sequence with none or too many OTFs
-        logger.debug("SEQUENCE HAS THE WRONG NUMBER OF OTFs")
-        return 0,0,0,0
-    
     uflag = np.zeros(n_spec)    
     for i in range(n_spec):
-        if data['MIXER'][i] == mixer:
-            
+        if data['MIXER'][i] == mixer:            
             if (data['scan_type'][i] == 'HOT')|((data['scan_type'][i] == 'REFHOT')&(data['scanID'][i] in urhs)):
                 if hcnt==0:
                     lasthot = i
@@ -287,22 +266,15 @@ def getHotInfo(spec, data, hdr, mixer, dfile='', verbose=False, rowflagfilter=0)
                     lasthot = i
                 uflag[i] = 1
                 hcnt += 1
-            else:
-                uflag[i] = 0
             hgroup[i] = hgrp
-            if ((data['scan_type'][i] == 'REF')&(data['scanID'][i] in urhs)):
-                uflag[i] = 1
             
-    maxgrp = 0
     ghots = np.zeros((int(hgroup.max()+1), n_pix))
     ghtim = np.zeros(int(hgroup.max()+1))
     ghtint = np.zeros(int(hgroup.max()+1))
     
-    # now we have to average the hots for each group flagged for use:
-    # for i, mx in enumerate(umixers):
+    # now we have to average the hots for each group flagged for use
     for i, mx in enumerate([mixer]):
-        maxgrp = int(hgroup[data['MIXER']==mx].max()+1)
-        for j in range(maxgrp):
+        for j in range(hgrp+1):
             sel = np.argwhere((data['MIXER']==mx) & (hgroup==j) & (rflags) & (uflag==1)).flatten()
             hsel = np.argwhere((data['MIXER']==mx) & (hgroup!=j) & (rflags) & (uflag==1)).flatten()
             htime = unixtime[sel].mean()
@@ -423,77 +395,73 @@ def L09_Pipeline(args, scanRange, verbose=False):
     return sum_files
 
 
-
-def cal_scaledGainHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
+def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
-    oldmed=999999
-    best = [0.5, 0.5]
+    oldmed = 999999
+    best = [0.5, 0.5, 0.5, 1.]
     Ta = ma.zeros(sspec.shape)
     tsyseff = ma.zeros(sspec.shape)
-                
+    idx = np.r_[band*40:band*60, band*70:band*95, band*260:band*300]
+    
     xaxis = np.arange(0, chan[band-1]*fScale[band-1], fScale[band-1])
     seq_hots = ghots[closest,:]
     
     if closest+1 < hgroup.max():
         seq_hots = np.vstack([seq_hots, ghots[closest+1,:]])
-    else:
+    if closest > 0:
         seq_hots = np.vstack([seq_hots, ghots[closest-1,:]])
-    n_shots = seq_hots.shape[0]
-                
-    if yfac.ndim > 1:
-        sRntest = [x/y for x,y in zip(seq_hots, yfac.squeeze())]
-        sRntest = np.array(sRntest)
-        yvalid = np.nonzero((yfac[0,:].squeeze() > 1.0))[0]
-    else:
-        sRntest = seq_hots / yfac.squeeze()
-        yvalid = np.nonzero((yfac.squeeze() > 1.0))
-    test = sspec - sRntest
-    med = np.ma.median(test[:,band*40:band*295], axis=1)
-    scale = 1 + med/np.ma.median(sRntest[:, band*40:band*295], axis=1)
     
-    for a in np.arange(0.0, 1.01, 0.25):  # now loop over a and b with c constant
-        for b in np.arange(0.0, 1.01, 0.25):
-            if yfac.ndim == 1:
-                yfac_eff = yfac
-                tsyseff = tsys
-                sRn = seq_hots*scale[:,None] / yfac_eff
-                Ta = 2*tsyseff * (sspec - (a*sRn[0,:] + (1.0-a)*sRn[1,:]))/(a*sRn[0,:] + (1.0-a)*sRn[1,:])
-            else:
-                yfac_eff = b*yfac[0,:] + (1-b)*yfac[1,:]
-                tsyseff = b*tsys[0,:] + (1-b)*tsys[1,:]
-                sRn1 = seq_hots*scale[0] / yfac_eff
-                sRn2 = seq_hots*scale[1] / yfac_eff
-                Ta = 2*tsyseff * (sspec - (a*sRn1[0,:] + (1.0-a)*sRn2[1,:]))/(a*sRn1[0,:] + (1.0-a)*sRn2[1,:])
-            x_fit = xaxis[band*40:band*60]
-            x_fit = np.append(x_fit, xaxis[band*250:band*300], axis=0)
-            y_fit = Ta[band*40:band*60]
-            y_fit = np.append(y_fit, Ta[band*250:band*300], axis=0)
-            fit = np.polyfit(x_fit, y_fit, 1)
-            baseline = np.poly1d(fit)
-            Ta = Ta - baseline(xaxis)
-            med = np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300])
-            if med < oldmed:
-                oldmed = med
-                best[0] = a
-                best[1] = b
-            if yfac.ndim == 1:
+    for a in np.arange(0.0, 1.01, 0.333):
+        for c in np.arange(0.0, 1.01, 0.333):
+            for b in np.arange(0.0, 1.01, 0.5):
+                if yfac.ndim == 1:
+                    yfac_eff = yfac
+                    tsyseff = tsys
+                else:
+                    yfac_eff = b*yfac[0,:] + (1-b)*yfac[1,:]
+                    tsyseff = b*tsys[0,:] + (1-b)*tsys[1,:]
+                sRn = seq_hots / yfac_eff
+                if sRn.shape[0] > 2:
+                    synthRef = a*sRn[0,:] + c*(1.0-a)*sRn[1,:] + (1.-c)*(1.0-a)*sRn[2,:]
+                else:
+                    synthRef = a*sRn[0,:] + (1.0-a)*sRn[1,:]
+                Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
+            
+                x_fit = xaxis[idx]
+                y_fit = Ta[idx]
+                fit = np.polyfit(x_fit, y_fit, polyorder)
+                baseline = np.poly1d(fit)
+                Ta = Ta - baseline(xaxis)
+                med = np.std(Ta[idx])
+                if med < oldmed:
+                    oldmed = med
+                    best[0] = a
+                    best[1] = b
+                    best[2] = c
+                    best[3] = sRn.shape[0]
+                if yfac.ndim == 1:
+                    break
+            if sRn.shape[0] < 3:
                 break
-    #print(best, oldmed)
+    if best[3] < 3:
+        best[2] = 1.0
+    #print(med, best)
     if yfac.ndim == 1:
         yfac_eff = yfac
         tsyseff = tsys
     else:
         yfac_eff = best[1]*yfac[0,:] + (1-best[1])*yfac[1,:]
         tsyseff = best[1]*tsys[0,:] + (1-best[1])*tsys[1,:]
-    sRn = seq_hots*scale[:,None] / yfac_eff
-    Ta = 2*tsyseff * (sspec - (best[0]*sRn[0,:] + (1.0-best[0])*sRn[1,:]))/(best[0]*sRn[0,:] + (1.0-best[0])*sRn[1,:])
-    x_fit = xaxis[band*40:band*60]
-    x_fit = np.append(x_fit, xaxis[band*75:band*95], axis=0)
-    x_fit = np.append(x_fit, xaxis[band*250:band*300], axis=0)
-    y_fit = Ta[band*40:band*60]
-    y_fit = np.append(y_fit, Ta[band*75:band*95], axis=0)
-    y_fit = np.append(y_fit, Ta[band*250:band*300], axis=0)
+    sRn = seq_hots / yfac_eff
+    if sRn.shape[0] > 2:
+        synthRef = best[0]*sRn[0,:] + best[2]*(1.0-best[0])*sRn[1,:] + (1.-best[2])*(1.0-best[0])*sRn[2,:]
+    else:
+        synthRef = best[0]*sRn[0,:] + (1.0-best[0])*sRn[1,:]
+    Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
+    #idx = np.r_[band*40:band*60, band*75:band*95, band*260:band*300]
+    x_fit = xaxis[idx]
+    y_fit = Ta[idx]
     fit = np.polyfit(x_fit, y_fit, polyorder)
     baseline = np.poly1d(fit)
     Ta = Ta - baseline(xaxis)
@@ -544,9 +512,8 @@ def processL07(paramlist):
         otfID, rfsID, rhsID, hotID = getSpecScanTypes(mix, spec, data, hdr, rowflagfilter=rowflagfilter)
         check = (np.argwhere(data['scan_type']=='REF').size > 3) & \
                 (np.argwhere(data['scan_type']=='HOT').size > 3) & \
-                (np.argwhere(data['scan_type']=='REFHOT').size > 3) & \
                 (np.argwhere(data['scan_type']=='OTF').size > 5) & \
-                (otfID.size>0) & (rfsID.size>0) & (rhsID.size>0) & (hotID.size>0) & np.any(rflag[msel])
+                (otfID.size>0) & (rfsID.size>0) & (hotID.size>0) & np.any(rflag[msel])
 
         if not check:
             logger.debug(f'{mix} {dfile}')
@@ -554,7 +521,6 @@ def processL07(paramlist):
             logger.debug(f'specs: {spec.shape}')
             logger.debug(f"REFs: {np.argwhere(data['scan_type']=='REF').size} {(np.argwhere(data['scan_type']=='REF').size > 3)}")
             logger.debug(f"HOTs: {np.argwhere(data['scan_type']=='HOT').size} {(np.argwhere(data['scan_type']=='HOT').size > 3)}")
-            logger.debug(f"REFHOTs: {np.argwhere(data['scan_type']=='REFHOT').size} {(np.argwhere(data['scan_type']=='REFHOT').size > 3)}")
             logger.debug(f"OTFs: {np.argwhere(data['scan_type']=='OTF').size} {(np.argwhere(data['scan_type']=='OTF').size > 5)}")
             logger.debug(f'other: {(otfID.size>0)} {(rfsID.size>0)} {(rhsID.size>0)} {(hotID.size>0)}')
             logger.debug(f'IDs: {otfID} {rfsID} {rhsID} {hotID}')
@@ -564,14 +530,14 @@ def processL07(paramlist):
             datavalid[k] = False
             return 0
         
-        tsys, refs, rhots, rtime, htime, Thot, rhIDs, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter=rowflagfilter, Tsky=Tsky, verbose=True)
+        tsys, refs, rhots, rtime, htime, Thot, rfIDs, yfac = getCalSpectra(mix, spec, data, hdr, rowflagfilter=rowflagfilter, Tsky=Tsky, verbose=True)
         # tsys is a masked array if valid or an int if no good
         if type(tsys)==type(0):
             logger.debug('No Tsys available! Stopped processing of mixer %i in dfile %s'%(mix, dfile))
             datavalid[k] = False
             continue
                 
-        osel = np.argwhere((np.isin(data['scanID'], otfID)) & (rfsID.size>=1) & (rhsID.size>=1) & 
+        osel = np.argwhere((np.isin(data['scanID'], otfID)) & (rfsID.size>=1) & 
                            (otfID.size>=1) & (mix == data['MIXER']) & (data['scan_type'] == 'OTF') & 
                            (rflag)).flatten()
         if len(osel) > 2:
@@ -584,6 +550,7 @@ def processL07(paramlist):
 
         spec_OTF = np.squeeze(spec[osel,:])
         cflags_OTF =  np.squeeze(data['CHANNEL_FLAG'][osel,:])
+        #rflags_OTF = np.squeeze(data['ROW_FLAG'][osel])
         stime = data['UNIXTIME'][osel]
         Tsys_OTF = data['Tsys'][osel]
         rms_OTF = data['rms'][osel]
@@ -600,12 +567,13 @@ def processL07(paramlist):
         hgroup = ahgroup[osel]
         # create the calibrated spectra
         for i0 in range(n_OTF):
-            # fixme: make this conditional.  if calmethod == 'cal_scaledGainHOTs'
-            ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_scaledGainHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+            # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
+            ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
             
         # now we have to save the data in a FITS file
         data['DATA'][osel,:] = ta.data        
         data['CHANNEL_FLAG'] [osel,:] = cflags_OTF
+        #data['ROW_FLAG'][osel] = rflags_OTF
         data['Tsys'][osel] = Tsys_OTF
         data['rms'][osel] = rms_OTF
         
@@ -618,9 +586,9 @@ def processL07(paramlist):
     # updating header keywords
     hdr.set('DLEVEL', value = 0.9)
     hdr.set('rwflfilt', value=rowflagfilter, comment='applied rowflag filter for useful spectra')
-    hdr.set('rhID1', value=rhIDs[0], comment='scan ID for first REFHOT/REF')
-    if len(rhIDs) > 1:
-        hdr.set('rhID2', value=rhIDs[1], comment='scan ID for second REFHOT/REF')
+    hdr.set('rfID1', value=rfIDs[0], comment='scan ID for first REFHOT/REF')
+    if len(rfIDs) > 1:
+        hdr.set('rfID2', value=rfIDs[1], comment='scan ID for second REFHOT/REF')
     hdr.set('polyordr', value=int(params['polyorder']), comment='order of baseline polynomial fit')
     hdr.set('spurfltr', value=params['spurchannelfilter'], comment='was a spur channel filter pre-applied')
     hdr.set('despur', value=params['despurmethod'], comment='despur processing method applied')

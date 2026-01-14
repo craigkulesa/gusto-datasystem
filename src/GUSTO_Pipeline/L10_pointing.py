@@ -190,41 +190,28 @@ def processL09(params, verbose=True):
     return dfile
 
 
-def getMixerOffsets(band, mixers, type='THEORY', offsetfile=None, verbose=False):
+def getMixerOffsets(band, mixers, offsetfile=None, verbose=False):
     """Function retrieving the GUSTO on-sky mixer offsets from file.
 
     usage:
-    ------
-    
+    ------    
     aa = getMixerOffsets(1, [3, 5, 8], verbose=True)
     print(aa['az'])     # prints: [0.06079  0.062584 0.093356]
-    print(aa[0]['az'])  # prints: 0.06079
-    print(aa['az'][0])  # prints: 0.06079
-    
-    Parameters
-    ----------
-    band : str
-        GUSTO band: 'B1' or 'B2'
-    mixers : int array
-        array of mixer indices
-    type : str
-        type of offset determination: 'Theory' or 'AS_MEASURED'
-    offsetfile : str
-        path to file with mixer offsets
-    verbose : bool
-        flag for output to STDOUT
-        
-    Returns
-    -------
-    function returns rec array with mixer offsets
-    """
+    """    
+
     if offsetfile is None:
         offsetfile = offsetfile0
 
+    offsets = np.empty(0, dtype=int)
+    
     data = np.genfromtxt(offsetfile, delimiter='\t', skip_header=2, 
                          dtype=[('mxpix', 'U4'), ('az', '<f8'), ('el', '<f8'), ('type', 'U16')])
     
     cmixers = ['B%iM%i'%(band, i) for i in mixers]    
-    ar = [np.argwhere((cmixer == data['mxpix'])&((type==data['type'])|(data['type']=='FIDUCIAL'))).flatten() for cmixer in cmixers]
-
-    return data[ar].flatten()
+    for cmixer in cmixers:
+        offset = np.argwhere((cmixer == data['mxpix'])&((data['type']=='AS_MEASURED')|(data['type']=='FIDUCIAL'))).flatten()
+        if offset.size == 0: # revert to the theory value
+            offset = np.argwhere((cmixer == data['mxpix'])&(data['type']=='THEORY')).flatten()
+        offsets = np.append(offsets, offset)
+        
+    return data[offsets].flatten()
