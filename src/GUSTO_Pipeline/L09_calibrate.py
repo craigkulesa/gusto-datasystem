@@ -82,7 +82,6 @@ def getWeights(spec, hdr, selectS, selectR, cutoff=0.3):
     Usage
     --------
     Typically used for the coadding of frames with multiple subscans like HOT, REF and REFHOT
-    
     """
     rms = []
     chan = [512, 1024]
@@ -166,8 +165,8 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky, verbose=False):
         osel = np.argwhere((mixer == mixers) & (scan_type == 'OTF') & (rflags))
         hsel = np.argwhere((rfID == scanID) & (mixer == mixers) & (scan_type == 'REFHOT') & (rflags))
         ohsel = np.argwhere((mixer == mixers) & (scan_type == 'HOT') & (rflags))
-        if not rsel.size:   # no REFs?  Skip it and keep going.  This shouldn't happen, BTW
-            logger.debug(f'getCalSpectra: No REFs found in scanID {rfID}')
+        if not rsel.size:   # no REFs?  Skip it and keep going. 
+            logger.debug(f'getCalSpectra: No REFs found in scanID {rfID}.  Warning: This should not happen.')
             continue
         rtime = stime[rsel].mean()
         if not hsel.size:  # no REFHOTS?  Steal the closest HOT in time from the OTF
@@ -422,10 +421,12 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
                     yfac_eff = b*yfac[0,:] + (1-b)*yfac[1,:]
                     tsyseff = b*tsys[0,:] + (1-b)*tsys[1,:]
                 sRn = seq_hots / yfac_eff
-                if sRn.shape[0] > 2:
+                if sRn.shape[0] == 3:
                     synthRef = a*sRn[0,:] + c*(1.0-a)*sRn[1,:] + (1.-c)*(1.0-a)*sRn[2,:]
-                else:
+                elif sRn.shape[0] == 2:
                     synthRef = a*sRn[0,:] + (1.0-a)*sRn[1,:]
+                else: # sRn.ndim = 1
+                    synthRef = sRn
                 Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
             
                 x_fit = xaxis[idx]
@@ -441,23 +442,23 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
                     best[2] = c
                     best[3] = sRn.shape[0]
                 if yfac.ndim == 1:
+                    best[1] = 1.0
                     break
             if sRn.shape[0] < 3:
                 break
-    if best[3] < 3:
-        best[2] = 1.0
+        if sRn.ndim == 1:
+            break
     #print(med, best)
-    if yfac.ndim == 1:
-        yfac_eff = yfac
-        tsyseff = tsys
-    else:
+    if yfac.ndim > 1:
         yfac_eff = best[1]*yfac[0,:] + (1-best[1])*yfac[1,:]
         tsyseff = best[1]*tsys[0,:] + (1-best[1])*tsys[1,:]
     sRn = seq_hots / yfac_eff
-    if sRn.shape[0] > 2:
+    if sRn.shape[0] == 3:
         synthRef = best[0]*sRn[0,:] + best[2]*(1.0-best[0])*sRn[1,:] + (1.-best[2])*(1.0-best[0])*sRn[2,:]
-    else:
+    elif sRn.shape[0] == 2:
         synthRef = best[0]*sRn[0,:] + (1.0-best[0])*sRn[1,:]
+    else: # sRn.ndim = 1
+        synthRef = sRn
     Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
     #idx = np.r_[band*40:band*60, band*75:band*95, band*260:band*300]
     x_fit = xaxis[idx]
@@ -465,11 +466,13 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
     fit = np.polyfit(x_fit, y_fit, polyorder)
     baseline = np.poly1d(fit)
     Ta = Ta - baseline(xaxis)
-    
+
     Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
     Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
     Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*210, band*245, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
+    if band == 1:  # one broad pass for bright spurs in [NII]
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 50*band, 260*band, points=150*band, count=1, deg=1, stdlim=5)
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
     return Ta, cflags, Tsys_median, rms
