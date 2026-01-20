@@ -170,9 +170,11 @@ def getCalSpectra(mixer, spec, data, hdr, rowflagfilter, Tsky, verbose=False):
             continue
         rtime = stime[rsel].mean()
         if not hsel.size:  # no REFHOTS?  Steal the closest HOT in time from the OTF
-            hot_closest = np.argmin(np.abs(stime[ohsel] - rtime)) 
+            hot_closest = np.argmin(np.abs(stime[ohsel] - rtime))
             hsel = np.argwhere((mixer == mixers) & (np.abs(stime - stime[ohsel[hot_closest]]) < 6.) & (scan_type == 'HOT') & (rflags))
-            logger.debug(f'getCalSpectra: Missing REFHOT in scanID {rfID}, substitite w/ OTF HOT at indexes: {hsel.flatten()}')
+            if not hsel.size: # if this substitution fails, then forget it and move on
+                continue
+            logger.debug(f'getCalSpectra: Missing REFHOT in scanID {rfID}, substituting w/ HOT at indexes: {hsel.flatten()}')
             doWeight = False
         htime = stime[hsel].mean()
         
@@ -277,10 +279,12 @@ def getHotInfo(spec, data, hdr, mixer, dfile='', verbose=False, rowflagfilter=0)
             sel = np.argwhere((data['MIXER']==mx) & (hgroup==j) & (rflags) & (uflag==1)).flatten()
             hsel = np.argwhere((data['MIXER']==mx) & (hgroup!=j) & (rflags) & (uflag==1)).flatten()
             htime = unixtime[sel].mean()
-            closest = np.argmin(np.abs(unixtime[hsel] - htime))        
-
-            weights = getWeights(spec, hdr, sel, hsel[closest])
-            ghots[j,:] = np.average(spec[sel,:], axis=0, weights=weights)
+            if hsel.size:
+                closest = np.argmin(np.abs(unixtime[hsel] - htime))        
+                weights = getWeights(spec, hdr, sel, hsel[closest])
+                ghots[j,:] = np.average(spec[sel,:], axis=0, weights=weights)
+            else:
+                ghots[j,:] = np.average(spec[sel,:], axis=0)
             ghtim[j] = np.mean(unixtime[sel])
             ghtint[j] = np.sum(tint[sel])
     
