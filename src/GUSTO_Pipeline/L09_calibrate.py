@@ -475,8 +475,11 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
     Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
     Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
     Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
-    if band == 1:  # one broad pass for bright spurs in [NII]
-        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 50*band, 260*band, points=150*band, count=1, deg=1, stdlim=5)
+    if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
+        try:
+            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
+        except:
+            pass
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
     return Ta, cflags, Tsys_median, rms
