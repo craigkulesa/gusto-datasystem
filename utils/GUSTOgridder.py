@@ -66,6 +66,7 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
     arr_line=np.array([],[])
     xpos = np.array([])
     ypos = np.array([])
+    legweight = np.array([])
 
     print(f'{nfile} files found for cube generation in {directory}.')
 
@@ -127,6 +128,7 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
             spec_OTF = np.squeeze(spec[osel,:])
             chan_OTF = np.squeeze(chanflag[osel,:])
             data_OTF = np.squeeze(data[osel])
+            mxrms    = data_OTF['rms']
             n_OTF, n_otfpix = spec_OTF.shape
             #x=np.arange(n_otfpix)
     
@@ -150,7 +152,7 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
                 leg_x=c_ra_dec.ra
             #print(len(leg_l),len(leg_b))
             leg_spec=[]
-            leg_wgt=[]
+            leg_chf=[]
             wgt1 = np.ones(n_otfpix)
             for i0,spec_OTF1 in enumerate(spec_OTF):
                 chan_OTF1 = chan_OTF[i0]
@@ -161,29 +163,30 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
                 arr_line1 = np.interp(vel_vector,vlsr, spec1)
                 arr_wgt1 = np.interp(vel_vector,vlsr, wgt1)
                 leg_spec.append(arr_line1)
-                leg_wgt.append(arr_wgt1)
+                leg_chf.append(arr_wgt1)
             leg_spec=np.array(leg_spec)
-            leg_wgt =np.array(leg_wgt)
+            leg_chf =np.array(leg_chf)
 
             #stack all usable spectra into new array
             if arr_line.shape[0] == 0:
                 arr_line = leg_spec
-                arr_wght = leg_wgt
+                arr_chf = leg_chf
             else:
                 arr_line = np.vstack((arr_line,leg_spec))
-                arr_wght = np.vstack((arr_wght,leg_wgt))
+                arr_chf = np.vstack((arr_chf,leg_chf))
                 
             #
             xpos = np.append(xpos,leg_x.degree)
             ypos = np.append(ypos,leg_y.degree)
+            legweight = np.append(legweight,1.0/mxrms**2)
 
             
     arr_line = np.array(arr_line)
     xpos = np.array(xpos)
     ypos = np.array(ypos)
     nchan = vel_vector.shape[0]
-    print(arr_line.shape,arr_wght.shape,xpos.shape,ypos.shape)
-    return arr_line, xpos, ypos, nchan, line_freq, arr_wght
+    print(arr_line.shape,legweight.shape,xpos.shape,ypos.shape)
+    return arr_line, xpos, ypos, legweight, nchan, line_freq, arr_chf
             
 
 
@@ -400,7 +403,7 @@ def main(args=None,verbose=True):
     coordType = [xcoord,ycoord]
     # read all calibrated fits data, at all positions
     print(f'Input dir {dir_level1} Line {line_str} Velocity array {vv_in.shape}')
-    arr_line0, xpos0, ypos0, nchan0, restfreq, arr_wght = make_gusto_array(dir_level1,line_str,vv_in,coordType)
+    arr_line0, xpos0, ypos0, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,vv_in,coordType)
     #os.system('ls')
             
     restfreq *= 1e6 # convert to Hz
@@ -444,7 +447,7 @@ def main(args=None,verbose=True):
     hdr, wcsObj, xsize, ysize = create_wcsheader(xpos_in,ypos_in,restfreq,vv_in,coordType,pix_scale,beam_fwhm_in)
     #
     # create spectral map 
-    cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, chwgt=arr_wght,kern = kern)
+    cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, weight=weight ,kern = kern)
     #cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, kern = kern)
     #
     #

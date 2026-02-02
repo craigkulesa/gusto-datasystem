@@ -26,7 +26,7 @@ import sys
 from scipy import interpolate
 import scipy
 
-def grid_otf(data, xsky, ysky, wcsObj, nchan, xsize, ysize, pix_scale, beam_fwhm,weight=None,chwgt = None,kern="gaussbessel", gauss_fwhm=None, verbose=4):   
+def grid_otf(data, xsky, ysky, wcsObj, nchan, xsize, ysize, pix_scale, beam_fwhm,weight=None,kern="gaussbessel", gauss_fwhm=None, verbose=4):   
     """
     Grid individual spectra onto a specified regular grid following the 
     recommendations of Mangum et al. (2007).  This is writtent to be of general
@@ -104,10 +104,6 @@ def grid_otf(data, xsky, ysky, wcsObj, nchan, xsize, ysize, pix_scale, beam_fwhm
     if weight is None:
         # equal weight = all 1s
         weight = np.ones(nspec)
-    if chwgt is None:
-        chwgt = np.ones(nchan,nspec)
-    if chwgt is None:
-        chwgt = np.ones(nchan,nspec)
     
     # need to watch for NaNs here - weight those to zero
     # current managed upstream when the data are read ...
