@@ -579,7 +579,12 @@ def processL07(paramlist):
         for i0 in range(n_OTF):
             # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
             ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
-            
+
+        #baseline correct entire sequence: remove a residual baseline not corrected in the calibration
+        base_median = ma.median(ta,0)
+        for i0 in range(n_OTF):
+            ta[i0,:] -= base_median
+
         # now we have to save the data in a FITS file
         data['DATA'][osel,:] = ta.data        
         data['CHANNEL_FLAG'] [osel,:] = cflags_OTF
