@@ -184,9 +184,20 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
     arr_line = np.array(arr_line)
     xpos = np.array(xpos)
     ypos = np.array(ypos)
+    print(np.min(xpos),np.max(xpos),np.min(ypos),np.max(ypos),np.median(xpos),np.median(ypos))
+    #filter out all postions more than 2 degrees away from median
+    xmed = np.median(xpos)
+    ymed = np.median(ypos)
+    dlim = 1.5
+    qkeep = np.argwhere( (np.abs(xpos-xmed) < dlim) & (np.abs(ypos-ymed) < dlim))
+    arr_linekeep = np.squeeze(arr_line[qkeep,:])
+    xkeep = np.squeeze(xpos[qkeep])
+    ykeep = np.squeeze(ypos[qkeep])
+    wgtkeep = np.squeeze(legweight[qkeep])
+    arr_chfkeep = np.squeeze(arr_chf[qkeep,:])
     nchan = vel_vector.shape[0]
     print(arr_line.shape,legweight.shape,xpos.shape,ypos.shape)
-    return arr_line, xpos, ypos, legweight, nchan, line_freq, arr_chf
+    return arr_linekeep, xkeep, ykeep, wgtkeep, nchan, line_freq, arr_chfkeep
             
 
 
