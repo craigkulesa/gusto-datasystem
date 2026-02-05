@@ -2,9 +2,12 @@
 import os
 import glob
 import shutil
-import configparser
 import argparse
+import configargparse
+from importlib.resources import files
 from astropy.io import fits
+
+cfg_file0 = files('GUSTO_Pipeline') / 'config.gusto'
 
 
 def doCopy(scan, path):
@@ -25,18 +28,17 @@ def doCopy(scan, path):
 
 
 if __name__ == "__main__":
-    config = configparser.ConfigParser()
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--file", help="\tFilename partial", default="*")
+    parser = configargparse.ArgParser(default_config_files=[cfg_file0, '~/.config.gusto'], prog='runGUSTO', ignore_unknown_config_file_keys=True)
+    parser.add('-p', '--path', required=False, help="\tOverarching data path")
     args = parser.parse_args()
+    print(parser.format_values())
 
+    if not args.path.endswith('/'):
+        args.path=args.path+'/'
+        
     # Read config file for Data Paths
-    config.read('../common/config.ini')
-    path = config.get('Paths', 'L10_path')
-    outpath = config.get('Paths', 'bundle_path')
-    partial_filename = args.file
-    files = sorted(glob.glob(f"{path}/{partial_filename}.fits"))
+    files = sorted(glob.glob(f"{args.path}level1/*.fits"))
 
     for file in files:
         print('file = ',file)
-        doCopy(file, outpath)
+        doCopy(file, args.path + 'bundles/')

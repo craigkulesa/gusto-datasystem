@@ -1,21 +1,11 @@
 import os
 import sys
-#import glob
-#import math
-#import random
 import numpy as np
-#import argparse
-#import configparser
-#from pathlib import Path
 from tqdm import trange, tqdm
 from datetime import datetime
 
 from scipy import interpolate
-#from scipy.interpolate.interpnd import _ndim_coords_from_arrays
-#from scipy.spatial import cKDTree
-
 from astropy import units as u
-#from astropy import constants
 
 from astropy.io import fits
 from astropy.io.fits import Header
@@ -24,12 +14,10 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import Galactic
 
-#from pybaselines import Baseline
 import matplotlib.pyplot as plt
 
 from .DataIO import loadSDFITS
 from .flagdefs import *
-#from Logger import *
 
 from multiprocessing import Process, Queue
 
@@ -40,7 +28,7 @@ directory = '/home/obs/data/GUSTO/level1/'
 
 #build a 3D array for regridding: axis 1: GALLONG axis 2: GALLAT axis 3: VELOCITY
 #build a second 3D array for counting denominator to divide by when done
-spacing = 2.0/60 # 2 arcmin spatial spacing
+spacing = 2/60 # 2 arcmin spatial spacing
 vel_spacing = 2.0 # km/s
 linename = "CII"
 
@@ -67,7 +55,7 @@ l_start=352.8
 l_end=353.5
 l_vector = np.arange(l_start,l_end,spacing)
 b_vector = np.arange(0,1.5,spacing)
-v_vector = np.arange(-50,50,vel_spacing)
+v_vector = np.arange(-50,16,vel_spacing)
 t_max = 4
 
 #LMC
@@ -249,7 +237,6 @@ if __name__ == '__main__':
         count_sum += worker_count_sum
         #print(worker_count_sum[worker_count_sum>0].shape)
         
-    print(count_sum)
     #print("Waiting for join...")
     for p in processes:
         p.join()

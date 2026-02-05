@@ -8,3 +8,4 @@ rowflagfilter = 0
 calmethod = cal_weightedHOTs
 despurmethod = polyRes
 spurchannelfilter = False
+mediansubtract = False

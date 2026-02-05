@@ -378,10 +378,11 @@ def L09_Pipeline(args, scanRange, verbose=False):
         calmethod = args.calmethod
         despurmethod = args.despurmethod
         spurchannelfilter = args.spurchannelfilter
+        mediansubtract = args.mediansubtract
         polyorder = args.polyorder
         
         params = {'band': int(band), 'inDir': inDir, 'outDir': outDir, 'polyorder': polyorder, 
-                  'calmethod': calmethod, 'despurmethod': despurmethod,
+                  'calmethod': calmethod, 'despurmethod': despurmethod, 'mediansubtract': mediansubtract,
                   'spurchannelfilter': spurchannelfilter, 'debug': args.debug, 'verbose': verbose,
                   'pxrange': pxrange, 'rowflagfilter': rowflagfilter, 'commit_info': commit_info}
         paramlist = [[a, b] for a in dfiles for b in [params]]
@@ -479,6 +480,7 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
         try:
             Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
         except:
+            logger.debug('WARNING: Band 1 global despurring pass failed')
             pass
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
@@ -560,7 +562,6 @@ def processL07(paramlist):
 
         spec_OTF = np.squeeze(spec[osel,:])
         cflags_OTF =  np.squeeze(data['CHANNEL_FLAG'][osel,:])
-        #rflags_OTF = np.squeeze(data['ROW_FLAG'][osel])
         stime = data['UNIXTIME'][osel]
         Tsys_OTF = data['Tsys'][osel]
         rms_OTF = data['rms'][osel]
@@ -569,7 +570,7 @@ def processL07(paramlist):
         ta = ma.zeros([n_OTF, n_opix])
         ahgroup, ghots, ghtim, ghtint = getHotInfo(spec, data, hdr, mix, dfile=dfile, rowflagfilter=rowflagfilter, verbose=True)
         if type(ahgroup)==type(0):
-            logger.debug('Encountered problem with HOT groups. Flaging rows.')
+            logger.debug('Encountered problem with HOT groups. Flagging rows.')
             data['ROW_FLAG'][msel] |= RowFlags.BAD_DATA   # flagged as missing data
             continue
 
@@ -577,13 +578,18 @@ def processL07(paramlist):
         hgroup = ahgroup[osel]
         # create the calibrated spectra
         for i0 in range(n_OTF):
-            # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
+            # fixme: make this conditional --> if calmethod == 'cal_weightedHOTs'
             ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+
+        # baseline correct entire mixer sequence (Russ' method)
+        if params['mediansubtract']:
+            base_median = ma.median(ta, 0)
+            for i0 in range(n_OTF):
+                ta[i0,:] -= base_median
             
         # now we have to save the data in a FITS file
         data['DATA'][osel,:] = ta.data        
         data['CHANNEL_FLAG'] [osel,:] = cflags_OTF
-        #data['ROW_FLAG'][osel] = rflags_OTF
         data['Tsys'][osel] = Tsys_OTF
         data['rms'][osel] = rms_OTF
         
@@ -601,6 +607,7 @@ def processL07(paramlist):
         hdr.set('rfID2', value=rfIDs[1], comment='scan ID for second REFHOT/REF')
     hdr.set('polyordr', value=int(params['polyorder']), comment='order of baseline polynomial fit')
     hdr.set('spurfltr', value=params['spurchannelfilter'], comment='was a spur channel filter pre-applied')
+    hdr.set('medianbg', value=params['mediansubtract'], comment='was a global spectral median removed')
     hdr.set('despur', value=params['despurmethod'], comment='despur processing method applied')
     hdr.set('calmethd', value=calmethod, comment='calibration processing method applied')
     hdr.set('', value='')
