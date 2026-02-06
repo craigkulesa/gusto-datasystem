@@ -146,7 +146,7 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
             if coordType[0][0] == 'G':
                 c_l_b = c_ra_dec.transform_to(Galactic)    # transform to l,b
                 leg_y = c_l_b.b
-                leg_x = c_l_b.l
+                leg_x = c_l_b.l.wrap_at(180*u.deg)
             else:
                 leg_y=c_ra_dec.dec
                 leg_x=c_ra_dec.ra
@@ -188,7 +188,7 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
     #filter out all postions more than 2 degrees away from median
     xmed = np.median(xpos)
     ymed = np.median(ypos)
-    dlim = 1.5
+    dlim = 2.5
     qkeep = np.argwhere( (np.abs(xpos-xmed) < dlim) & (np.abs(ypos-ymed) < dlim))
     arr_linekeep = np.squeeze(arr_line[qkeep,:])
     xkeep = np.squeeze(xpos[qkeep])
