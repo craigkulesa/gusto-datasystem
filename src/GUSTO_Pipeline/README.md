@@ -133,7 +133,13 @@ Config File (/home/obs/src/gusto-datasystem/src/GUSTO_Pipeline/config.gusto):
 ```
 
 ## Special notes for current version 
+- New flag as of 1 Feb 2026:  mediansubtract.   This snippet of code is from Russ.  This applies a spectral baseline subtraction based on the median of all spectra in the sequence for that mixer.  The current default is False but it is provided for evaluation.  It is certain to improve baselines but we need to be careful to ensure that large scale diffuse emission is not also removed in the background subtraction.
+- New quicklook regridder from Chris Martin: L20_regridder.  Codewise, it is merged into the tree but from a user interface standpoint, it remains a standalone module in the pipeline.  It will be integrated more properly in an updated branch, but as an interim workaround, to run it:
+
+  ``` python3 -m GUSTO_Pipeline.L20_regridder.py ```
+
+### Older notes 
 - If you are using the influx database from DR1 Rev A or earlier, please download and install the new version (reduced size = 260 MB) with interpolated calibration load THOT values when they are missing: [see link to calibration folder](http://soral.as.arizona.edu/GUSTO/calibration/) and look at the instructions for installing it from the Level 0.5 pipeline readme.
 - As of October 2025, the level 0.5-level 1 SDFITS format has changed slightly.  In the data table, there are two new columns for Tsys and rms which are ignored at levels 0.5-0.7 and filled in at level 0.9.  If you are processing data with the new pipeline, either generate new level 0.5 data yourself or use a new starting dataset for level 0.5 or 0.7 (October 2025 or newer).
-- After sufficient refactoring, the level 0.8 pipeline has been absorbed into level 0.7 -- there were only 2 dozen lines to add.  
+- Level 0.8 and level 0.95 pipelines have been absorbed into Level 0.7 and Level 0.9 pipeline steps, respectively.  They are no more.  
 - The sequences file changd in June 2025.  If you are using an older version, either delete any old sequences.txt file for the L07 pipeline to regenerate, or download a new sequences.txt from the calibration folder, above.
