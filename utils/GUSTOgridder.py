@@ -383,6 +383,12 @@ def main(args=None,verbose=True):
                                required=False,
                                help='minimum maximum velocity channel, default -200 200 km/s',
                                default=[-200, 200])
+        my_parser.add_argument('-f', 
+                               metavar='--wcsfile',
+                               required=False,
+                               help='Input fits cube to match WCS if not present the WCS will be made based on input L1 scans')
+
+
         args = my_parser.parse_args()
 
     source = args.s
@@ -393,6 +399,7 @@ def main(args=None,verbose=True):
     print(float(vinput))
     vmin = float(args.l[0])
     vmax = float(args.l[1])
+    wcsfile = args.f
     
 
     print(args)
@@ -468,8 +475,15 @@ def main(args=None,verbose=True):
     pix_scale = int(3600.0*beam_fwhm_in/pixPerBeam)/3600.0
     #
     print(f'Beam: {beam_fwhm*60:.2} arcmin.  Pixel scale: {pix_scale*60:.2}')
-    # create header, wcs, and image size from header and given parameters
-    hdr, wcsObj, xsize, ysize = create_wcsheader(xpos_in,ypos_in,restfreq,vv_in,coordType,pix_scale,beam_fwhm_in)
+    # Use existing WCS or create header, wcs, and image size from header and given parameters
+    if wcsfile != None:
+        hdu_wcs = fits.open(wcsfile)
+        hdr = hdu_wcs[0].header
+        wcsObj = wcs.WCS(hdr,relax = True)
+        xsize = hdr['NAXIS1']
+        ysize = hdr['NAXIS2']
+    else:
+        hdr, wcsObj, xsize, ysize = create_wcsheader(xpos_in,ypos_in,restfreq,vv_in,coordType,pix_scale,beam_fwhm_in)
     #
     # create spectral map 
     cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, weight=weight ,kern = kern)
