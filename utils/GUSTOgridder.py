@@ -54,7 +54,7 @@ def call_fits(dir):
 
 	return hdu_tot
 
-def make_gusto_array(directory, linename, vel_vector, coordType):
+def make_gusto_array(directory, linename,mx, vel_vector, coordType):
     # level 1 calibrated spectra in directory 
     # Line to make cube of in line_str (either NII or CII)
     # velocity vector to interpolate Leve 1 data onto
@@ -120,7 +120,15 @@ def make_gusto_array(directory, linename, vel_vector, coordType):
             #osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==8))).flatten()
             osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & ((data['MIXER']==5) | (data['MIXER']==8))).flatten()
         if (linename == "NII"):
-            osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & ((data['MIXER']==2) | (data['MIXER']==3) | (data['MIXER']==6))).flatten()
+            if mx == 2:
+                osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & (data['MIXER']==2) ).flatten()
+            elif mx == 3:
+                osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & (data['MIXER']==3) ).flatten()
+            elif mx == 6:
+                osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & (data['MIXER']==6) ).flatten()
+            else:
+                osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & ((data['MIXER']==2) | (data['MIXER']==3) | (data['MIXER']==6))).flatten()
+
         if len(osel) <= 0:
             print('WARNING: No OTF spectra available in ',input_filename)
             # logger.warning('No OTF spectra available.')                           
@@ -354,6 +362,11 @@ def main(args=None,verbose=True):
                                required=False,
                                help='gridding kernel: gaussbessel, gauss, or nearest.  Default is gaussbessel ',
                                default='gaussbessel')
+        my_parser.add_argument('-x', 
+                               metavar='--mixer',
+                               required=False,
+                               help='mixer: 2, 3, 6:  0 for all',
+                               default=0)
         my_parser.add_argument('-P', 
                                metavar='--pixBeam',
                                required=False,
@@ -376,6 +389,7 @@ def main(args=None,verbose=True):
     line_str = args.b
     kern = args.k
     vinput = args.l[0]
+    mx = int(args.x)
     print(float(vinput))
     vmin = float(args.l[0])
     vmax = float(args.l[1])
@@ -414,7 +428,7 @@ def main(args=None,verbose=True):
     coordType = [xcoord,ycoord]
     # read all calibrated fits data, at all positions
     print(f'Input dir {dir_level1} Line {line_str} Velocity array {vv_in.shape}')
-    arr_line0, xpos0, ypos0, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,vv_in,coordType)
+    arr_line0, xpos0, ypos0, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,mx,vv_in,coordType)
     #os.system('ls')
             
     restfreq *= 1e6 # convert to Hz
@@ -470,7 +484,7 @@ def main(args=None,verbose=True):
     #
     silentremove(dir_write+f'cube_{line_str}.fits')
     hdu_cube_out = fits.PrimaryHDU(cube.data, header = hdr)
-    hdu_cube_out.writeto(dir_write+f'{source}_{line_str}_{pixPerBeam}pix_in_{beam_fwhm*60:0.2}_{KT}.fits',overwrite=True)
+    hdu_cube_out.writeto(dir_write+f'{source}_{line_str}_{mx}_{pixPerBeam}pix_in_{beam_fwhm*60:0.2}_{KT}.fits',overwrite=True)
     #
     #
     #
