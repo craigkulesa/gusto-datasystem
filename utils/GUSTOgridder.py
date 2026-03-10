@@ -196,7 +196,7 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
     #filter out all postions more than 2 degrees away from median
     xmed = np.median(xpos)
     ymed = np.median(ypos)
-    dlim = 2.5
+    dlim = 1.5
     qkeep = np.argwhere( (np.abs(xpos-xmed) < dlim) & (np.abs(ypos-ymed) < dlim))
     arr_linekeep = np.squeeze(arr_line[qkeep,:])
     xkeep = np.squeeze(xpos[qkeep])
