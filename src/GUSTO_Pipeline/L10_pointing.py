@@ -15,6 +15,7 @@ from astropy.io import fits
 from astropy import units as u
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 from astropy.time import Time
+from BayesicFitting import PolynomialModel, LevenbergMarquardtFitter, RobustShell
 
 from .DataIO import *
 from .Logger import *
@@ -76,6 +77,21 @@ def L10_Pipeline(args, scanRange, verbose=False):
         
     return sum_files
 
+def flattenleg( leg , deg = 1):
+    """Function to fit and remove a line using robust fitting
+        Parameters: leg:  OTF leg of one mixer at one velocity
+                    deg:  degree of polynomial to fit over leg data, default = 1
+
+        return:  polynomial model fit
+
+    """
+    x = np.arange(leg.size)
+    model = PolynomialModel( deg )
+    lmf = LevenbergMarquardtFitter( x , model)
+    ftr = RobustShell( lmf )
+    par = ftr.fit( leg , verbose = 0)
+    #newleg leg - model( x )
+    return model( x ) 
 
 
 def processL09(params, verbose=True):
@@ -128,6 +144,17 @@ def processL09(params, verbose=True):
             
             data['RA'][msel] = nradec.ra.deg
             data['DEC'][msel] = nradec.dec.deg
+
+            legs = data['DATA'][msel,:]
+            # legs array ( nlegs X nvlsr )
+            # isolate the time change of each leg at a given vlsr
+            #print(legs.shape)
+            for ivlsr in range(legs.shape[1]):
+                leg = legs[:,ivlsr]
+                #flattenleg( leg )
+                legs[:,ivlsr] -= flattenleg( leg ) 
+            data['DATA'][msel,:] = legs
+            break
         
     # now we have to save the data in a FITS file
     
