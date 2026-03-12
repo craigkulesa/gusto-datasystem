@@ -151,7 +151,7 @@ def main(args=None,verbose=True):
         my_parser.add('-o',
                                metavar='--foff',
                                nargs = 2, 
-                               help = 'fractional offset from calibration (AZ, ALT)')
+                               help = 'scale factor of calibration offsets (AZ, ALT)')
         my_parser.add('-r',
                                metavar='--fileroot',
                                type=str,
@@ -169,6 +169,12 @@ def main(args=None,verbose=True):
                                default = '/data/scratch/GUSTO/gusto-datasystem/calib/cal_offsets.txt',
                                type=str,
                                help='Path to calibration directory')
+
+        my_parser.add('-check',
+                               metavar='--checkifdone',
+                               default = '0',
+                               type=str,
+                               help='Only check which scans ready applied, make no changes 1 to not to apply, 0 to apply')
         args = my_parser.parse_args()
     
 
@@ -179,7 +185,11 @@ def main(args=None,verbose=True):
     directory =args.d
     calib_file = args.c
     foff = np.array(args.o)
-    print(f'{directory}/{fileroot}*.fits')
+    if args.check != '0':
+        check = True
+    else:
+        check = False
+    #print(f'{directory}/{fileroot}*.fits')
 
     to_process_files = sorted(glob.glob(f'{directory}/{fileroot}*.fits'))
     to_process_files = np.array(to_process_files).flatten()
@@ -216,26 +226,26 @@ def main(args=None,verbose=True):
             
             #median time of observation time
             obstime = utc0 + np.timedelta64(int(otime*1000),'ms')
-
-            for mx in mixer:
-                
-                qmx = data['mixer'] == mx
-                mra = data['RA'][qmx]
-                mdec= data['DEC'][qmx]
-                #apply offsets for each mixer
-                nradec = update_mixer_offset(foff,hdr0, mra, mdec, obstime, band, mx, calib_file,verbose=False)
-                newra  = nradec.ra.deg
-                newdec = nradec.dec.deg
-        
-                
-                #Write back to fits array
-                data['RA'][qmx] = np.array(newra)
-                data['DEC'][qmx]= np.array(newdec)
+            if not check:
+                for mx in mixer:
+                    
+                    qmx = data['mixer'] == mx
+                    mra = data['RA'][qmx]
+                    mdec= data['DEC'][qmx]
+                    #apply offsets for each mixer
+                    nradec = update_mixer_offset(foff,hdr0, mra, mdec, obstime, band, mx, calib_file,verbose=False)
+                    newra  = nradec.ra.deg
+                    newdec = nradec.dec.deg
+                    #Write back to fits array
+                    data['RA'][qmx] = np.array(newra)
+                    data['DEC'][qmx]= np.array(newdec)
     
-            #Write back to file
-            print(f'Updating {infile}')
-            hdu[0].header.add_history(history_phrase)
-            hdu.flush()
+                #Write back to file
+                print(f'Updating {infile}')
+                hdu[0].header.add_history(history_phrase)
+                hdu.flush()
+            else:
+                print(f'{infile} would be updated')
         else:
             print(f'Offsets already applied: {infile} not updated)')
         hdu.close()   
