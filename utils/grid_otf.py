@@ -22,6 +22,7 @@
 
 import math
 import numpy as np
+import numpy.ma as ma
 import sys
 from scipy import interpolate
 import scipy
@@ -99,6 +100,8 @@ def grid_otf(data, xsky, ysky, wcsObj, nchan, xsize, ysize, pix_scale, beam_fwhm
         if verbose > 1:
             print("Frequency axis in target header and spectra length do not match")
     
+    # Check if input data are masked arrays
+    print('Masked arrays',ma.is_masked(data))
     # does not yet support per channel weights
     print('Total spectra to grid: ',nspec)
     if weight is None:
