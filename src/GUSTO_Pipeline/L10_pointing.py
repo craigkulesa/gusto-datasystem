@@ -19,6 +19,7 @@ from BayesicFitting import PolynomialModel, LevenbergMarquardtFitter, RobustShel
 
 from .DataIO import *
 from .Logger import *
+from .flagdefs import *
 
 offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
 logger = logging.getLogger('pipelineLogger')
@@ -77,12 +78,12 @@ def L10_Pipeline(args, scanRange, verbose=False):
         
     return sum_files
 
-def flattenleg( leg , deg = 1):
-    """Function to fit and remove a line using robust fitting
+def flattenleg( leg , cflags,  deg = 1, stdlim = 0.1):
+    """Function to fit and remove a line using robust fitting and and identify new SPUR_CANDIDATE
         Parameters: leg:  OTF leg of one mixer at one velocity
                     deg:  degree of polynomial to fit over leg data, default = 1
 
-        return:  polynomial model fit
+        return:  robustfit, newcflags
 
     """
     x = np.arange(leg.size)
@@ -90,8 +91,11 @@ def flattenleg( leg , deg = 1):
     lmf = LevenbergMarquardtFitter( x , model)
     ftr = RobustShell( lmf )
     par = ftr.fit( leg , verbose = 0)
-    #newleg leg - model( x )
-    return model( x ) 
+    rwgt = ftr.weights
+    qmask = rwgt < stdlim
+    cflags[qmask] |= ChanFlags.SPUR_CANDIDATE
+    robustfit = model( x )
+    return robustfit, cflags
 
 
 def processL09(params, verbose=True):
@@ -146,14 +150,19 @@ def processL09(params, verbose=True):
             data['DEC'][msel] = nradec.dec.deg
 
             legs = data['DATA'][msel,:]
+            cflags = data['CHANNEL_FLAG'][msel,:]
             # legs array ( nlegs X nvlsr )
-            # isolate the time change of each leg at a given vlsr
             #print(legs.shape)
+            # flatten leg removes a linear trend (over time of the leg) at each velocity
+            # Additional channel flagging to identify SPUR_CANDIDATE
             for ivlsr in range(legs.shape[1]):
                 leg = legs[:,ivlsr]
-                #flattenleg( leg )
-                legs[:,ivlsr] -= flattenleg( leg ) 
+                cflag = cflags[:,ivlsr]
+                legtrend, newcflag = flattenleg( leg, cflag )
+                legs[:,ivlsr] -= legtrend
+                cflags[:,ivlsr] = newcflag 
             data['DATA'][msel,:] = legs
+            data['CHANNEL_FLAG'][msel,:] = cflags
             #break
         
     # now we have to save the data in a FITS file
