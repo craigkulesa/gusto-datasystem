@@ -6,6 +6,7 @@ from astropy.coordinates import Galactic
 from astropy import units as u
 from astropy import wcs
 import numpy as np
+import numpy.ma as ma
 import scipy as sp
 import glob
 import math
@@ -172,14 +173,16 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
             for i0,spec_OTF1 in enumerate(spec_OTF):
                 chan_OTF1 = chan_OTF[i0]
                 chan1 = chan_OTF1[qsort]
-                qchan = np.argwhere(chan1 == 0)
                 spec1 = spec_OTF1[qsort]
+                qchan = np.argwhere(chan1 == 0)
                 wgt1[qchan] = 0.00
                 arr_line1 = np.interp(vel_vector,vlsr, spec1)
                 arr_wgt1 = np.interp(vel_vector,vlsr, wgt1)
-                leg_spec.append(arr_line1)
-                leg_chf.append(arr_wgt1)
-            leg_spec=np.array(leg_spec)
+                arr_chan = np.interp(vel_vector,vlsr,chan1)
+                
+                leg_spec.append(ma.MaskedArray(arr_line1,mask = (arr_chan >0)))
+                leg_chf.append(arr_chan)
+            leg_spec=ma.array(leg_spec)
             leg_chf =np.array(leg_chf)
 
             #stack all usable spectra into new array
@@ -187,7 +190,7 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
                 arr_line = leg_spec
                 arr_chf = leg_chf
             else:
-                arr_line = np.vstack((arr_line,leg_spec))
+                arr_line = ma.vstack((arr_line,leg_spec))
                 arr_chf = np.vstack((arr_chf,leg_chf))
                 
             #
@@ -196,7 +199,7 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
             legweight = np.append(legweight,1.0/mxrms**2)
 
             
-    arr_line = np.array(arr_line)
+    #arr_line = np.array(arr_line)
     xpos = np.array(xpos)
     ypos = np.array(ypos)
     print(np.min(xpos),np.max(xpos),np.min(ypos),np.max(ypos),np.median(xpos),np.median(ypos))
@@ -374,6 +377,10 @@ def main(args=None,verbose=True):
                                required=False,
                                help='mixer: 2, 3, 6:  0 for all',
                                default=0)
+        my_parser.add_argument('-o', 
+                               metavar='--ofile',
+                               required=False,
+                               help='Output cube name.  If none provided a name based on target and regridding parameters is created')
         my_parser.add_argument('-P', 
                                metavar='--pixBeam',
                                required=False,
@@ -401,6 +408,7 @@ def main(args=None,verbose=True):
     source = args.s
     line_str = args.b
     kern = args.k
+    ofile=args.o
     vinput = args.l[0]
     mx = int(args.x)
     print(float(vinput))
@@ -472,6 +480,7 @@ def main(args=None,verbose=True):
     nchan_in = len(vv_in)
     # 
     arr_line_in = arr_line0
+    print('Input array is masked',ma.is_masked(arr_line_in))
     
     #xpos_in = np.append(xpos0[0,:],xpos1[1,:])
     #ypos_in = np.append(ypos0[0,:],ypos1[1,:])
@@ -505,7 +514,12 @@ def main(args=None,verbose=True):
     #
     silentremove(dir_write+f'cube_{line_str}.fits')
     hdu_cube_out = fits.PrimaryHDU(cube.data, header = hdr)
-    hdu_cube_out.writeto(dir_write+f'{source}_{line_str}_{mx}_{pixPerBeam}pix_in_{beam_fwhm*60:0.2}_{KT}.fits',overwrite=True)
+    if ofile == None:
+        outcube = dir_write+f'{source}_{line_str}_{mx}_{pixPerBeam}pix_in_{beam_fwhm*60:0.2}_{KT}.fits'
+    else:
+        outcube = dir_write + ofile
+
+    hdu_cube_out.writeto(outcube ,overwrite = True)
     #
     #
     #
