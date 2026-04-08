@@ -515,7 +515,7 @@ def main(args=None,verbose=True):
     silentremove(dir_write+f'cube_{line_str}.fits')
     hdu_cube_out = fits.PrimaryHDU(cube.data, header = hdr)
     if ofile == None:
-        outcube = dir_write+f'{source}_{line_str}_{mx}_{pixPerBeam}pix_in_{beam_fwhm*60:0.2}_{KT}.fits'
+        outcube = dir_write+f'{source}_{line_str}_{mx}_at_{beam_fwhm*60:0.2}_{KT}.fits'
     else:
         outcube = dir_write + ofile
 
