@@ -129,7 +129,7 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
                 osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & ((data['MIXER']==2) | (data['MIXER']==3) | (data['MIXER']==6))).flatten()
 
         if len(osel) <= 0:
-            print('WARNING: No OTF spectra available in ',input_filename)
+            print('WARNING: No OTF spectra available in ', ifile)
             # logger.warning('No OTF spectra available.')                           
         else:
             spec_OTF = np.squeeze(spec[osel,:])
@@ -518,7 +518,7 @@ def main(args=None,verbose=True):
     hdr['CDELT3'] = (vv_in[1]-vv_in[0])
     #
     silentremove(dir_write+f'cube_{line_str}.fits')
-    hdu_cube_out = fits.PrimaryHDU(cube.data, header = hdr)
+    hdu_cube_out = fits.PrimaryHDU(cube, header=hdr)
     if ofile == None:
         outcube = dir_write+f'{source}_{line_str}_{mx}_at_{beam_fwhm*60:0.2}_{KT}.fits'
     else:
