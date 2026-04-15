@@ -11,7 +11,7 @@ import scipy as sp
 import glob
 import math
 from astropy import constants as const
-from grid_otf import grid_otf
+from grid_otf_optimized import grid_otf
 import sys
 import warnings
 #from progressbar import ProgressBar
@@ -82,15 +82,6 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
         # new level 1 files are already in V_lsr, no longer need this code
         ## compute velocity                                                           
         npix    = hdr['NPIX']            
-        #IF_pix  = hdr['CRPIX1']
-        #IF_val  = hdr['CRVAL1']
-        #IF_del  = hdr['CDELT1']
-        #IF_freq = (np.arange(npix)-IF_pix)*IF_del+IF_val
-        #VLSR    = hdr['VLSR']        
-        #
-        #IF_vlsr0= hdr['IF0']
-        #vlsr    = (IF_vlsr0 - IF_freq)/line_freq*constants.c.value/1.e3 + VLSR # Vlsr in km/s 
-        
         # new level 1 V_lsr import
         VLSR_pix  = hdr['CRPIX1']
         VLSR_val  = hdr['CRVAL1']
@@ -391,6 +382,11 @@ def main(args=None,verbose=True):
                                required=False,
                                help='beam FWHM in decimal arcmin, default use data header',
                                default='header')
+        my_parser.add_argument('-dv', 
+                               metavar='--vel_spacing',
+                               required=False,
+                               help='Velocity spacing in output cube in km/s',
+                               default='header')
         my_parser.add_argument('-l', 
                                metavar='--VLSRrange',
                                nargs=2,
@@ -424,8 +420,17 @@ def main(args=None,verbose=True):
     dir_level1 = f'{datadir}/level1/{source}/'
     dir_write = f'{datadir}/level2/{source}/'
     
-    vel_spacing = 2.0 # km/s
-    
+    dvNII = 2.0076146439883598  # band 1 native resolution
+    dvCII = 0.7709722465531635  # band 2 native resolution
+    # velocity steps
+    if args.dv == 'header':
+        if args.b == 'NII':
+            vel_spacing = dvNII
+        else:
+            vel_spacing = dvCII
+    else:
+        vel_spacing = float(args.dv)
+
     vv_in = np.arange(vmin,vmax,vel_spacing)
     ktypes = ['B', 'G', 'N']
     match kern:
@@ -464,7 +469,7 @@ def main(args=None,verbose=True):
         beam_fwhm = 1.2 * wavelength/dish_diam * np.rad2deg(1.)
     else:
         beam_fwhm = float(args.Beam)/60.0
-    
+
     # create spectra array to put in regridder
     #arr_line0, xpos0, ypos0, nchan0 = make_line_array(hdu)
     #
