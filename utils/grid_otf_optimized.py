@@ -182,19 +182,27 @@ def grid_otf(data, xsky, ysky, wcsObj, nchan, xsize, ysize, pix_scale, beam_fwhm
     ny = cubeShape[1]
 
     # ------------------------------------------------------------------ #
-    # Pre-process data: replace NaN with 0 and record NaN positions       #
-    # nan_weight[s, c] = 0 if data[s,c] is NaN, else weight[s]           #
+    # Pre-process data: replace NaN/masked values with 0                  #
+    # combined_mask[s, c] = True if channel c of spectrum s is bad        #
     # ------------------------------------------------------------------ #
-    data_work = np.array(data, dtype=np.float32)          # working copy
+    data_work = np.array(data, dtype=np.float32)          # strips ma mask, gets fill values
     nan_mask  = np.isnan(data_work)                        # (nspec, nchan)
-    data_work[nan_mask] = 0.0
 
-    # per-spectrum-channel weight: starts at weight[s], zeroed where NaN
+    # Honor masked array mask if present (ma.getmaskarray always returns a
+    # full boolean array, never the scalar False that ma.getmask can return)
+    if ma.is_masked(data):
+        combined_mask = nan_mask | np.asarray(ma.getmaskarray(data), dtype=bool)
+    else:
+        combined_mask = nan_mask
+
+    data_work[combined_mask] = 0.0
+
+    # per-spectrum-channel weight: starts at weight[s], zeroed where bad
     # shape: (nspec, nchan)
     spec_weight = np.broadcast_to(
         weight[:, np.newaxis], (nspec, nchan_data)
     ).copy()                                               # writeable copy
-    spec_weight[nan_mask] = 0.0
+    spec_weight[combined_mask] = 0.0
 
     # ------------------------------------------------------------------ #
     # "nearest" kernel — fast scatter path                                 #
