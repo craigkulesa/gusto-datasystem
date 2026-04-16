@@ -55,59 +55,49 @@ def call_fits(dir):
 
 	return hdu_tot
 
-def make_gusto_array(directory, linename,mx, vel_vector, coordType):
-    # level 1 calibrated spectra in directory 
+def make_gusto_array(directory, linename, mx, vel_vector, coordType):
+    # level 1 calibrated spectra in directory
     # Line to make cube of in line_str (either NII or CII)
-    # velocity vector to interpolate Leve 1 data onto
+    # velocity vector to interpolate Level 1 data onto
     input_files = glob.glob(f'{directory}/{linename}*fits')
-    #ifile = os.path.join(directory,input_filename)
-    #print(ifile)        
-    nfile= len(input_files)
+    nfile = len(input_files)
     print(f'nchan: {vel_vector.size}')
-    arr_line=np.array([],[])
-    xpos = np.array([])
-    ypos = np.array([])
-    legweight = np.array([])
-
     print(f'{nfile} files found for cube generation in {directory}.')
 
+    # Accumulate per-file results in lists; single vstack/concatenate at end
+    # avoids O(N^2) copying from repeated ma.vstack / np.append in a loop.
+    all_specs = []
+    all_chf   = []
+    all_x     = []
+    all_y     = []
+    all_wgt   = []
+
     for ifile in input_files:
-        
+
         spec, data, hdr, hdr1 = loadSDFITS(ifile, verbose=False)
-        rowFlag = data['ROW_FLAG']
+        rowFlag  = data['ROW_FLAG']
         n_spec, n_pix = spec.shape
         chanflag = data['CHANNEL_FLAG']
-        
-        
-        # new level 1 files are already in V_lsr, no longer need this code
-        ## compute velocity                                                           
-        npix    = hdr['NPIX']            
-        # new level 1 V_lsr import
-        VLSR_pix  = hdr['CRPIX1']
-        VLSR_val  = hdr['CRVAL1']
-        VLSR_del  = hdr['CDELT1']
-        vlsr = (np.arange(npix)-(VLSR_pix))*VLSR_del+VLSR_val
-        #print(vlsr.min(),vlsr.max())
+
+        # velocity axis — already in V_lsr
+        npix     = hdr['NPIX']
+        VLSR_pix = hdr['CRPIX1']
+        VLSR_val = hdr['CRVAL1']
+        VLSR_del = hdr['CDELT1']
+        vlsr = (np.arange(npix) - VLSR_pix) * VLSR_del + VLSR_val
         qsort = vlsr.argsort()
-        vlsr.sort()
-    
-        #print(np.all(vlsr[1:] > vlsr[:-1]))
+        vlsr  = vlsr[qsort]          # sorted in-place equivalent, keeps qsort valid
 
-
-
-        
         line_freq = hdr['LINEFREQ']
-        
+
         if (linename == "CII") & (line_freq < 1900500):
             continue
         if (linename == "NII") & (line_freq > 1900500):
             continue
-        
-        rfl = RowFlags.MIXER_UNPUMPED | RowFlags.MIXER_MISPUMPED
-        rfl = RowFlags.RINGING_BIT0 | RowFlags.RINGING_BIT1
 
-        #osel = np.argwhere((data['scan_type'] == 'OTF') & (data['ROW_FLAG']==0)).flatten()
-        #osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==5) | (data['MIXER']==8)) & (data['rms']<5)).flatten()
+        rfl = RowFlags.MIXER_UNPUMPED | RowFlags.MIXER_MISPUMPED
+        rfl = RowFlags.RINGING_BIT0  | RowFlags.RINGING_BIT1
+
         if (linename == "CII"):
             if mx == 2:
                 osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & (data['MIXER']==2 )).flatten()
@@ -117,7 +107,6 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
                 osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & (data['MIXER']==8 )).flatten()
             else:
                 osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & ((data['MIXER']==5) | (data['MIXER']==8))).flatten()
-                #osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & 0x60)==0) & ((data['MIXER']==8))).flatten()
         if (linename == "NII"):
             if mx == 2:
                 osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & (data['MIXER']==2) ).flatten()
@@ -130,82 +119,83 @@ def make_gusto_array(directory, linename,mx, vel_vector, coordType):
 
         if len(osel) <= 0:
             print('WARNING: No OTF spectra available in ', ifile)
-            # logger.warning('No OTF spectra available.')                           
+            continue
+
+        spec_OTF = np.squeeze(spec[osel, :])
+        chan_OTF = np.squeeze(chanflag[osel, :])
+        data_OTF = np.squeeze(data[osel])
+        mxrms    = data_OTF['rms']
+        n_OTF, n_otfpix = spec_OTF.shape
+
+        # Coordinate transform
+        c_ra_dec = SkyCoord(ra=data_OTF['RA']*u.degree, dec=data_OTF['DEC']*u.degree, frame='icrs')
+        if coordType[0][0] == 'G':
+            c_l_b = c_ra_dec.transform_to(Galactic)
+            leg_y = c_l_b.b
+            leg_x = c_l_b.l.wrap_at(180*u.deg)
         else:
-            spec_OTF = np.squeeze(spec[osel,:])
-            chan_OTF = np.squeeze(chanflag[osel,:])
-            data_OTF = np.squeeze(data[osel])
-            mxrms    = data_OTF['rms']
-            n_OTF, n_otfpix = spec_OTF.shape
-            #x=np.arange(n_otfpix)
-    
-            # Instantiate for ra,dec->l,b transform                                      
-            c_ra_dec = SkyCoord(ra=data_OTF['RA']*u.degree, dec=data_OTF['DEC']*u.degree, frame='icrs')
-    
-            #basecorr = np.zeros(spec_OTF.shape)
-            #rmsotf = np.zeros(n_OTF)
-            #rf = np.zeros(n_OTF)
-            
-            # empty arrays to fill                                                        
-            
-            
+            leg_y = c_ra_dec.dec
+            leg_x = c_ra_dec.ra
 
-            if coordType[0][0] == 'G':
-                c_l_b = c_ra_dec.transform_to(Galactic)    # transform to l,b
-                leg_y = c_l_b.b
-                leg_x = c_l_b.l.wrap_at(180*u.deg)
-            else:
-                leg_y=c_ra_dec.dec
-                leg_x=c_ra_dec.ra
-            #print(len(leg_l),len(leg_b))
-            leg_spec=[]
-            leg_chf=[]
-            wgt1 = np.ones(n_otfpix)
-            for i0,spec_OTF1 in enumerate(spec_OTF):
-                chan_OTF1 = chan_OTF[i0]
-                chan1 = chan_OTF1[qsort]
-                spec1 = spec_OTF1[qsort]
-                qchan = np.argwhere(chan1 == 0)
-                wgt1[qchan] = 0.00
-                arr_line1 = np.interp(vel_vector,vlsr, spec1)
-                arr_wgt1 = np.interp(vel_vector,vlsr, wgt1)
-                arr_chan = np.interp(vel_vector,vlsr,chan1)
-                
-                leg_spec.append(ma.MaskedArray(arr_line1,mask = (arr_chan >0)))
-                leg_chf.append(arr_chan)
-            leg_spec=ma.array(leg_spec)
-            leg_chf =np.array(leg_chf)
+        # ------------------------------------------------------------------
+        # Vectorized interpolation — replaces the per-spectrum Python loop.
+        #
+        # Pre-compute interpolation indices and weights once for vel_vector
+        # vs vlsr, then apply to all spectra simultaneously.
+        #
+        # Also fixes a bug in the original: wgt1 was never reset between
+        # spectra, so bad-channel flags from spectrum N leaked into N+1.
+        # ------------------------------------------------------------------
 
-            #stack all usable spectra into new array
-            if arr_line.shape[0] == 0:
-                arr_line = leg_spec
-                arr_chf = leg_chf
-            else:
-                arr_line = ma.vstack((arr_line,leg_spec))
-                arr_chf = np.vstack((arr_chf,leg_chf))
-                
-            #
-            xpos = np.append(xpos,leg_x.degree)
-            ypos = np.append(ypos,leg_y.degree)
-            legweight = np.append(legweight,1.0/mxrms**2)
+        # Sort all spectra and channel flags along the velocity axis at once
+        spec_sorted = spec_OTF[:, qsort]   # (n_OTF, n_otfpix)
+        chan_sorted  = chan_OTF[:, qsort]   # (n_OTF, n_otfpix)
 
-            
-    #arr_line = np.array(arr_line)
-    xpos = np.array(xpos)
-    ypos = np.array(ypos)
-    print(np.min(xpos),np.max(xpos),np.min(ypos),np.max(ypos),np.median(xpos),np.median(ypos))
-    #filter out all postions more than 2 degrees away from median
-    xmed = np.median(xpos)
-    ymed = np.median(ypos)
-    dlim = 1.5
-    qkeep = np.argwhere( (np.abs(xpos-xmed) < dlim) & (np.abs(ypos-ymed) < dlim))
-    arr_linekeep = np.squeeze(arr_line[qkeep,:])
-    xkeep = np.squeeze(xpos[qkeep])
-    ykeep = np.squeeze(ypos[qkeep])
-    wgtkeep = np.squeeze(legweight[qkeep])
-    arr_chfkeep = np.squeeze(arr_chf[qkeep,:])
-    nchan = vel_vector.shape[0]
-    print(arr_line.shape,legweight.shape,xpos.shape,ypos.shape)
+        # Interpolation index and fractional weight (same for every spectrum)
+        idx = np.searchsorted(vlsr, vel_vector)
+        idx = np.clip(idx, 1, len(vlsr) - 1)
+        lo  = idx - 1
+        hi  = idx
+        dv  = vlsr[hi] - vlsr[lo]
+        # Guard against zero-width intervals (shouldn't occur with real data)
+        dv  = np.where(dv == 0, 1.0, dv)
+        t   = (vel_vector - vlsr[lo]) / dv  # (nchan_out,)
+
+        # Interpolate all spectra at once: (n_OTF, nchan_out)
+        arr_lines = spec_sorted[:, lo] + t * (spec_sorted[:, hi] - spec_sorted[:, lo])
+        arr_chans = chan_sorted[:, lo]  + t * (chan_sorted[:, hi] - chan_sorted[:, lo])
+
+        # Build masked array: mask where channel flag > 0
+        leg_spec = ma.MaskedArray(arr_lines, mask=(arr_chans > 0))
+        leg_chf  = arr_chans
+
+        all_specs.append(leg_spec)
+        all_chf.append(leg_chf)
+        all_x.append(leg_x.degree)
+        all_y.append(leg_y.degree)
+        all_wgt.append(1.0 / mxrms**2)
+
+    # Single stack at the end — avoids O(N^2) copies from repeated vstack
+    arr_line  = ma.vstack(all_specs)
+    arr_chf   = np.vstack(all_chf)
+    xpos      = np.concatenate(all_x)
+    ypos      = np.concatenate(all_y)
+    legweight = np.concatenate(all_wgt)
+
+    print(np.min(xpos), np.max(xpos), np.min(ypos), np.max(ypos), np.median(xpos), np.median(ypos))
+
+    # Filter out positions more than 1.5 degrees from median
+    xmed  = np.median(xpos)
+    ymed  = np.median(ypos)
+    dlim  = 1.5
+    qkeep = np.argwhere((np.abs(xpos - xmed) < dlim) & (np.abs(ypos - ymed) < dlim))
+    arr_linekeep = np.squeeze(arr_line[qkeep, :])
+    xkeep        = np.squeeze(xpos[qkeep])
+    ykeep        = np.squeeze(ypos[qkeep])
+    wgtkeep      = np.squeeze(legweight[qkeep])
+    arr_chfkeep  = np.squeeze(arr_chf[qkeep, :])
+    nchan        = vel_vector.shape[0]
+    print(arr_line.shape, legweight.shape, xpos.shape, ypos.shape)
     return arr_linekeep, xkeep, ykeep, wgtkeep, nchan, line_freq, arr_chfkeep
             
 
