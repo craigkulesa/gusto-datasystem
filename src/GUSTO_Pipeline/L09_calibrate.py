@@ -14,6 +14,11 @@ from multiprocessing.pool import Pool
 from PyAstronomy import pyasl
 from scipy.optimize import minimize
 
+from BayesicFitting import PolynomialModel
+from BayesicFitting import ConstantModel
+from BayesicFitting import LevenbergMarquardtFitter
+from BayesicFitting import RobustShell
+
 from .DataIO import *
 from .Logger import *
 from .Configuration import *
@@ -29,6 +34,18 @@ def scalefunc(x,c1,c2):
     y = c1 - (c2*x1 + x2)
     return(np.sum(y*y))
 
+def despike_robust(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=0.1):
+    mask = np.zeros(len(data), dtype=bool)
+    model = PolynomialModel( deg )
+    lmf = LevenbergMarquardtFitter(x[start:stop],model)
+    ftr = RobustShell( lmf )
+    par = ftr.fit( data[start:stop],verbose=0)
+    rwgt = ftr.weights
+    qmask = rwgt < stdlim
+    mask[ np.argwhere(qmask) + start ]
+    cflags[mask] |= ChanFlags.SPUR_CANDIDATE
+    newdata = np.ma.masked_array( data , mask )
+    return newdata, cflags
 
 def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
     mask = np.zeros(len(data), dtype=bool)
@@ -551,13 +568,17 @@ def cal_bestmatchHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, p
 
     Ta = 2.*tsyseff * (sspec - synRef)/synRef
 
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
+    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
+    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
+    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
+    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=0.1)
+    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=0.1)
+    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=0.1)
+    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=0.1)
     if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
         try:
-            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
+            Ta, cflags = despike_robust(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.20)
         except:
             pass
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
