@@ -12,6 +12,7 @@ from astropy.time import Time
 from astropy.io import fits
 from multiprocessing.pool import Pool
 from PyAstronomy import pyasl
+from scipy.optimize import minimize
 
 from .DataIO import *
 from .Logger import *
@@ -19,6 +20,15 @@ from .Configuration import *
 from .flagdefs import *
 
 logger = logging.getLogger('pipelineLogger')
+
+
+
+def scalefunc(x,c1,c2):
+    x1 = x[0]
+    x2 = x[1]
+    y = c1 - (c2*x1 + x2)
+    return(np.sum(y*y))
+
 
 def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
     mask = np.zeros(len(data), dtype=bool)
@@ -485,6 +495,75 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
     return Ta, cflags, Tsys_median, rms
 
 
+def cal_bestmatchHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
+    chan = [512, 1024]
+    fScale = [5000/511.0, 5000/1023.0]
+    oldmed = 999999
+    best = [0.5, 0.5, 0.5, 1.]
+    Ta = ma.zeros(sspec.shape)
+    tsyseff = ma.zeros(sspec.shape)
+    idx = np.r_[band*40:band*60, band*70:band*95, band*260:band*300]
+    
+    xaxis = np.arange(0, chan[band-1]*fScale[band-1], fScale[band-1])
+    seq_hots = ghots[closest,:]
+    
+    if closest+1 < hgroup.max():
+        seq_hots = np.vstack([seq_hots, ghots[closest+1,:]])
+    if closest > 0:
+        seq_hots = np.vstack([seq_hots, ghots[closest-1,:]])
+    
+    synRefs = []
+    tsyss = []
+    testvar = []
+    mincoeffs = []
+    
+    onlyonce = False
+    if yfac.ndim == 1:
+        yfac = np.vstack([yfac,yfac])
+        onlyonce = True
+
+    if tsys.ndim == 1:
+        tsys = np.vstack([tsys,tsys])
+
+    for if1,yfac1 in enumerate(yfac):
+        yfac_eff = yfac1
+        quse = np.argwhere((yfac_eff > 1.0) & (cflags == 0))
+        nsamp = quse.shape[0]
+        if nsamp > 0:
+            for hot1 in seq_hots:
+                sRn = hot1 / yfac_eff
+                synRefs.append(sRn)
+                tsyss.append( tsys[if1,:] )
+                xstart = [1.0,0.0]
+                minresult = minimize(scalefunc,xstart,args = (sspec[quse],sRn[quse]))
+                mincoeffs.append(minresult.x)
+                testvar.append(minresult.fun/nsamp)
+        if onlyonce:
+            break
+
+    testvar=np.array(testvar)
+    mincoeffs = np.array(mincoeffs)
+    #find minimum variance
+    qmin = np.argmin(testvar)
+
+    synRef = mincoeffs[qmin][0]*synRefs[qmin] + mincoeffs[qmin][1]
+    tsyseff = tsyss[qmin]
+
+    Ta = 2.*tsyseff * (sspec - synRef)/synRef
+
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
+    if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
+        try:
+            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
+        except:
+            pass
+    Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
+    rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+    return Ta, cflags, Tsys_median, rms
+
 def processL07(paramlist):
     """Function processing the Level 0.7 data. Input are uncalibrated 
     REF, HOT, and OTF spectra and output are calibrated OTF spectra
@@ -576,9 +655,16 @@ def processL07(paramlist):
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
         # create the calibrated spectra
-        for i0 in range(n_OTF):
-            # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
-            ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+        if calmethod == 'cal_weightedHOTs':
+            for i0 in range(n_OTF):
+                # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+        elif calmethod == 'cal_bestmatchHOTs':
+            for i0 in range(n_OTF):
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_bestmatchHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+        else:
+            print('Choose an implemented calibration method')
+            break
 
         #baseline correct entire sequence: remove a residual baseline not corrected in the calibration
         base_median = ma.median(ta,0)
