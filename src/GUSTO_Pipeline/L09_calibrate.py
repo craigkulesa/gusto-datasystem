@@ -487,7 +487,7 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
                 fit = np.polyfit(x_fit, y_fit, polyorder)
                 baseline = np.poly1d(fit)
                 Ta = Ta - baseline(xaxis)
-                med = np.std(Ta[idx])
+                med = np.std(Ta[idx], ddof = 1)
                 if med < oldmed:
                     oldmed = med
                     best[0] = a
