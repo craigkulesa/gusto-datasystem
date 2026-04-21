@@ -4,6 +4,7 @@ This is the GUSTO Level 0.9 Pipeline.
 import numpy as np
 import numpy.ma as ma
 import os
+import math
 import subprocess
 from tqdm import tqdm
 from datetime import datetime
@@ -33,6 +34,27 @@ def scalefunc(x,c1,c2):
     x2 = x[1]
     y = c1 - (c2*x1 + x2)
     return(np.sum(y*y))
+
+def calculatemin(c1,c2):
+    # calculate an scale and an offset that mininimizes the square difference of c1 and c2
+    # return the scale and offset and the minimum square diff
+    N = len(c2)
+    sqc1 = np.sum(c1 * c1)
+    sqc2 = np.sum(c2 * c2)
+    c1c2 = np.sum(c1 * c2)
+    c1sm = np.sum(c1)
+    c2sm = np.sum(c2)
+
+    denom = N * sqc2 - c2sm**2
+    if denom != 0.0:
+        b = ( N * c1c2 - c1sm * c2sm )/denom
+        c = c1sm / N - c2sm/N * ( N * c1c2 - c1sm * c2sm)/denom
+    else:
+        b=1.0
+        c=0.0
+
+    sdiff = np.sum((c1 - (b*c2 + c))**2)
+    return [b,c], sdiff
 
 def despike_robust(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=0.1):
     mask = np.zeros(len(data), dtype=bool)
@@ -544,7 +566,8 @@ def cal_bestmatchHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, p
 
     for if1,yfac1 in enumerate(yfac):
         yfac_eff = yfac1
-        quse = np.argwhere((yfac_eff > 1.0) & (cflags == 0))
+        #quse = np.argwhere((yfac_eff > 1.0) & (cflags == 0))
+        quse = idx
         nsamp = quse.shape[0]
         if nsamp > 0:
             for hot1 in seq_hots:
@@ -552,33 +575,41 @@ def cal_bestmatchHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, p
                 synRefs.append(sRn)
                 tsyss.append( tsys[if1,:] )
                 xstart = [1.0,0.0]
-                minresult = minimize(scalefunc,xstart,args = (sspec[quse],sRn[quse]))
-                mincoeffs.append(minresult.x)
-                testvar.append(minresult.fun/nsamp)
+                #minresult = minimize(scalefunc,xstart,args = (sspec[quse],sRn[quse]))
+                x,testvar1 = calculatemin(sspec[quse],sRn[quse])
+                mincoeffs.append(x)
+                testvar.append(testvar1/nsamp)
         if onlyonce:
             break
 
     testvar=np.array(testvar)
     mincoeffs = np.array(mincoeffs)
     #find minimum variance
-    qmin = np.argmin(testvar)
+    if testvar.shape[0] == 0:
+        print(seq_hots.shape,yfac.shape)
+        synRef = seq_hots / yfac
+        tsyseff = tsys
+    else:
+        qmin = np.argmin(testvar)
 
-    synRef = mincoeffs[qmin][0]*synRefs[qmin] + mincoeffs[qmin][1]
-    tsyseff = tsyss[qmin]
+        synRef = mincoeffs[qmin][0]*synRefs[qmin] + mincoeffs[qmin][1]
+        #print(mincoeffs[qmin])
+        tsyseff = tsyss[qmin]
 
     Ta = 2.*tsyseff * (sspec - synRef)/synRef
 
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=0.1)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=0.1)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=0.1)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=0.1)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
+    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
+    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=0.1)
+    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=0.1)
+    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=0.1)
+    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=0.1)
     if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
         try:
-            Ta, cflags = despike_robust(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.20)
+            #Ta, cflags = despike_robust(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.20)
+            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.20)
         except:
             pass
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
