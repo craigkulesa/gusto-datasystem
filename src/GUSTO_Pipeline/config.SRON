@@ -1,11 +1,11 @@
-path = /data/scratch/gusto-datasystem/
+path = /data/scratch/GUSTO/gusto-datasystem/Data/
 band = [1, 2]
 cpus = 1
 scanid = [14920, 14930]
 level = 0.9
 polyorder = 3
 rowflagfilter = 0
-calmethod = cal_weightedHOTs
+calmethod = cal_bestmatchHOTs
 despurmethod = polyRes
 spurchannelfilter = False
 mediansubtract = True
