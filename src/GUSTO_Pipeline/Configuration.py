@@ -23,6 +23,7 @@ def getConfiguration(verbose=False):
     parser.add('--polyorder', required=False, help='Baseline polynomial order', default='1')
     parser.add('--calmethod', required=False, help='Calibration method to use', default='cal_scaledGainHOTs')
     parser.add('--despurmethod', required=False, help='despur method to use', default='polyRes')
+    parser.add('--mediansubtract',required=False, help='global median background was used', default=False)
     parser.add('--spurchannelfilter', required=False, action=argparse.BooleanOptionalAction, help='apply filter for spur masks', default=False)
     
     args = parser.parse_args()
