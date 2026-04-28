@@ -106,6 +106,38 @@ def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=
     newdata = np.ma.masked_array(data, mask)
     return newdata, cflags
 
+def identifyspurs(Ta,cflags,xaxis,band,method = None):
+    if method == 'robust':
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=0.3)
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=0.3)
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=0.3)
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=0.3)
+        if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
+            try:
+                Ta, cflags = despike_robust(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.5)
+            except:
+                pass
+    else:
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
+        if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
+            try:
+                Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
+            except:
+                pass
+    
+    
+    return Ta, cflags
+
+def removepolybaseline(Ta,xaxis,idx,polyorder):
+    x_fit = xaxis[idx]
+    y_fit = Ta[idx]
+    fit = np.polyfit(x_fit, y_fit, polyorder)
+    baseline = np.poly1d(fit)
+    Ta = Ta - baseline(xaxis)
+    return Ta
 
 def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     """Function calculating the calibration spectrum for a single mixer.
@@ -454,11 +486,12 @@ def L09_Pipeline(args, scanRange, verbose=False):
         rowflagfilter = 4294967295
         calmethod = args.calmethod
         despurmethod = args.despurmethod
+        mediansubtract = args.mediansubtract
         spurchannelfilter = args.spurchannelfilter
         polyorder = args.polyorder
         
         params = {'band': int(band), 'inDir': inDir, 'outDir': outDir, 'polyorder': polyorder, 
-                  'calmethod': calmethod, 'despurmethod': despurmethod,
+                  'calmethod': calmethod, 'despurmethod': despurmethod, 'mediansubtract': mediansubtract, 
                   'spurchannelfilter': spurchannelfilter, 'debug': args.debug, 'verbose': verbose,
                   'pxrange': pxrange, 'rowflagfilter': rowflagfilter, 'commit_info': commit_info}
         paramlist = [[a, b] for a in dfiles for b in [params]]
@@ -475,7 +508,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
     return sum_files
 
 
-def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
+def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed = 999999
@@ -540,29 +573,24 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
         synthRef = best[0]*sRn[0,:] + (1.0-best[0])*sRn[1,:]
     else: # sRn.ndim = 1
         synthRef = sRn
-    Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
-    #idx = np.r_[band*40:band*60, band*75:band*95, band*260:band*300]
-    x_fit = xaxis[idx]
-    y_fit = Ta[idx]
-    fit = np.polyfit(x_fit, y_fit, polyorder)
-    baseline = np.poly1d(fit)
-    Ta = Ta - baseline(xaxis)
 
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
-    if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
-        try:
-            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
-        except:
-            pass
+    #calcualte Ta
+    Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
+
+    #remove initial baseline
+    Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
+    
+    # identify spurs
+    Ta, cflags = identifyspurs(Ta,cflags, xaxis, band,method = despurmethod)
+
+    # calculate Tsys and rms
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+
     return Ta, cflags, Tsys_median, rms
 
 
-def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
+def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed = 999999
@@ -605,7 +633,6 @@ def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyo
             sRn = hot1 / yfac1
             synRefs.append(sRn)
             tsyss.append( tsys_eff[if1,:] )
-            #minresult = minimize(scalefunc,xstart,args = (sspec[quse],sRn[quse]))
             x,testvar1 = calculatemin(sspec[quse],sRn[quse])
             mincoeffs.append(x)
             testvar.append(testvar1/nsamp)
@@ -624,34 +651,25 @@ def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyo
         #print(mincoeffs[qmin])
         tsyseff = tsyss[qmin]
 
-    Ta = 2.*tsyseff * (sspec - synRef)/synRef
-    # fit a baseline over entire  OTF
-    x_fit = xaxis[idx]
-    y_fit = Ta[idx]
-    fit = np.polyfit(x_fit, y_fit, polyorder)
-    baseline = np.poly1d(fit)
-    Ta = Ta - baseline(xaxis)
+    #calcualte Ta
+    Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
 
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
-    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=0.1)
-    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=0.1)
-    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=0.1)
-    #Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=0.1)
-    if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
-        try:
-            #Ta, cflags = despike_robust(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.20)
-            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.20)
-        except:
-            pass
+    #remove initial baseline
+    Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
+    
+    # identify spurs
+    Ta, cflags = identifyspurs(Ta,cflags,xaxis,band,method = despurmethod)
+
+    # calculate Tsys and rms
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+
+
     return Ta, cflags, Tsys_median, rms
 
 
-def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
+
+def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed = 999999
@@ -747,35 +765,19 @@ def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, pol
         qmin = np.argmin(testvar)
         synRef = synRefs[qmin]
         tsyseff = tsyss[qmin]
-    #print(synRef.shape,tsyseff.shape,sspec.shape)
 
-    # scale the best combination of SynRef (HOTs) to minimize variance
-    #coeffs , variance = calculatemin(sspec[quse],synRef[quse])
-    #synRef = coeffs[0] * synRef + coeffs[1]
+    # Calculate Ta
     Ta = 2.*tsyseff * (sspec - synRef)/synRef
 
-    #x_fit = xaxis[idx]
-    #y_fit = Ta[idx]
-    #fit = np.polyfit(x_fit, y_fit, polyorder)
-    #baseline = np.poly1d(fit)
-    #Ta = Ta - baseline(xaxis)
+    # Remove baseline
+    Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
 
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    #Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=0.3)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=0.3)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=0.3)
-    Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=0.3)
-    if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
-        try:
-            #Ta, cflags = despike_robust(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.20)
-            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=3)
-        except:
-            pass
+    # Identfy spurs 
+    Ta, cflags = identifyspurs(Ta,cflags,xaxis,band,method = despurmethod)
+
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+    
     return Ta, cflags, Tsys_median, rms
 
 
@@ -789,8 +791,8 @@ def processL07(paramlist):
     TSKY = [33, 45]
     dfile = paramlist[0]
     params = paramlist[1]
-    band, inDir, outDir, polyorder, calmethod, debug, verbose, rowflagfilter, commit_info = \
-        params['band'], params['inDir'], params['outDir'], params['polyorder'], params['calmethod'], \
+    band, inDir, outDir, polyorder, calmethod, despurmethod, debug, verbose, rowflagfilter, commit_info = \
+        params['band'], params['inDir'], params['outDir'], params['polyorder'], params['calmethod'], params['despurmethod'], \
         params['debug'], params['verbose'], params['rowflagfilter'], params['commit_info']
     #pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))      # good pixel ranges
 
@@ -877,25 +879,27 @@ def processL07(paramlist):
         if calmethod == 'cal_weightedHOTs':
             for i0 in range(n_OTF):
                 # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
-                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder), despurmethod)
 
         elif calmethod == 'cal_scaleHOTs':
             for i0 in range(n_OTF):
-                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_scaleHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_scaleHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder), despurmethod)
 
         elif calmethod == 'cal_combineHOTs':
             for i0 in range(n_OTF):
-                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_combineHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_combineHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder), despurmethod)
                
 
         else:
             print('Choose an implemented calibration method')
             break
 
+
         #baseline correct entire sequence: remove a residual baseline not corrected in the calibration
-        base_median = ma.median(ta,0)
-        for i0 in range(n_OTF):
-            ta[i0,:] -= base_median
+        if params['mediansubtract']:
+            base_median = ma.median(ta,0)
+            for i0 in range(n_OTF):
+                ta[i0,:] -= base_median
 
         # now we have to save the data in a FITS file
         data['DATA'][osel,:] = ta.data        
@@ -918,6 +922,7 @@ def processL07(paramlist):
         hdr.set('rfID2', value=rfIDs[1], comment='scan ID for second REFHOT/REF')
     hdr.set('polyordr', value=int(params['polyorder']), comment='order of baseline polynomial fit')
     hdr.set('spurfltr', value=params['spurchannelfilter'], comment='was a spur channel filter pre-applied')
+    hdr.set('medianbg', value=params['mediansubtract'], comment='was a global spectral median removed')
     hdr.set('despur', value=params['despurmethod'], comment='despur processing method applied')
     hdr.set('calmethd', value=calmethod, comment='calibration processing method applied')
     hdr.set('', value='')
