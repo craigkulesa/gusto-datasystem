@@ -32,7 +32,10 @@ logger = logging.getLogger('pipelineLogger')
 def scalefunc(x,c1,c2):
     x1 = x[0]
     x2 = x[1]
-    y = c1 - (c2*x1 + x2)
+    r = c2 * x1 + x2
+    #y = c1 - (c2*x1 + x2)
+    # minimize S-R / R
+    y = (c1 - r) / r
     return(np.sum(y*y))
 
 def combinetwo(t0, s1, s2):
@@ -633,8 +636,15 @@ def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyo
             sRn = hot1 / yfac1
             synRefs.append(sRn)
             tsyss.append( tsys_eff[if1,:] )
-            x,testvar1 = calculatemin(sspec[quse],sRn[quse])
+
+            #x,testvar1 = calculatemin(sspec[quse],sRn[quse])
+            x = [1.0,0]
+            optres = minimize(scalefunc,x,(sspec[quse],sRn[quse]))
+            x = optres.x
             mincoeffs.append(x)
+            R = sRn[quse] * x[0] + x[1]
+            S = sspec[quse]
+            testvar1 = np.sum(((S - R) / R)**2)
             testvar.append(testvar1/nsamp)
 
     testvar=np.array(testvar)
@@ -652,7 +662,7 @@ def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyo
         tsyseff = tsyss[qmin]
 
     #calcualte Ta
-    Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
+    Ta = 2.*tsyseff * (sspec - synRef)/synRef
 
     #remove initial baseline
     Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
@@ -742,11 +752,11 @@ def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, pol
             mincoeffs.append(a)
             testvar.append(testvar1/nsamp)
         else:
-            # This option is not possible
-            print(sRn.shape,tsys.shape)
-            #synRefs.append(sRn)
-            #tsyss.append(tsys)
-            
+            #print(' ',sRn.shape,tsys.shape)
+            synRefs.append(sRn)
+            tsyss.append(tsys)
+            testvar1 =0 
+            testvar.append(testvar1)
 
     testvar=np.array(testvar)
     mincoeffs = np.array(mincoeffs)
@@ -761,12 +771,14 @@ def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, pol
             tsyseff = tsys[0]
         else:
             tsyseff = tsys
+            print('only one tsys',tsyseff.shape)
     else:
         qmin = np.argmin(testvar)
         synRef = synRefs[qmin]
         tsyseff = tsyss[qmin]
 
     # Calculate Ta
+    #print(Ta.shape,sspec.shape,synRef.shape,tsyseff.shape)
     Ta = 2.*tsyseff * (sspec - synRef)/synRef
 
     # Remove baseline
