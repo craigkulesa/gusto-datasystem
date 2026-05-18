@@ -500,21 +500,34 @@ def main(args=None,verbose=True):
     cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, weight=weight ,kern = kern)
     #cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, kern = kern)
     #
+    qzero = weight == 0.0
+    bzero = -9999
+    cube[qzero] = bzero
+    
     #
     hdr['CTYPE3'] = 'VRAD'
-    hdr['CUNIT3'] = 'm/s'
+    hdr['CUNIT3'] = 'km/s'
     hdr['CRVAL3'] = vv_in[0]
     hdr['CRPIX3'] = 1.0
     hdr['CDELT3'] = (vv_in[1]-vv_in[0])
+    hdr['BZERO']  = bzero
+    hdr['BSCALE'] = 1.0
     #
     silentremove(dir_write+f'cube_{line_str}.fits')
     hdu_cube_out = fits.PrimaryHDU(cube, header=hdr)
+
+    hdulist = fits.HDUList(hdu_cube_out)
+
+    hduw = fits.ImageHDU(data = weight,name = 'WEIGHT')
+    
+    hdulist.append(hduw)
     if ofile == None:
         outcube = dir_write+f'{source}_{line_str}_{mx}_at_{beam_fwhm*60:0.2}_{KT}.fits'
     else:
         outcube = dir_write + ofile
 
-    hdu_cube_out.writeto(outcube ,overwrite = True)
+    #hdu_cube_out.writeto(outcube ,overwrite = True)
+    hdulist.writeto(outcube, overwrite = True)
     #
     #
     #
