@@ -512,6 +512,17 @@ def main(args=None,verbose=True):
     hdr['CDELT3'] = (vv_in[1]-vv_in[0])
     hdr['BZERO']  = bzero
     hdr['BSCALE'] = 1.0
+    hdr['OBJECT'] = source 
+    hdr['LINE'] = (line_str, 'Observed line') 
+    hdr['KERNEL'] = (KT, 'Regridder, B:GAUSSBESSEL, G:GAUSS, N:NEAREST ') 
+    hdr['BEAMFWHM'] = (beam_fwhm*60,'beam in arcminutes')
+    hdr['PIX_BEAM'] = (pixPerBeam,'Pixels per beam')
+    hdr['MIXER'] = (mx,'mixer ID, 0 for all usable mixers') 
+    hdr['MINVEL'] = args.l[0]
+    hdr['MAXVEL'] = args.l[1]
+    #wcsfile = args.f
+    
+
     #
     silentremove(dir_write+f'cube_{line_str}.fits')
     hdu_cube_out = fits.PrimaryHDU(cube, header=hdr)
