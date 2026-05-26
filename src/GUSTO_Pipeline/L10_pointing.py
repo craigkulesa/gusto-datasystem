@@ -149,20 +149,18 @@ def processL09(params, verbose=True):
             data['RA'][msel] = nradec.ra.deg
             data['DEC'][msel] = nradec.dec.deg
 
-            #legs = data['DATA'][msel,:]
-            #cflags = data['CHANNEL_FLAG'][msel,:]
+            legs = data['DATA'][msel,:]
+            cflags = data['CHANNEL_FLAG'][msel,:]
             # legs array ( nlegs X nvlsr )
-            #print(legs.shape)
-            # flatten leg removes a linear trend (over time of the leg) at each velocity
+            # Identify spurious signals across channels:
             # Additional channel flagging to identify SPUR_CANDIDATE
-            #for ivlsr in range(legs.shape[1]):
-            #    leg = legs[:,ivlsr]
-            #    cflag = cflags[:,ivlsr]
-            #    legtrend, newcflag = flattenleg( leg, cflag )
-            #    legs[:,ivlsr] -= legtrend
-            #    cflags[:,ivlsr] = newcflag 
+            for ileg in range(legs.shape[0]):
+                leg= legs[ileg,:]
+                cflag = cflags[ileg,:]
+                legtrend, newcflag = flattenleg( leg, cflag )
+                cflags[ileg,:] = newcflag 
             #data['DATA'][msel,:] = legs
-            #data['CHANNEL_FLAG'][msel,:] = cflags
+            data['CHANNEL_FLAG'][msel,:] = cflags
             #break
         
     # now we have to save the data in a FITS file
