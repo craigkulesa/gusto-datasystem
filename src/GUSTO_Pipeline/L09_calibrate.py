@@ -87,17 +87,35 @@ def calculatemin(c1,c2):
     sdiff = np.sum((c1 - (b*c2 + c))**2)
     return [b,c], sdiff
 
-def despike_robust(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=0.1):
-    mask = np.zeros(len(data), dtype=bool)
+def despike_robust(x0, data0, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=0.1):
+    x = x0[start:stop]
+    data = data0[start : stop]
+    dlen = stop - start
+    cflag = cflags[start : stop]
+    mask = np.zeros(dlen, dtype=bool) | (cflag > 0)
+    rwgt = np.zeros(dlen, dtype=bool)
+    
     model = PolynomialModel( deg )
-    lmf = LevenbergMarquardtFitter(x[start:stop],model)
-    ftr = RobustShell( lmf )
-    par = ftr.fit( data[start:stop],verbose=0)
-    rwgt = ftr.weights
-    qmask = rwgt < stdlim
-    mask[ np.argwhere(qmask) + start ]
-    cflags[mask] |= ChanFlags.SPUR_CANDIDATE
-    newdata = np.ma.masked_array( data , mask )
+    quse = mask == 0
+    if mask.min() == 0:
+        lmf = LevenbergMarquardtFitter(x[quse],model)
+        ftr = RobustShell( lmf )
+        try:
+            par = ftr.fit( data[quse],verbose=0)
+        except:
+            #print(quse)
+            print(data,data.shape,data0.shape)
+            return
+
+
+        rwgt[quse] = ftr.weights
+        qmask = rwgt < stdlim
+        #mask[ np.argwhere(qmask) ]
+        cflag[qmask] |= ChanFlags.SPUR_CANDIDATE
+        cflags[start:stop] = cflag
+        newdata = np.ma.masked_array( data0 , cflags > 0 )
+    else:
+        newdata = data0
     return newdata, cflags
 
 def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
@@ -111,15 +129,10 @@ def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=
 
 def identifyspurs(Ta,cflags,xaxis,band,method = None):
     if method == 'robust':
-        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=0.3)
-        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=0.3)
-        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=0.3)
-        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=0.3)
-        if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
-            try:
-                Ta, cflags = despike_robust(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=0.5)
-            except:
-                pass
+
+        # try spur id of entire spectrum
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, 40*band, 240*band, points=100*band, count=1, deg=7, stdlim=0.5)
+        # 
     else:
         Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
         Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
@@ -751,11 +764,18 @@ def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, pol
             tsyss.append( tsys_eff[if1,:] )
             mincoeffs.append(a)
             testvar.append(testvar1/nsamp)
-        else:
-            #print(' ',sRn.shape,tsys.shape)
+        elif (sRn.shape[0] > 3) & (tsys.shape[0] == 2 ):
+            # this case is not tested.  there is only one sRn but two Tsys_eff,  How to judge between them?  
+            #print(' ',sRn.shape,tsys.shape,tsys_eff.shape)
             synRefs.append(sRn)
-            tsyss.append(tsys)
-            testvar1 =0 
+            tsyss.append(tsys_eff[if1,:])
+            #this will always choose the first one in the loop if1 == 0
+            testvar1 = if1
+            testvar.append(testvar1)
+        else:
+            synRefs.append(sRn)
+            tsyss.append( tsys )
+            testvar1 = 0
             testvar.append(testvar1)
 
     testvar=np.array(testvar)
@@ -779,16 +799,25 @@ def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, pol
 
     # Calculate Ta
     #print(Ta.shape,sspec.shape,synRef.shape,tsyseff.shape)
-    Ta = 2.*tsyseff * (sspec - synRef)/synRef
+    if tsyseff.shape[0] == 5:
+        #  How is tsyseff more than one?
+        Ta = 2.*tsyseff[0,:] * (sspec - synRef)/synRef
+    else:
+        Ta = 2.*tsyseff * (sspec - synRef)/synRef
 
-    # Remove baseline
-    Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
+    # Remove baseline baseline removal here is seen in final product
+    # Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
 
     # Identfy spurs 
+    #try:
     Ta, cflags = identifyspurs(Ta,cflags,xaxis,band,method = despurmethod)
 
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+    #except:
+    #    print(f'{Ta.shape} Ta: ')
+    #    #print(f'xaxis: {xaxis}')
+    #    print(f'{cflags.shape} cflags: ')
     
     return Ta, cflags, Tsys_median, rms
 
