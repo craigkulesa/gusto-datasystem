@@ -508,11 +508,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
         polyorder = args.polyorder
         
         params = {'band': int(band), 'inDir': inDir, 'outDir': outDir, 'polyorder': polyorder, 
-<<<<<<< HEAD
                   'calmethod': calmethod, 'despurmethod': despurmethod, 'mediansubtract': mediansubtract,
-=======
-                  'calmethod': calmethod, 'despurmethod': despurmethod, 'mediansubtract': mediansubtract, 
->>>>>>> band1_tests
                   'spurchannelfilter': spurchannelfilter, 'debug': args.debug, 'verbose': verbose,
                   'pxrange': pxrange, 'rowflagfilter': rowflagfilter, 'commit_info': commit_info}
         paramlist = [[a, b] for a in dfiles for b in [params]]
@@ -595,18 +591,6 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
     else: # sRn.ndim = 1
         synthRef = sRn
 
-<<<<<<< HEAD
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
-    if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
-        try:
-            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
-        except:
-            logger.debug('WARNING: Band 1 global despurring pass failed')
-            pass
-=======
     #calcualte Ta
     Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
 
@@ -617,7 +601,7 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
     Ta, cflags = identifyspurs(Ta,cflags, xaxis, band,method = despurmethod)
 
     # calculate Tsys and rms
->>>>>>> band1_tests
+    #>>>>>>> band1_tests
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
 
@@ -934,18 +918,6 @@ def processL07(paramlist):
         hgroup = ahgroup[osel]
         
         # create the calibrated spectra
-<<<<<<< HEAD
-        for i0 in range(n_OTF):
-            # fixme: make this conditional --> if calmethod == 'cal_weightedHOTs'
-            ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
-
-        # baseline correct entire mixer sequence (Russ' method)
-        if params['mediansubtract']:
-            base_median = ma.median(ta, 0)
-            for i0 in range(n_OTF):
-                ta[i0,:] -= base_median
-            
-=======
         if calmethod == 'cal_weightedHOTs':
             for i0 in range(n_OTF):
                 # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
@@ -971,7 +943,7 @@ def processL07(paramlist):
             for i0 in range(n_OTF):
                 ta[i0,:] -= base_median
 
->>>>>>> band1_tests
+        #>>>>>>> band1_tests
         # now we have to save the data in a FITS file
         data['DATA'][osel,:] = ta.data        
         data['CHANNEL_FLAG'] [osel,:] = cflags_OTF
