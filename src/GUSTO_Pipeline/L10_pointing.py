@@ -15,9 +15,11 @@ from astropy.io import fits
 from astropy import units as u
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 from astropy.time import Time
+from BayesicFitting import PolynomialModel, LevenbergMarquardtFitter, RobustShell
 
 from .DataIO import *
 from .Logger import *
+from .flagdefs import *
 
 offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
 logger = logging.getLogger('pipelineLogger')
@@ -76,6 +78,24 @@ def L10_Pipeline(args, scanRange, verbose=False):
         
     return sum_files
 
+def flattenleg( leg , cflags,  deg = 1, stdlim = 0.1):
+    """Function to fit and remove a line using robust fitting and and identify new SPUR_CANDIDATE
+        Parameters: leg:  OTF leg of one mixer at one velocity
+                    deg:  degree of polynomial to fit over leg data, default = 1
+
+        return:  robustfit, newcflags
+
+    """
+    x = np.arange(leg.size)
+    model = PolynomialModel( deg )
+    lmf = LevenbergMarquardtFitter( x , model)
+    ftr = RobustShell( lmf )
+    par = ftr.fit( leg , verbose = 0)
+    rwgt = ftr.weights
+    qmask = rwgt < stdlim
+    cflags[qmask] |= ChanFlags.SPUR_CANDIDATE
+    robustfit = model( x )
+    return robustfit, cflags
 
 
 def processL09(params, verbose=True):
@@ -128,6 +148,20 @@ def processL09(params, verbose=True):
             
             data['RA'][msel] = nradec.ra.deg
             data['DEC'][msel] = nradec.dec.deg
+
+            legs = data['DATA'][msel,:]
+            cflags = data['CHANNEL_FLAG'][msel,:]
+            # legs array ( nlegs X nvlsr )
+            # Identify spurious signals across channels:
+            # Additional channel flagging to identify SPUR_CANDIDATE
+            for ileg in range(legs.shape[0]):
+                leg= legs[ileg,:]
+                cflag = cflags[ileg,:]
+                legtrend, newcflag = flattenleg( leg, cflag )
+                cflags[ileg,:] = newcflag 
+            #data['DATA'][msel,:] = legs
+            data['CHANNEL_FLAG'][msel,:] = cflags
+            #break
         
     # now we have to save the data in a FITS file
     
@@ -214,4 +248,5 @@ def getMixerOffsets(band, mixers, offsetfile=None, verbose=False):
             offset = np.argwhere((cmixer == data['mxpix'])&(data['type']=='THEORY')).flatten()
         offsets = np.append(offsets, offset)
         
+
     return data[offsets].flatten()
