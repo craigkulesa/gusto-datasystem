@@ -246,9 +246,7 @@ def getMixerOffsets(band, mixers, offsetfile=None, verbose=False):
         offset = np.argwhere((cmixer == data['mxpix'])&((data['type']=='AS_MEASURED')|(data['type']=='FIDUCIAL'))).flatten()
         if offset.size == 0: # revert to the theory value
             offset = np.argwhere((cmixer == data['mxpix'])&(data['type']=='THEORY')).flatten()
-            #print(f'Theory for {cmixer}')
         offsets = np.append(offsets, offset)
         
 
-    #print(data[offsets].flatten())    
     return data[offsets].flatten()
