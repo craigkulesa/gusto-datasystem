@@ -266,10 +266,10 @@ def getOffsetVersion(filename):
     with open(filename,"r") as f:
         line0 = f.readline()
 
-    line0.strip('\n')
-    indx = line0.find("version =")
+    line = line0.strip("\n")
+    indx = line.find("version = ")
     if indx >= 0:
-        version = line0[indx+9:]
+        version = line[indx+9:]
     else:
         version = "0.0"
 
