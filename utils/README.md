@@ -8,8 +8,10 @@ The module GUSTOgridder.py will create level2  datacubes from level 1 GUSTO data
 The regridder is based on the STO2 gridder which was originally based on the Green Bank Telescope of the NRAO gridder for single dish OTF data.
 gridi\_otf.py and optimized to work with multiple pixel mixer arrays.
 
-   '''     
-   options:
+   
+
+```
+    options:
       -h, --help            show this help message and exit
       -v                    show program's version number and exit
       -s --source           Name of source directory in level1. galactic coords maps for source G???, RADEC otherwise
@@ -23,6 +25,7 @@ gridi\_otf.py and optimized to work with multiple pixel mixer arrays.
       -l --VLSRrange --VLSRrange
                             minimum maximum velocity channel, default -200 200 km/s
       -f --wcsfile          Input fits cube to match WCS if not present the WCS will be made based on input L1 scans
-    ,,,
+    ```   
+    
 
 
