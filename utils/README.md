@@ -1,2 +1,4 @@
-** GUSTO DATA CUBES per object 
-Creating GUSTO L2 data cubes
+# GUSTO DATA CUBES 
+![CII of Galactic Plane](images/GalacticPlane_CII.png)
+
+##Creating GUSTO L2 data cubes
