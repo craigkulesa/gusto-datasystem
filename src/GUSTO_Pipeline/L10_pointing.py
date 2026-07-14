@@ -116,7 +116,7 @@ def processL09(params, verbose=True):
     # insert the coordinate corrections
     # Note: the coordinate correction is not yet final
     # and will be (iteratively) improved    
-    mxoffs = getMixerOffsets(band, umixers, verbose=verbose)
+    mxoffs, offsversion = getMixerOffsets(band, umixers, verbose=verbose)
     
     for i, mix in enumerate(umixers):
         azoff = mxoffs['az'][i]
@@ -190,6 +190,7 @@ def processL09(params, verbose=True):
     hdr.set('CRPIX1', value=0.000, comment=(''))
     hdr.set('CRVAL1', value=vlsr[0], comment=(''))
     hdr.set('CDELT1', value=np.diff(vlsr).mean(), comment=(''))
+    hdr.set('OFFVERS',value=offsversion,comment=("Version of Mixer Offset Calibration"))
 
 # add 
 #    hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
@@ -236,6 +237,8 @@ def getMixerOffsets(band, mixers, offsetfile=None, verbose=False):
     if offsetfile is None:
         offsetfile = offsetfile0
 
+    offsetversion = getOffsetVersion(offsetfile)
+
     offsets = np.empty(0, dtype=int)
     
     data = np.genfromtxt(offsetfile, delimiter='\t', skip_header=2, 
@@ -249,4 +252,25 @@ def getMixerOffsets(band, mixers, offsetfile=None, verbose=False):
         offsets = np.append(offsets, offset)
         
 
-    return data[offsets].flatten()
+    return data[offsets].flatten(), offsetversion
+
+def getOffsetVersion(filename):
+    """Function retrieving version of offset mixer calibration.
+
+    usage:
+    ------
+    version = getOffsetVersion(filename)
+    print('version',version)
+    """
+
+    with open(filename,"r") as f:
+        line0 = f.readline()
+
+    line0.strip('\n')
+    indx = line0.find("version =")
+    if indx >= 0:
+        version = line0[indx+9:]
+    else:
+        version = "0.0"
+
+    return version
