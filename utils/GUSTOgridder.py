@@ -335,7 +335,7 @@ def main(args=None,verbose=True):
         my_parser = argparse.ArgumentParser(prog='GUSTOgridder',
                                             usage='%(prog)s source band',
                                             description='Regrid level1 data in source directory of specified band')
-        my_parser.version = "Version 0.0.2 (22 Jan 2026) "
+        my_parser.version = "Version 1.0.0 (15 July 2026) "
         my_parser.add_argument('-v', action='version')
 
         my_parser.add_argument('-s',
