@@ -357,7 +357,7 @@ def main(args=None,verbose=True):
         my_parser.add_argument('-x', 
                                metavar='--mixer',
                                required=False,
-                               help='mixer: 2, 3, 6:  0 for all',
+                               help='NII mixer: 2, 3, 6 or CII mixer: 5, 8 or 0 for all mixers in band',
                                default=0)
         my_parser.add_argument('-o', 
                                metavar='--ofile',
@@ -384,7 +384,7 @@ def main(args=None,verbose=True):
                                required=False,
                                help='minimum maximum velocity channel, default -200 200 km/s',
                                default=[-200, 200])
-        my_parser.add_argument('-f', 
+        my_parser.add_argument('-wf', 
                                metavar='--wcsfile',
                                required=False,
                                help='Input fits cube to match WCS if not present the WCS will be made based on input L1 scans')
@@ -401,7 +401,7 @@ def main(args=None,verbose=True):
     print(float(vinput))
     vmin = float(args.l[0])
     vmax = float(args.l[1])
-    wcsfile = args.f
+    wcsfile = args.wf
     
 
     print(args)
