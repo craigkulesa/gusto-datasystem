@@ -526,6 +526,9 @@ def L09_Pipeline(args, scanRange, verbose=False):
 
 
 def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
+    """
+    Calibration method developed for RC2.  
+    """
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed = 999999
@@ -609,6 +612,10 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
 
 
 def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
+    """
+    Find a scale and offset of the Synthetic Refs, which minimizes [(S-R)/R]**2
+
+    """
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed = 999999
@@ -695,6 +702,10 @@ def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyo
 
 
 def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
+    """
+    combine two synthetic refs (before and after a scan time), that minimizes Ta * (S-R)/R
+    """
+
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed = 999999
