@@ -61,7 +61,7 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
     # velocity vector to interpolate Level 1 data onto
     input_files = glob.glob(f'{directory}/{linename}*fits')
     nfile = len(input_files)
-    print(f'nchan: {vel_vector.size}')
+    #print(f'nchan: {vel_vector.size}')
     print(f'{nfile} files found for cube generation in {directory}.')
 
     # Accumulate per-file results in lists; single vstack/concatenate at end
@@ -71,6 +71,7 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
     all_x     = []
     all_y     = []
     all_wgt   = []
+    all_scn   = []
 
     for ifile in input_files:
 
@@ -78,8 +79,10 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
         rowFlag  = data['ROW_FLAG']
         n_spec, n_pix = spec.shape
         chanflag = data['CHANNEL_FLAG']
+        #get scanID from data file
+        scanid = data['scanID']
 
-        # velocity axis — already in V_lsr
+        # velocity axis already in V_lsr
         npix     = hdr['NPIX']
         VLSR_pix = hdr['CRPIX1']
         VLSR_val = hdr['CRVAL1']
@@ -138,7 +141,7 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
             leg_x = c_ra_dec.ra
 
         # ------------------------------------------------------------------
-        # Vectorized interpolation — replaces the per-spectrum Python loop.
+        # Vectorized interpolation replaces the per-spectrum Python loop.
         #
         # Pre-compute interpolation indices and weights once for vel_vector
         # vs vlsr, then apply to all spectra simultaneously.
@@ -174,30 +177,35 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
         all_x.append(leg_x.degree)
         all_y.append(leg_y.degree)
         all_wgt.append(1.0 / mxrms**2)
+        all_scn.append(scanid)
 
-    # Single stack at the end — avoids O(N^2) copies from repeated vstack
+    # Single stack at the end  avoids O(N^2) copies from repeated vstack
     arr_line  = ma.vstack(all_specs)
     arr_chf   = np.vstack(all_chf)
     xpos      = np.concatenate(all_x)
     ypos      = np.concatenate(all_y)
+    scans     = np.concatenate(all_scn)
     legweight = np.concatenate(all_wgt)
 
-    print(np.min(xpos), np.max(xpos), np.min(ypos), np.max(ypos), np.median(xpos), np.median(ypos))
+    #print(np.min(xpos), np.max(xpos), np.min(ypos), np.max(ypos), np.median(xpos), np.median(ypos))
 
     # Filter out positions more than 1.5 degrees from median
     xmed  = np.median(xpos)
     ymed  = np.median(ypos)
+    # 21.5 below is to allow for entire GP to be made into a cube.  This could cause a problem is more many more scans outside a longitude 
+    # range  are available for a given object
     dliml  = 21.5
     dlimb = 2.0
     qkeep = np.argwhere((np.abs(xpos - xmed) < dliml) & (np.abs(ypos - ymed) < dlimb))
     arr_linekeep = np.squeeze(arr_line[qkeep, :])
     xkeep        = np.squeeze(xpos[qkeep])
     ykeep        = np.squeeze(ypos[qkeep])
+    skeep        = np.squeeze(scans[qkeep])
     wgtkeep      = np.squeeze(legweight[qkeep])
     arr_chfkeep  = np.squeeze(arr_chf[qkeep, :])
     nchan        = vel_vector.shape[0]
-    print(arr_line.shape, legweight.shape, xpos.shape, ypos.shape)
-    return arr_linekeep, xkeep, ykeep, wgtkeep, nchan, line_freq, arr_chfkeep
+    #print(arr_line.shape, legweight.shape, xpos.shape, ypos.shape)
+    return arr_linekeep, xkeep, ykeep, skeep, wgtkeep, nchan, line_freq, arr_chfkeep
             
 
 
@@ -222,6 +230,42 @@ def get_vel_freq(hdu):
 		freq[j0,:] = restfreq[j0]* (1.- vv[j0,:]/const.c.cgs.value)
 	return vv, freq
 		
+def make_im_header(xref, yref, xsize, ysize, pix_scale, xref_pix, yref_pix, coordType, radesys, equinox, proj="SFL"):
+
+    hdr = fits.Header()
+
+    # BASIC stuff, the WCS code needs this
+    #hdr['SIMPLE'] = True
+    hdr['XTENSION'] = 'IMAGE'
+    hdr['NAXIS'] = 2
+    hdr['NAXIS1'] = xsize
+    hdr['NAXIS2'] = ysize
+
+    ctypeDashes = '----'
+
+    xctype = coordType[0] + ctypeDashes[len(coordType[0]):]
+    yctype = coordType[1] + ctypeDashes[len(coordType[1]):]
+
+
+    # MAKE THE POSITION AXES
+    hdr['CTYPE1'] = xctype + '-' + proj
+    hdr['CRVAL1'] = xref
+    hdr['CRPIX1'] = xref_pix
+    hdr['CDELT1'] = -1.0*pix_scale
+
+    hdr['CTYPE2'] = yctype + '-' + proj
+    hdr['CRVAL2'] = yref
+    hdr['CRPIX2'] = yref_pix
+    hdr['CDELT2'] = pix_scale
+    # ADD THE RADESYS and EQUINOX when appropriate
+    if radesys is not None and len(radesys) > 0:
+        hdr['RADESYS'] = radesys
+    if equinox is not None and equinox > 0.0:
+        hdr['EQUINOX'] = equinox
+
+    return hdr
+
+
 def make_header(xref, yref, xsize, ysize, pix_scale, xref_pix, yref_pix, coordType, radesys, equinox, frest, faxis, beam_fwhm, veldef, specsys, proj="SFL"):
 
     hdr = fits.Header()
@@ -398,7 +442,7 @@ def main(args=None,verbose=True):
     ofile=args.o
     vinput = args.l[0]
     mx = int(args.x)
-    print(float(vinput))
+    #print(float(vinput))
     vmin = float(args.l[0])
     vmax = float(args.l[1])
     wcsfile = args.wf
@@ -446,7 +490,7 @@ def main(args=None,verbose=True):
     coordType = [xcoord,ycoord]
     # read all calibrated fits data, at all positions
     print(f'Input dir {dir_level1} Line {line_str} Velocity array {vv_in.shape}')
-    arr_line0, xpos0, ypos0, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,mx,vv_in,coordType)
+    arr_line0, xpos0, ypos0, scanids, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,mx,vv_in,coordType)
     #os.system('ls')
             
     restfreq *= 1e6 # convert to Hz
@@ -482,6 +526,7 @@ def main(args=None,verbose=True):
     #ypos_in = np.append(ypos0[0,:],ypos1[1,:])
     xpos_in = xpos0
     ypos_in = ypos0
+    scan_in = scanids
     beam_fwhm_in = beam_fwhm
     #print(beam_fwhm_in)
     pix_scale = int(3600.0*beam_fwhm_in/pixPerBeam)/3600.0
@@ -499,6 +544,20 @@ def main(args=None,verbose=True):
     #
     # create spectral map 
     cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, weight=weight ,kern = kern)
+    # create a map of the scan IDs used
+    #print ('creating scan id map')
+    #scanid for each xpos_in and ypos_in
+    #grid_x = np.arange(xsize) * hdr['CDELT1'] + hdr['CRVAL1']
+    #grid_y = np.arange(ysize) * hdr['CDELT2'] + hdr['CRVAL2']
+    #print(xsize,hdr['CRPIX1'],hdr['CDELT1'],hdr['CRVAL1'])
+    grid_x = (np.linspace(0,xsize - 1, xsize) - hdr['CRPIX1']) * hdr['CDELT1'] + hdr['CRVAL1']
+    #print(grid_x.min(),grid_x.max())
+    grid_y = (np.linspace(0,ysize - 1, ysize) - hdr['CRPIX2']) * hdr['CDELT2'] + hdr['CRVAL2']
+    xv,yv = np.meshgrid(grid_x,grid_y)
+    idmap = scipy.interpolate.griddata((xpos_in,ypos_in), scan_in,(xv,yv),method='nearest')
+    #print(idmap.shape)
+    idhdr = make_im_header(hdr['CRVAL1'],hdr['CRVAL2'], xsize, ysize, hdr['CDELT2'],hdr['CRPIX1'],hdr['CRPIX2'], coordType, '', 0.)
+
     #cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, kern = kern)
     #
     qzero = weight == 0.0
@@ -529,15 +588,22 @@ def main(args=None,verbose=True):
     hdu_cube_out = fits.PrimaryHDU(cube, header=hdr)
 
     hdulist = fits.HDUList(hdu_cube_out)
-
+    print('Adding Weight Extension')
     hduw = fits.ImageHDU(data = weight,name = 'WEIGHT')
     
     hdulist.append(hduw)
+
+    #print(idhdr)
+    print('Adding Scan ID  Extension')
+    hduscan = fits.ImageHDU(data = idmap,name = 'SCANID', header = idhdr )
+    hdulist.append(hduscan)
+
     if ofile == None:
         outcube = dir_write+f'{source}_{line_str}_{mx}_at_{beam_fwhm*60:0.2}_{KT}.fits'
     else:
         outcube = dir_write + ofile
 
+    print(f'Writing to {outcube}')
     #hdu_cube_out.writeto(outcube ,overwrite = True)
     hdulist.writeto(outcube, overwrite = True)
     #
