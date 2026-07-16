@@ -29,6 +29,9 @@
 # FITS files
 *.fits
 
+# Shell scripts
+*.sh
+
 # OS generated files #
 ######################
 .DS_Store
