@@ -4,6 +4,7 @@ This is the GUSTO Level 0.9 Pipeline.
 import numpy as np
 import numpy.ma as ma
 import os
+import math
 import subprocess
 from tqdm import tqdm
 from datetime import datetime
@@ -12,6 +13,12 @@ from astropy.time import Time
 from astropy.io import fits
 from multiprocessing.pool import Pool
 from PyAstronomy import pyasl
+from scipy.optimize import minimize
+
+from BayesicFitting import PolynomialModel
+from BayesicFitting import ConstantModel
+from BayesicFitting import LevenbergMarquardtFitter
+from BayesicFitting import RobustShell
 
 from .DataIO import *
 from .Logger import *
@@ -19,6 +26,97 @@ from .Configuration import *
 from .flagdefs import *
 
 logger = logging.getLogger('pipelineLogger')
+
+
+
+def scalefunc(x,c1,c2):
+    x1 = x[0]
+    x2 = x[1]
+    r = c2 * x1 + x2
+    #y = c1 - (c2*x1 + x2)
+    # minimize S-R / R
+    y = (c1 - r) / r
+    return(np.sum(y*y))
+
+def combinetwo(t0, s1, s2):
+    #
+    # Combine s1 and s2 into a new Synthetic using (a S1 + (1 -a) S2)
+    # t0:  OTF Ta
+    # s1: Synthetic Ref 1
+    # s2: Synthetic Ref 2
+    #
+    # retrun a: factor that minimizes SUM [Ta - aS1 - (1-a)S2]**2
+    #
+    N = len(t0)
+    ts1 = np.sum(t0 * s1)
+    ts2 = np.sum(t0 * s2)
+    s1s2 = np.sum(s1 * s2)
+    s1sq = np.sum(s1 * s1)
+    s2sq = np.sum(s2 * s2)
+    
+    denom = s1sq -2*s1s2 + s2sq
+    if denom != 0.0:
+        a = [ -ts2 + ts1 - s1s2 + s2sq ] / denom
+    else:
+        a = 0.5   # if zero, s1 = s2
+
+    smin = a*s1 + (1 - a) * s2
+    minval = np.sum((t0 - smin)**2)
+    return a, minval
+
+
+
+def calculatemin(c1,c2):
+    # calculate a scale and an offset that mininimizes the square difference of c1 and c2
+    # return the scale and offset and the minimum square diff
+    N = len(c2)
+    sqc1 = np.sum(c1 * c1)
+    sqc2 = np.sum(c2 * c2)
+    c1c2 = np.sum(c1 * c2)
+    c1sm = np.sum(c1)
+    c2sm = np.sum(c2)
+
+    denom = N * sqc2 - c2sm**2
+    if denom != 0.0:
+        b = ( N * c1c2 - c1sm * c2sm )/denom
+        c = c1sm / N - c2sm/N * ( N * c1c2 - c1sm * c2sm)/denom
+    else:
+        b=1.0
+        c=0.0
+
+    sdiff = np.sum((c1 - (b*c2 + c))**2)
+    return [b,c], sdiff
+
+def despike_robust(x0, data0, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=0.1):
+    x = x0[start:stop]
+    data = data0[start : stop]
+    dlen = stop - start
+    cflag = cflags[start : stop]
+    mask = np.zeros(dlen, dtype=bool) | (cflag > 0)
+    rwgt = np.zeros(dlen, dtype=bool)
+    
+    model = PolynomialModel( deg )
+    quse = mask == 0
+    if mask.min() == 0:
+        lmf = LevenbergMarquardtFitter(x[quse],model)
+        ftr = RobustShell( lmf )
+        try:
+            par = ftr.fit( data[quse],verbose=0)
+        except:
+            #print(quse)
+            print(data,data.shape,data0.shape)
+            return
+
+
+        rwgt[quse] = ftr.weights
+        qmask = rwgt < stdlim
+        #mask[ np.argwhere(qmask) ]
+        cflag[qmask] |= ChanFlags.SPUR_CANDIDATE
+        cflags[start:stop] = cflag
+        newdata = np.ma.masked_array( data0 , cflags > 0 )
+    else:
+        newdata = data0
+    return newdata, cflags
 
 def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
     mask = np.zeros(len(data), dtype=bool)
@@ -29,6 +127,33 @@ def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=
     newdata = np.ma.masked_array(data, mask)
     return newdata, cflags
 
+def identifyspurs(Ta,cflags,xaxis,band,method = None):
+    if method == 'robust':
+
+        # try spur id of entire spectrum
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, 40*band, 240*band, points=100*band, count=1, deg=7, stdlim=0.5)
+        # 
+    else:
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
+        if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
+            try:
+                Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
+            except:
+                pass
+    
+    
+    return Ta, cflags
+
+def removepolybaseline(Ta,xaxis,idx,polyorder):
+    x_fit = xaxis[idx]
+    y_fit = Ta[idx]
+    fit = np.polyfit(x_fit, y_fit, polyorder)
+    baseline = np.poly1d(fit)
+    Ta = Ta - baseline(xaxis)
+    return Ta
 
 def getSpecScanTypes(mixer, spec, data, hdr, rowflagfilter=0, verbose=False):
     """Function calculating the calibration spectrum for a single mixer.
@@ -377,6 +502,7 @@ def L09_Pipeline(args, scanRange, verbose=False):
         rowflagfilter = 4294967295
         calmethod = args.calmethod
         despurmethod = args.despurmethod
+        mediansubtract = args.mediansubtract
         spurchannelfilter = args.spurchannelfilter
         mediansubtract = args.mediansubtract
         polyorder = args.polyorder
@@ -399,7 +525,10 @@ def L09_Pipeline(args, scanRange, verbose=False):
     return sum_files
 
 
-def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder):
+def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
+    """
+    Calibration method developed for RC2.  
+    """
     chan = [512, 1024]
     fScale = [5000/511.0, 5000/1023.0]
     oldmed = 999999
@@ -464,27 +593,249 @@ def cal_weightedHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, po
         synthRef = best[0]*sRn[0,:] + (1.0-best[0])*sRn[1,:]
     else: # sRn.ndim = 1
         synthRef = sRn
-    Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
-    #idx = np.r_[band*40:band*60, band*75:band*95, band*260:band*300]
-    x_fit = xaxis[idx]
-    y_fit = Ta[idx]
-    fit = np.polyfit(x_fit, y_fit, polyorder)
-    baseline = np.poly1d(fit)
-    Ta = Ta - baseline(xaxis)
 
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
-    Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
-    if band == 1:  # one broad pass for bright spurs in [NII], pass if it fails
-        try:
-            Ta, cflags = despike_polyRes(xaxis, Ta, cflags, 80*band, 200*band, points=100*band, count=1, deg=1, stdlim=5)
-        except:
-            logger.debug('WARNING: Band 1 global despurring pass failed')
-            pass
+    #calcualte Ta
+    Ta = 2.*tsyseff * (sspec - synthRef)/synthRef
+
+    #remove initial baseline
+    Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
+    
+    # identify spurs
+    Ta, cflags = identifyspurs(Ta,cflags, xaxis, band,method = despurmethod)
+
+    # calculate Tsys and rms
+    #>>>>>>> band1_tests
     Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
     rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+
     return Ta, cflags, Tsys_median, rms
+
+
+def cal_scaleHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
+    """
+    Find a scale and offset of the Synthetic Refs, which minimizes [(S-R)/R]**2
+
+    """
+    chan = [512, 1024]
+    fScale = [5000/511.0, 5000/1023.0]
+    oldmed = 999999
+    best = [0.5, 0.5, 0.5, 1.]
+    Ta = ma.zeros(sspec.shape)
+    tsyseff = ma.zeros(sspec.shape)
+    idx = np.r_[band*40:band*60, band*70:band*95, band*260:band*300]
+    
+    xaxis = np.arange(0, chan[band-1]*fScale[band-1], fScale[band-1])
+    seq_hots = ghots[closest,:]
+    
+    if closest+1 < hgroup.max():
+        seq_hots = np.vstack([seq_hots, ghots[closest+1,:]])
+    if closest > 0:
+        seq_hots = np.vstack([seq_hots, ghots[closest-1,:]])
+    
+    synRefs = []
+    tsyss = []
+    testvar = []
+    mincoeffs = []
+    
+    onlyonce = False
+    if yfac.ndim == 1:
+        yfac_eff = np.vstack([yfac,yfac])
+        tsys_eff = np.vstack([tsys,tsys])
+        onlyonce = True
+    else:
+        y0 = yfac[0,:]
+        t0 = tsys[0,:]
+        y1 = yfac[1,:]
+        t1 = tsys[1,:]
+        yfac_eff = np.vstack([y0, 0.5 * y0 + 0.5 * y1, y1])
+        tsys_eff = np.vstack([t0, 0.5 * t0 + 0.5 * t1, t1])
+
+    for if1,yfac1 in enumerate(yfac_eff):
+        #quse = np.argwhere((yfac_eff > 1.0) & (cflags == 0))
+        quse = idx
+        nsamp = quse.shape[0]
+        for hot1 in seq_hots:
+            sRn = hot1 / yfac1
+            synRefs.append(sRn)
+            tsyss.append( tsys_eff[if1,:] )
+
+            #x,testvar1 = calculatemin(sspec[quse],sRn[quse])
+            x = [1.0,0]
+            optres = minimize(scalefunc,x,(sspec[quse],sRn[quse]))
+            x = optres.x
+            mincoeffs.append(x)
+            R = sRn[quse] * x[0] + x[1]
+            S = sspec[quse]
+            testvar1 = np.sum(((S - R) / R)**2)
+            testvar.append(testvar1/nsamp)
+
+    testvar=np.array(testvar)
+    mincoeffs = np.array(mincoeffs)
+    #find minimum variance
+    if testvar.shape[0] == 0:
+        #print(seq_hots.shape,yfac.shape)
+        synRef = seq_hots / yfac
+        tsyseff = tsys
+    else:
+        qmin = np.argmin(testvar)
+
+        synRef = mincoeffs[qmin][0]*synRefs[qmin] + mincoeffs[qmin][1]
+        #print(mincoeffs[qmin])
+        tsyseff = tsyss[qmin]
+
+    #calcualte Ta
+    Ta = 2.*tsyseff * (sspec - synRef)/synRef
+
+    #remove initial baseline
+    Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
+    
+    # identify spurs
+    Ta, cflags = identifyspurs(Ta,cflags,xaxis,band,method = despurmethod)
+
+    # calculate Tsys and rms
+    Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
+    rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+
+
+    return Ta, cflags, Tsys_median, rms
+
+
+
+def cal_combineHOTs(sspec, band, cflags, hgroup, closest, ghots, tsys, yfac, polyorder, despurmethod):
+    """
+    combine two synthetic refs (before and after a scan time), that minimizes Ta * (S-R)/R
+    """
+
+    chan = [512, 1024]
+    fScale = [5000/511.0, 5000/1023.0]
+    oldmed = 999999
+    best = [0.5, 0.5, 0.5, 1.]
+    Ta = ma.zeros(sspec.shape)
+    tsyseff = ma.zeros(sspec.shape)
+    #
+    # pre identify the indices outside of the observed band
+    idx = np.r_[band*40:band*60, band*70:band*95, band*260:band*300]
+    xaxis = np.arange(0, chan[band-1]*fScale[band-1], fScale[band-1])
+
+
+    seq_hots = ghots[closest,:]
+    #create a stack of closest hots
+    if closest+1 < hgroup.max():
+        seq_hots = np.vstack([seq_hots, ghots[closest+1,:]])
+    if closest > 0:
+        seq_hots = np.vstack([seq_hots, ghots[closest-1,:]])
+    
+    #print(sspec.__class__)
+    synRefs = []
+    tsyss = []
+    testvar = []
+    mincoeffs = []
+    
+    # stack yfac and tsys.  If two, create an intermediate 
+    if yfac.ndim == 1:
+        yfac_eff = np.vstack([yfac,yfac])
+        tsys_eff = np.vstack([tsys,tsys])
+    else:
+        y0 = yfac[0,:]
+        t0 = tsys[0,:]
+        y1 = yfac[1,:]
+        t1 = tsys[1,:]
+        yfac_eff = np.vstack([y0, 0.5 * y0 + 0.5 * y1, y1])
+        tsys_eff = np.vstack([t0, 0.5 * t0 + 0.5 * t1, t1])
+
+    
+    #calculate using upto three Y factors, and find the mininum of those
+    for if1,yfac1 in enumerate(yfac_eff):
+        #quse = np.argwhere((yfac_eff > 1.0) & (cflags == 0))
+        quse = idx
+        nsamp = quse.shape[0]
+        sRn = seq_hots / yfac1
+        if sRn.shape[0] == 3:
+            # combine the first two synthec refs
+            sRn0 = sRn[0,:]
+            sRnp1 = sRn[1,:]
+            sRnm1 = sRn[2,:]
+            a1,testvar1 = combinetwo(sspec[quse],sRn0[quse],sRnp1[quse])
+            # keep the synthetic refs, tsys, coefficients and the test variance
+            synRefs.append( a1 * sRn0 + (1 - a1) * sRnp1)
+            tsyss.append( tsys_eff[if1,:] )
+            mincoeffs.append(a1)
+            testvar.append(testvar1/nsamp)
+            # combine next two
+            a2,testvar1 = combinetwo(sspec[quse],sRn0[quse],sRnm1[quse])
+            # keep the synthetic refs, tsys, coefficients and the test variance
+            synRefs.append( a2 * sRn0 + (1 - a2) * sRnm1)
+            tsyss.append( tsys_eff[if1,:] )
+            mincoeffs.append(a2)
+            testvar.append(testvar1/nsamp)
+        elif sRn.shape[0] == 2 :
+            sRn0 = sRn[0,:]
+            sRn1 = sRn[1,:]
+            a, testvar1 = combinetwo(sspec[quse],sRn0[quse],sRn1[quse])
+            # keep the synthetic refs, tsys, coefficients and the test variance
+            synRefs.append( a * sRn0 + (1.0 - a) * sRn1)
+            tsyss.append( tsys_eff[if1,:] )
+            mincoeffs.append(a)
+            testvar.append(testvar1/nsamp)
+        elif (sRn.shape[0] > 3) & (tsys.shape[0] == 2 ):
+            # this case is not tested.  there is only one sRn but two Tsys_eff,  How to judge between them?  
+            #print(' ',sRn.shape,tsys.shape,tsys_eff.shape)
+            synRefs.append(sRn)
+            tsyss.append(tsys_eff[if1,:])
+            #this will always choose the first one in the loop if1 == 0
+            testvar1 = if1
+            testvar.append(testvar1)
+        else:
+            synRefs.append(sRn)
+            tsyss.append( tsys )
+            testvar1 = 0
+            testvar.append(testvar1)
+
+    testvar=np.array(testvar)
+    mincoeffs = np.array(mincoeffs)
+    tsyss = np.array(tsyss)
+    #find minimum variance
+    if testvar.shape[0] == 0:
+        #print('testvar =0')
+        #print(seq_hots.shape,yfac.shape,tsys.shape)
+        synRef = seq_hots[0] / yfac[0]
+        if tsys.shape[0] > 1:
+            #tsyseff is only for estimating Tsys later
+            tsyseff = tsys[0]
+        else:
+            tsyseff = tsys
+            print('only one tsys',tsyseff.shape)
+    else:
+        qmin = np.argmin(testvar)
+        synRef = synRefs[qmin]
+        tsyseff = tsyss[qmin]
+
+    # Calculate Ta
+    #print(Ta.shape,sspec.shape,synRef.shape,tsyseff.shape)
+    if tsyseff.shape[0] == 5:
+        #  How is tsyseff more than one?
+        Ta = 2.*tsyseff[0,:] * (sspec - synRef)/synRef
+    else:
+        Ta = 2.*tsyseff * (sspec - synRef)/synRef
+
+    # Remove baseline baseline removal here is seen in final product
+    # Ta = removepolybaseline(Ta,xaxis,idx,polyorder)
+
+    # Identfy spurs 
+    #try:
+    Ta, cflags = identifyspurs(Ta,cflags,xaxis,band,method = despurmethod)
+
+    Tsys_median = 2.0*np.ma.median(tsyseff[band*40:band*240])
+    rms = 0.33*(np.std(Ta[band*40:band*60]) + np.std(Ta[band*75:band*95]) + np.std(Ta[band*250:band*300]))
+    #except:
+    #    print(f'{Ta.shape} Ta: ')
+    #    #print(f'xaxis: {xaxis}')
+    #    print(f'{cflags.shape} cflags: ')
+    
+    return Ta, cflags, Tsys_median, rms
+
+
+
 
 
 def processL07(paramlist):
@@ -494,8 +845,8 @@ def processL07(paramlist):
     TSKY = [33, 45]
     dfile = paramlist[0]
     params = paramlist[1]
-    band, inDir, outDir, polyorder, calmethod, debug, verbose, rowflagfilter, commit_info = \
-        params['band'], params['inDir'], params['outDir'], params['polyorder'], params['calmethod'], \
+    band, inDir, outDir, polyorder, calmethod, despurmethod, debug, verbose, rowflagfilter, commit_info = \
+        params['band'], params['inDir'], params['outDir'], params['polyorder'], params['calmethod'], params['despurmethod'], \
         params['debug'], params['verbose'], params['rowflagfilter'], params['commit_info']
     #pxrange = (int(params['pxrange'][0]), int(params['pxrange'][1]))      # good pixel ranges
 
@@ -576,17 +927,34 @@ def processL07(paramlist):
 
         # reduce the assignment to the OTF spectra only
         hgroup = ahgroup[osel]
+        
         # create the calibrated spectra
-        for i0 in range(n_OTF):
-            # fixme: make this conditional --> if calmethod == 'cal_weightedHOTs'
-            ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder))
+        if calmethod == 'cal_weightedHOTs':
+            for i0 in range(n_OTF):
+                # fixme: make this conditional.  if calmethod == 'cal_weightedHOTs'
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_weightedHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder), despurmethod)
 
-        # baseline correct entire mixer sequence (Russ' method)
+        elif calmethod == 'cal_scaleHOTs':
+            for i0 in range(n_OTF):
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_scaleHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder), despurmethod)
+
+        elif calmethod == 'cal_combineHOTs':
+            for i0 in range(n_OTF):
+                ta[i0,:], cflags_OTF[i0], Tsys_OTF[i0], rms_OTF[i0] = cal_combineHOTs(spec_OTF[i0,:], band, cflags_OTF[i0], hgroup, hgroup[i0], ghots, tsys, yfac, int(polyorder), despurmethod)
+               
+
+        else:
+            print('Choose an implemented calibration method')
+            break
+
+
+        #baseline correct entire sequence: remove a residual baseline not corrected in the calibration
         if params['mediansubtract']:
-            base_median = ma.median(ta, 0)
+            base_median = ma.median(ta,0)
             for i0 in range(n_OTF):
                 ta[i0,:] -= base_median
-            
+
+        #>>>>>>> band1_tests
         # now we have to save the data in a FITS file
         data['DATA'][osel,:] = ta.data        
         data['CHANNEL_FLAG'] [osel,:] = cflags_OTF

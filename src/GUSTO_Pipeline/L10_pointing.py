@@ -15,9 +15,11 @@ from astropy.io import fits
 from astropy import units as u
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 from astropy.time import Time
+from BayesicFitting import PolynomialModel, LevenbergMarquardtFitter, RobustShell
 
 from .DataIO import *
 from .Logger import *
+from .flagdefs import *
 
 offsetfile0 = files('GUSTO_Pipeline') / 'calib/offsets.txt'
 logger = logging.getLogger('pipelineLogger')
@@ -76,6 +78,24 @@ def L10_Pipeline(args, scanRange, verbose=False):
         
     return sum_files
 
+def flattenleg( leg , cflags,  deg = 1, stdlim = 0.1):
+    """Function to fit and remove a line using robust fitting and and identify new SPUR_CANDIDATE
+        Parameters: leg:  OTF leg of one mixer at one velocity
+                    deg:  degree of polynomial to fit over leg data, default = 1
+
+        return:  robustfit, newcflags
+
+    """
+    x = np.arange(leg.size)
+    model = PolynomialModel( deg )
+    lmf = LevenbergMarquardtFitter( x , model)
+    ftr = RobustShell( lmf )
+    par = ftr.fit( leg , verbose = 0)
+    rwgt = ftr.weights
+    qmask = rwgt < stdlim
+    cflags[qmask] |= ChanFlags.SPUR_CANDIDATE
+    robustfit = model( x )
+    return robustfit, cflags
 
 
 def processL09(params, verbose=True):
@@ -96,7 +116,7 @@ def processL09(params, verbose=True):
     # insert the coordinate corrections
     # Note: the coordinate correction is not yet final
     # and will be (iteratively) improved    
-    mxoffs = getMixerOffsets(band, umixers, verbose=verbose)
+    mxoffs, offsversion = getMixerOffsets(band, umixers, verbose=verbose)
     
     for i, mix in enumerate(umixers):
         azoff = mxoffs['az'][i]
@@ -128,6 +148,20 @@ def processL09(params, verbose=True):
             
             data['RA'][msel] = nradec.ra.deg
             data['DEC'][msel] = nradec.dec.deg
+
+            legs = data['DATA'][msel,:]
+            cflags = data['CHANNEL_FLAG'][msel,:]
+            # legs array ( nlegs X nvlsr )
+            # Identify spurious signals across channels:
+            # Additional channel flagging to identify SPUR_CANDIDATE
+            for ileg in range(legs.shape[0]):
+                leg= legs[ileg,:]
+                cflag = cflags[ileg,:]
+                legtrend, newcflag = flattenleg( leg, cflag )
+                cflags[ileg,:] = newcflag 
+            #data['DATA'][msel,:] = legs
+            data['CHANNEL_FLAG'][msel,:] = cflags
+            #break
         
     # now we have to save the data in a FITS file
     
@@ -156,6 +190,7 @@ def processL09(params, verbose=True):
     hdr.set('CRPIX1', value=0.000, comment=(''))
     hdr.set('CRVAL1', value=vlsr[0], comment=(''))
     hdr.set('CDELT1', value=np.diff(vlsr).mean(), comment=(''))
+    hdr.set('OFFVERS',value=offsversion,comment=("Version of Mixer Offset Calibration"))
 
 # add 
 #    hdr.set('CDELT2', value=0.000000001, comment=(''), after='CDELT1')
@@ -202,6 +237,8 @@ def getMixerOffsets(band, mixers, offsetfile=None, verbose=False):
     if offsetfile is None:
         offsetfile = offsetfile0
 
+    offsetversion = getOffsetVersion(offsetfile)
+
     offsets = np.empty(0, dtype=int)
     
     data = np.genfromtxt(offsetfile, delimiter='\t', skip_header=2, 
@@ -214,4 +251,26 @@ def getMixerOffsets(band, mixers, offsetfile=None, verbose=False):
             offset = np.argwhere((cmixer == data['mxpix'])&(data['type']=='THEORY')).flatten()
         offsets = np.append(offsets, offset)
         
-    return data[offsets].flatten()
+
+    return data[offsets].flatten(), offsetversion
+
+def getOffsetVersion(filename):
+    """Function retrieving version of offset mixer calibration.
+
+    usage:
+    ------
+    version = getOffsetVersion(filename)
+    print('version',version)
+    """
+
+    with open(filename,"r") as f:
+        line0 = f.readline()
+
+    line = line0.strip("\n")
+    indx = line.find("version = ")
+    if indx >= 0:
+        version = line[indx+9:]
+    else:
+        version = "0.0"
+
+    return version
