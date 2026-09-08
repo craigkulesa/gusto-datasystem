@@ -87,7 +87,28 @@ def calculatemin(c1,c2):
     sdiff = np.sum((c1 - (b*c2 + c))**2)
     return [b,c], sdiff
 
-def despike_robust(x0, data0, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=0.1):
+def despike_robust(x0, data0, cflags, start, stop, points=60, count=3, deg=2, dx=1, stdlim=4.0):
+    """ Identify spikes iteratively
+
+    Prameters:
+        x0: velocity array
+        data0: Ta
+        cflags: channel flags already assigned per data0
+        start, stop:  sub-vector of x0, full range start==0, stop == length-1
+        count:  not used but kept to be consistent with other despur method
+        degree:  polynomial degree
+        dx:  velocity step size
+        stdlim:  number of standard deviations to call a datapoint a spike
+    Returns:
+        updated masked data0
+        cflags with outliers flaged SPUR_CANDIDATE
+
+    Note:
+        This uses the BayesicFitting routines to iteratively fit a polymomial and identify outliers.  Outliers will have a low weight.
+        stdlim represents standard deviations away.  2 sigma reflects roughly 0.95 within, so 0.05 of the points should be high for a Gaussian distribution.
+        stdlim is converted to a weight limit, below which the point is flagged
+    """
+    wgtlimit = (1.0 - math.erf(stdlim/np.sqrt(2)))
     x = x0[start:stop]
     data = data0[start : stop]
     dlen = stop - start
@@ -109,7 +130,7 @@ def despike_robust(x0, data0, cflags, start, stop, points=60, count=3, deg=2, dx
 
 
         rwgt[quse] = ftr.weights
-        qmask = rwgt < stdlim
+        qmask = rwgt < wgtlimit
         #mask[ np.argwhere(qmask) ]
         cflag[qmask] |= ChanFlags.SPUR_CANDIDATE
         cflags[start:stop] = cflag
@@ -129,9 +150,11 @@ def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=
 
 def identifyspurs(Ta,cflags,xaxis,band,method = None):
     if method == 'robust':
-
-        # try spur id of entire spectrum
-        Ta, cflags = despike_robust(xaxis, Ta, cflags, 40*band, 240*band, points=100*band, count=1, deg=7, stdlim=0.5)
+        # 
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*80, band*105, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*150, band*180, points=20*band, count=1, deg=1, stdlim=3)
+        Ta, cflags = despike_robust(xaxis, Ta, cflags, band*215, band*240, points=20*band, count=1, deg=1, stdlim=3)
         # 
     else:
         Ta, cflags = despike_polyRes(xaxis, Ta, cflags, band*40, band*75, points=20*band, count=1, deg=1, stdlim=3)
