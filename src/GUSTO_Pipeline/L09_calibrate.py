@@ -144,7 +144,7 @@ def despike_polyRes(x, data, cflags, start, stop, points=60, count=3, deg=2, dx=
     iin, iout = pyasl.slidingPolyResOutlier(x[start:stop], data[start:stop], points=points, count=count, deg=deg, stdlim=stdlim, controlPlot=False, dx=dx, mode='both')
     shifted = [i+start for i in iout]
     mask[shifted] = True
-    cflags[mask] |= ChanFlags.SPUR 
+    cflags[mask] |= ChanFlags.SPUR_CANDIDATE
     newdata = np.ma.masked_array(data, mask)
     return newdata, cflags
 
