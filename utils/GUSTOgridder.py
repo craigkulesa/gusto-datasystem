@@ -55,7 +55,7 @@ def call_fits(dir):
 
 	return hdu_tot
 
-def make_gusto_array(directory, linename, mx, vel_vector, coordType):
+def make_gusto_array(directory, linename, mx, vel_vector, coordType, args):
     # level 1 calibrated spectra in directory
     # Line to make cube of in line_str (either NII or CII)
     # velocity vector to interpolate Level 1 data onto
@@ -133,9 +133,8 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
         data_OTF = np.squeeze(data[osel])
         mxrms    = data_OTF['rms']
         n_OTF, n_otfpix = spec_OTF.shape
-        if linefile != None:
+        if args.lfile != None:
             spec_OTF, chan_OTF, mxrms = flag_lines(spec_OTF, chan_OTF, mxrms,vlsr, linefile)
-
             
 
         # Coordinate transform
@@ -238,7 +237,7 @@ def get_vel_freq(hdu):
 		freq[j0,:] = restfreq[j0]* (1.- vv[j0,:]/const.c.cgs.value)
 	return vv, freq
 	
-def flag_lines(spec,chan,rms,vlsr,linefile):
+def flag_lines(spec,chan,rms,vlsr,linefile=None):
     """
     Flag possible line ranges listed in linefile and remove an extra base
     linefile is a small file which identifies velocity ranges where a line is possible
@@ -247,7 +246,7 @@ def flag_lines(spec,chan,rms,vlsr,linefile):
     #open(linefile)
 
     
-    return,spec,chan,rms
+    return spec, chan, rms
 
 
 def make_im_header(xref, yref, xsize, ysize, pix_scale, xref_pix, yref_pix, coordType, radesys, equinox, proj="SFL"):
@@ -364,11 +363,13 @@ def make_header(xref, yref, xsize, ysize, pix_scale, xref_pix, yref_pix, coordTy
     return hdr
 	
 def create_wcsheader(xpos,ypos,restfreq,vv_in,coordType,pix_scale,beam_fwhm):
-    # image size
+    # image size oversize by edge pixels in both directions, and 10% on top of that
+    edge = 10
+    extrascale = 1.00
     xRange = np.max(xpos)-np.min(xpos)
     yRange = np.max(ypos)-np.min(ypos)
-    xsize = int(math.ceil(xRange*1.1/pix_scale))+20
-    ysize = int(math.ceil(yRange*1.1/pix_scale))+20
+    xsize = int(math.ceil(xRange*extrascale/pix_scale))+edge
+    ysize = int(math.ceil(yRange*extrascale/pix_scale))+edge
     # set image center
     refXsky = np.min(xpos)+0.5*xRange
     refYsky = np.min(ypos)+0.5*yRange
@@ -455,7 +456,7 @@ def main(args=None,verbose=True):
         my_parser.add_argument('-lfile', 
                                metavar='--linefile',
                                required=False,
-                               help='Input velocity ranges of expected line emission.')
+                               help='Input velocity ranges of expected line emission')
 
 
         args = my_parser.parse_args()
@@ -515,7 +516,7 @@ def main(args=None,verbose=True):
     coordType = [xcoord,ycoord]
     # read all calibrated fits data, at all positions
     print(f'Input dir {dir_level1} Line {line_str} Velocity array {vv_in.shape}')
-    arr_line0, xpos0, ypos0, scanids, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,mx,vv_in,coordType)
+    arr_line0, xpos0, ypos0, scanids, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,mx,vv_in,coordType, args)
     #os.system('ls')
             
     restfreq *= 1e6 # convert to Hz
