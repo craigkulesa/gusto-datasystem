@@ -74,8 +74,12 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
     all_scn   = []
 
     for ifile in input_files:
+        try:
+            spec, data, hdr, hdr1 = loadSDFITS(ifile, verbose=False)
+        except:
+            print('problem file',ifile)
+            return
 
-        spec, data, hdr, hdr1 = loadSDFITS(ifile, verbose=False)
         rowFlag  = data['ROW_FLAG']
         n_spec, n_pix = spec.shape
         chanflag = data['CHANNEL_FLAG']
@@ -129,6 +133,10 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType):
         data_OTF = np.squeeze(data[osel])
         mxrms    = data_OTF['rms']
         n_OTF, n_otfpix = spec_OTF.shape
+        if linefile != None:
+            spec_OTF, chan_OTF, mxrms = flag_lines(spec_OTF, chan_OTF, mxrms,vlsr, linefile)
+
+            
 
         # Coordinate transform
         c_ra_dec = SkyCoord(ra=data_OTF['RA']*u.degree, dec=data_OTF['DEC']*u.degree, frame='icrs')
@@ -229,7 +237,19 @@ def get_vel_freq(hdu):
 		vv[j0,:] = vv[j0,:]*1.e2
 		freq[j0,:] = restfreq[j0]* (1.- vv[j0,:]/const.c.cgs.value)
 	return vv, freq
-		
+	
+def flag_lines(spec,chan,rms,vlsr,linefile):
+    """
+    Flag possible line ranges listed in linefile and remove an extra base
+    linefile is a small file which identifies velocity ranges where a line is possible
+    """
+    lchf = ChanFlags.LINE
+    #open(linefile)
+
+    
+    return,spec,chan,rms
+
+
 def make_im_header(xref, yref, xsize, ysize, pix_scale, xref_pix, yref_pix, coordType, radesys, equinox, proj="SFL"):
 
     hdr = fits.Header()
@@ -432,6 +452,10 @@ def main(args=None,verbose=True):
                                metavar='--wcsfile',
                                required=False,
                                help='Input fits cube to match WCS if not present the WCS will be made based on input L1 scans')
+        my_parser.add_argument('-lfile', 
+                               metavar='--linefile',
+                               required=False,
+                               help='Input velocity ranges of expected line emission.')
 
 
         args = my_parser.parse_args()
@@ -446,6 +470,7 @@ def main(args=None,verbose=True):
     vmin = float(args.l[0])
     vmax = float(args.l[1])
     wcsfile = args.wf
+    linefile = args.lfile
     
 
     print(args)
@@ -541,6 +566,7 @@ def main(args=None,verbose=True):
         ysize = hdr['NAXIS2']
     else:
         hdr, wcsObj, xsize, ysize = create_wcsheader(xpos_in,ypos_in,restfreq,vv_in,coordType,pix_scale,beam_fwhm_in)
+
     #
     # create spectral map 
     cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, weight=weight ,kern = kern)
