@@ -85,6 +85,8 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType, args):
         chanflag = data['CHANNEL_FLAG']
         #get scanID from data file
         scanid = data['scanID']
+        seqid = np.zeros(scanid.shape) + int(hdr['SEQ_ID'])
+
 
         # velocity axis already in V_lsr
         npix     = hdr['NPIX']
@@ -184,7 +186,8 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType, args):
         all_x.append(leg_x.degree)
         all_y.append(leg_y.degree)
         all_wgt.append(1.0 / mxrms**2)
-        all_scn.append(scanid)
+        #all_scn.append(scanid)
+        all_scn.append(seqid)
 
     # Single stack at the end  avoids O(N^2) copies from repeated vstack
     arr_line  = ma.vstack(all_specs)
@@ -477,7 +480,8 @@ def main(args=None,verbose=True):
     print(args)
     
     #dir = '/Users/umit/Desktop/STO2_etacar5_data-redution/Pipeline_HOTneeded/Gum31_4591-4733/'
-    datadir = '/data/scratch/GUSTO/gusto-datasystem/Data/'
+    #datadir = '/data/scratch/GUSTO/gusto-datasystem/Data/'
+    datadir = '/Volumes/scratch/russ/GUSTO/Data/'
     dir_level1 = f'{datadir}/level1/{source}/'
     dir_write = f'{datadir}/level2/{source}/'
     
@@ -516,7 +520,7 @@ def main(args=None,verbose=True):
     coordType = [xcoord,ycoord]
     # read all calibrated fits data, at all positions
     print(f'Input dir {dir_level1} Line {line_str} Velocity array {vv_in.shape}')
-    arr_line0, xpos0, ypos0, scanids, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,mx,vv_in,coordType, args)
+    arr_line0, xpos0, ypos0, seqids, weight, nchan0, restfreq, arr_chf = make_gusto_array(dir_level1,line_str,mx,vv_in,coordType, args)
     #os.system('ls')
             
     restfreq *= 1e6 # convert to Hz
@@ -552,7 +556,7 @@ def main(args=None,verbose=True):
     #ypos_in = np.append(ypos0[0,:],ypos1[1,:])
     xpos_in = xpos0
     ypos_in = ypos0
-    scan_in = scanids
+    scan_in = seqids
     beam_fwhm_in = beam_fwhm
     #print(beam_fwhm_in)
     pix_scale = int(3600.0*beam_fwhm_in/pixPerBeam)/3600.0
@@ -622,7 +626,7 @@ def main(args=None,verbose=True):
 
     #print(idhdr)
     print('Adding Scan ID  Extension')
-    hduscan = fits.ImageHDU(data = idmap,name = 'SCANID', header = idhdr )
+    hduscan = fits.ImageHDU(data = idmap,name = 'SEQ_ID', header = idhdr )
     hdulist.append(hduscan)
 
     if ofile == None:
