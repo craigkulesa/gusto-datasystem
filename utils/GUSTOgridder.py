@@ -211,6 +211,7 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType, args):
     xkeep        = np.squeeze(xpos[qkeep])
     ykeep        = np.squeeze(ypos[qkeep])
     skeep        = np.squeeze(scans[qkeep])
+    #print('SEQ_ID: ',skeep.max())
     wgtkeep      = np.squeeze(legweight[qkeep])
     arr_chfkeep  = np.squeeze(arr_chf[qkeep, :])
     nchan        = vel_vector.shape[0]
@@ -557,6 +558,7 @@ def main(args=None,verbose=True):
     xpos_in = xpos0
     ypos_in = ypos0
     scan_in = seqids
+    #print(scan_in.min(),scan_in.max())
     beam_fwhm_in = beam_fwhm
     #print(beam_fwhm_in)
     pix_scale = int(3600.0*beam_fwhm_in/pixPerBeam)/3600.0
@@ -585,6 +587,7 @@ def main(args=None,verbose=True):
     #print(grid_x.min(),grid_x.max())
     grid_y = (np.linspace(0,ysize - 1, ysize) - hdr['CRPIX2']) * hdr['CDELT2'] + hdr['CRVAL2']
     xv,yv = np.meshgrid(grid_x,grid_y)
+    #print(scan_in.max())
     idmap = scipy.interpolate.griddata((xpos_in,ypos_in), scan_in,(xv,yv),method='nearest')
     #print(idmap.shape)
     idhdr = make_im_header(hdr['CRVAL1'],hdr['CRVAL2'], xsize, ysize, hdr['CDELT2'],hdr['CRPIX1'],hdr['CRPIX2'], coordType, '', 0.)
@@ -592,8 +595,7 @@ def main(args=None,verbose=True):
     #cube, weight, beam_size = grid_otf(arr_line_in, xpos_in, ypos_in, wcsObj, nchan_in, xsize, ysize, pix_scale, beam_fwhm_in, kern = kern)
     #
     qzero = weight == 0.0
-    bzero = -9999
-    cube[qzero] = bzero
+    cube[qzero] = np.nan
     
     #
     hdr['CTYPE3'] = 'VRAD'
@@ -601,8 +603,6 @@ def main(args=None,verbose=True):
     hdr['CRVAL3'] = vv_in[0]
     hdr['CRPIX3'] = 1.0
     hdr['CDELT3'] = (vv_in[1]-vv_in[0])
-    hdr['BZERO']  = bzero
-    hdr['BSCALE'] = 1.0
     hdr['OBJECT'] = source 
     hdr['LINE'] = (line_str, 'Observed line') 
     hdr['KERNEL'] = (KT, 'Regridder, B:GAUSSBESSEL, G:GAUSS, N:NEAREST ') 
