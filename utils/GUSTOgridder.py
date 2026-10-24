@@ -482,7 +482,8 @@ def main(args=None,verbose=True):
     
     #dir = '/Users/umit/Desktop/STO2_etacar5_data-redution/Pipeline_HOTneeded/Gum31_4591-4733/'
     #datadir = '/data/scratch/GUSTO/gusto-datasystem/Data/'
-    datadir = '/Volumes/scratch/russ/GUSTO/Data/'
+    #datadir = '/Volumes/scratch/russ/GUSTO/Data/'
+    datadir = '/Users/russ/GUSTO/gusto-datasystem/Data/'
     dir_level1 = f'{datadir}/level1/{source}/'
     dir_write = f'{datadir}/level2/{source}/'
     
