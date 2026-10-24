@@ -638,24 +638,34 @@ def plot_region_montage(images, labels, extent, region,
     problems (noisy region, coverage holes, wrong velocity range,
     structure mismatch between mixers) are visible immediately.
 
-    extent: world-coordinate box from the ORIGINAL cube WCS
-    (montage_extent). The region center marker is drawn at the
-    region's OWN world coordinates (region.lon, region.lat) -- the
-    axes are in world degrees because of imshow(extent=), so pixel
-    coordinates would land in the wrong place.
+    extent: world-coordinate box from the ORIGINAL cube WCS, in
+    the cube's NATIVE frame, plus the frame name (montage_extent
+    returns a 5-tuple). The region center marker is drawn at the
+    region's world coordinates TRANSFORMED INTO THAT FRAME -- e.g.
+    an ICRS-defined region against a Galactic cube is transformed
+    before plotting, so marker and image always agree.
     """
     import matplotlib.pyplot as plt
     n = len(images)
     fig, axes = plt.subplots(1, n + 1, figsize=(4 * (n + 1), 4))
     axes = np.atleast_1d(axes).ravel()
+    # imshow wants a 4-tuple; the 5th element (frame name) is for
+    # markers and axis labels
+    ext4 = tuple(extent[:4])
     vmax = np.nanpercentile(np.nanmax(images, axis=0), 99)
-    cx = float(region.lon.to_value(u.deg))
-    cy = float(region.lat.to_value(u.deg))
-    lonlab = "Gal. lon (deg)" if region.frame == "galactic" else "RA (deg)"
-    latlab = "Gal. lat (deg)" if region.frame == "galactic" else "Dec (deg)"
+    # region center in the MONTAGE frame (cube-native frame)
+    frame = extent[4] if len(extent) == 5 else region.frame
+    rc = SkyCoord(region.lon, region.lat, frame=region.frame)
+    rc = rc.galactic if frame == "galactic" else rc.icrs
+    cx = float(rc.l.to_value(u.deg)) if frame == "galactic" \
+        else float(rc.ra.to_value(u.deg))
+    cy = float(rc.b.to_value(u.deg)) if frame == "galactic" \
+        else float(rc.dec.to_value(u.deg))
+    lonlab = "Gal. lon (deg)" if frame == "galactic" else "RA (deg)"
+    latlab = "Gal. lat (deg)" if frame == "galactic" else "Dec (deg)"
     from matplotlib.ticker import MaxNLocator
     for ax, im, lab in zip(axes, images, labels):
-        pcm = ax.imshow(im, origin="lower", extent=extent, cmap="inferno",
+        pcm = ax.imshow(im, origin="lower", extent=ext4, cmap="inferno",
                         vmin=0, vmax=vmax)
         ax.plot(cx, cy, "w+", ms=12, mew=1.5)
         ax.set_title(f"Mixer {lab}", fontsize=10)
@@ -670,7 +680,7 @@ def plot_region_montage(images, labels, extent, region,
     diff = images[-1] - images[0]
     ax = axes[n]
     dmax = np.nanpercentile(np.abs(diff), 99)
-    pcm = ax.imshow(diff, origin="lower", extent=extent, cmap="RdBu_r",
+    pcm = ax.imshow(diff, origin="lower", extent=ext4, cmap="RdBu_r",
                     vmin=-dmax, vmax=dmax)
     ax.plot(cx, cy, "k+", ms=12, mew=1.5)
     ax.set_title(f"Difference (Mixer {labels[-1]} - "
@@ -889,7 +899,10 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None):
                  and str(r["region"]) != "-"]
         if mrows:
             summaries[label] = combine_measurements(mrows)
-    st = QTable(rows=[{**{"mixer": k}, **v} for k, v in summaries.items()])
+    # summary WITH input breakdown: one row per (mixer, region)
+    # across all runs, then the COMBINED weighted average per mixer
+    st = QTable(rows=summary_rows(
+        [r for r in rows if str(r["region"]) != "-"], summaries))
     st.write(root / "all_summary.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
     if fid_label and pix_band:
@@ -979,41 +992,81 @@ def plot_summary(summary_by_mixer, outfile):
 
 def montage_extent(wcs_celestial, pixbox):
     """World-coordinate extent of the pixel box, computed from the
-    ORIGINAL cube WCS. Returns (lon0, lon1, lat0, lat1) in degrees
-    for imshow(extent=).
+    ORIGINAL cube WCS, in the cube's NATIVE frame (no frame
+    conversion!). Returns (lon0, lon1, lat0, lat1, frame) in degrees
+    for imshow(extent=), where frame is 'galactic' or 'icrs' --
+    callers must draw markers and axis labels in THAT frame too
+    (transform region coordinates into it; e.g. an ICRS-defined
+    LMC region plotted against a Galactic cube axis previously
+    produced nonsense extents).
 
     Implementation via pixel_to_skycoord: SkyCoord knows which
     coordinate is longitude/latitude regardless of the CTYPE axis
     order, eliminating the corner/axis bookkeeping that previously
     mixed lat values into the lon range (axis showed ~-1..348).
-    Corners normalized to GALACTIC (the montage labels are Gal
-    lon/lat). lon range: corners differing in x only; lat: in y."""
+    Corners normalized to the NATIVE frame. lon range: corners
+    differing in x only; lat: in y."""
     from astropy.wcs.utils import pixel_to_skycoord
     x0, x1, y0, y1 = pixbox
-    g00 = pixel_to_skycoord(x0, y0, wcs_celestial).galactic
-    g10 = pixel_to_skycoord(x1, y0, wcs_celestial).galactic
-    g01 = pixel_to_skycoord(x0, y1, wcs_celestial).galactic
-    lon_a, lon_b = g00.l.deg, g10.l.deg
-    lat_a, lat_b = g00.b.deg, g01.b.deg
-    # ascending ranges (lon may decrease along +x)
+    ctype = wcs_celestial.wcs.ctype[0].upper()
+    frame = "galactic" if ctype.startswith("GLON") else "icrs"
+    c00 = pixel_to_skycoord(x0, y0, wcs_celestial)
+    c10 = pixel_to_skycoord(x1, y0, wcs_celestial)
+    c01 = pixel_to_skycoord(x0, y1, wcs_celestial)
+    if frame == "galactic":
+        lon_a, lon_b = c00.galactic.l.deg, c10.galactic.l.deg
+        lat_a, lat_b = c00.galactic.b.deg, c01.galactic.b.deg
+    else:
+        lon_a, lon_b = c00.icrs.ra.deg, c10.icrs.ra.deg
+        lat_a, lat_b = c00.icrs.dec.deg, c01.icrs.dec.deg
+    # ascending ranges (lon may decrease along +x; for RA the
+    # extent handed to imshow then runs descending, which is
+    # CORRECT: RA increases to the left)
     return (min(lon_a, lon_b), max(lon_a, lon_b),
-            min(lat_a, lat_b), max(lat_a, lat_b))
+            min(lat_a, lat_b), max(lat_a, lat_b), frame)
 
 
 # ----------------------------------------------------------------------
 # 7. Output
 # ----------------------------------------------------------------------
 
+def summary_rows(measurements, summaries):
+    """Per-mixer summary rows WITH input breakdown.
+
+    For each mixer: one row per REGION (weighted mean over that
+    region's velocity slices), then one COMBINED row (weighted mean
+    over everything) -- so the table shows both the separate inputs
+    and the combined result they average into. The COMBINED row is
+    what write_calibration / update_calibration consume.
+    """
+    rows = []
+    for label in sorted({r["mixer"] for r in measurements}):
+        regions = sorted({str(r["region"]) for r in measurements
+                          if r["mixer"] == label and str(r["region"]) != "-"})
+        for rg in regions:
+            mrows = [r for r in measurements
+                     if r["mixer"] == label and str(r["region"]) == rg]
+            rows.append({"mixer": label, "input": rg,
+                         **combine_measurements(mrows)})
+        if label in summaries:
+            rows.append({"mixer": label, "input": "COMBINED",
+                         **summaries[label]})
+    return rows
+
+
 def save_results(measurements, summaries, outdir):
-    """Save per-measurement and per-mixer summary tables (ECSV + FITS)."""
+    """Save per-measurement and summary tables (ECSV + FITS).
+
+    The summary table has one row per (mixer, region) -- the
+    separate inputs -- plus a COMBINED row per mixer with the
+    weighted average over all inputs (summary_rows)."""
     mt = QTable(rows=measurements)
     # ECSV: comma delimiter (astropy default is space, which makes
     # the data block awkward to eyeball / ingest in other tools)
     mt.write(outdir / "offsets_measurements.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
     mt.write(outdir / "offsets_measurements.fits", overwrite=True)
-    # summaries is a dict {mixer_label: summary_row} -- take .values()
-    st = QTable(rows=list(summaries.values()))
+    st = QTable(rows=summary_rows(measurements, summaries))
     st.write(outdir / "offsets_summary.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
     log.info("wrote results tables to %s", outdir)
@@ -1404,6 +1457,12 @@ def main(argv=None):
 
     # -- fiducial mixer: zero offset by definition -------------------
     # (angles in the focal plane trivially zero as well)
+    # -- fiducial mixer: zero offset by definition -------------------
+    # obstime/position columns are placeholders ("-"/NaN) here:
+    # the fiducial is the REFERENCE, so no AzEl conversion is done
+    # for it -- the epoch + gondola position apply to the MIXER
+    # measurement rows only. (Kept as columns so the table is
+    # rectangular; treat "-" as "not applicable", not "unknown".)
     measurements.append(dict(
         band=args.band, mixer=fid_label, region="-", vel_lo=0, vel_hi=0,
         obstime="-", gon_lat=np.nan * u.deg, gon_lon=np.nan * u.deg,
