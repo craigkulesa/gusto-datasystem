@@ -412,6 +412,13 @@ def main(args=None,verbose=True):
                                required=True,
                                type=str,
                                help = 'Name of source directory in level1. galactic coords maps for source G???, RADEC otherwise')
+        my_parser.add_argument('-d',
+                               metavar='--datadir',
+                               required=False,
+                               type=str,
+                               default='/Users/russ/GUSTO/gusto-datasystem/Data/',
+                               help = 'datadir path')
+
         my_parser.add_argument('-b',
                                metavar='--band',
                                type=str,
@@ -483,7 +490,8 @@ def main(args=None,verbose=True):
     #dir = '/Users/umit/Desktop/STO2_etacar5_data-redution/Pipeline_HOTneeded/Gum31_4591-4733/'
     #datadir = '/data/scratch/GUSTO/gusto-datasystem/Data/'
     #datadir = '/Volumes/scratch/russ/GUSTO/Data/'
-    datadir = '/Users/russ/GUSTO/gusto-datasystem/Data/'
+    datadir = args.d
+    #datadir = '/Users/russ/GUSTO/gusto-datasystem/Data/'
     dir_level1 = f'{datadir}/level1/{source}/'
     dir_write = f'{datadir}/level2/{source}/'
     
