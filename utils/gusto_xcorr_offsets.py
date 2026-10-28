@@ -63,6 +63,9 @@ def load_config(path):
     with open(path) as f:
         cfg = yaml.safe_load(f)
     data_cfg = cfg["data"]
+    # read options BEFORE the band loop: per-band values may fall
+    # back to the global option (pix_band)
+    options = cfg.get("options", {})
     bands = {}
     for band, b in cfg["bands"].items():
         fid = b["fiducial"]
@@ -71,13 +74,19 @@ def load_config(path):
         mixers = list(b.get("mixers", []))
         if mixers and fid not in mixers:
             mixers.append(fid)
+        # pix_band: which PIXEL ARRAY (B1/B2) this band's mixers
+        # belong to, for the calibration file naming. PER-BAND,
+        # not global -- e.g. NII is the B1 array while CII is B2;
+        # a global setting mislabels one band's rows (NII mixers
+        # written as B2M* when they are really B1M*).
+        pix_band = b.get("pix_band", options.get("pix_band", "B2"))
         # optional explicit cube filenames (see main(); default is
         # the naming convention <target>_<band>_<mixer>_at_<Beam>_<kernel>.fits,
         # which needs the target/beam/kernel resolved at run time)
         cubes = dict(b.get("cubes", {}))
         bands[band] = {"fiducial": fid, "mixers": mixers,
+                       "pix_band": pix_band,
                        "cubes": cubes}
-    options = cfg.get("options", {})
     log.info("Config: bands %s, level1_root %s, level2_root %s",
              list(bands), data_cfg.get("level1_root"),
              data_cfg.get("level2_root"))
@@ -868,7 +877,7 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None):
          -> <root>/all_summary.ecsv (+ the per-mixer chi2 flags
          show whether fields agree),
       4. writes the master calibration file,
-         <root>/offsets_deltas.txt (DELTA/residual format) and,
+         <root>/offsets_<band>_deltas.txt (DELTA/residual format) and,
          if the env var GUSTO_CAL_FILE points at the applied
          calibration file, the UPDATED file.
 
@@ -906,15 +915,18 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None):
     st.write(root / "all_summary.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
     if fid_label and pix_band:
+        # banded filenames, matching the per-run outputs, so the
+        # L1 pipeline can consume the combined values directly
+        suffix = f"_{band}" if band else ""
         write_calibration(summaries, fid_label, pix_band,
-                          root / "offsets_deltas.txt")
+                          root / f"offsets{suffix}_deltas.txt")
         cal_file = os.environ.get("GUSTO_CAL_FILE")
         if cal_file:
             cal_rows = read_calibration(cal_file)
             upd = update_calibration(cal_rows, summaries, fid_label,
-                                    pix_band)
+                                     pix_band)
             write_calibration_rows(upd,
-                                   root / "offsets_cal_updated.txt")
+                                   root / f"offsets{suffix}_cal_updated.txt")
     return summaries
 
 
@@ -1155,7 +1167,8 @@ def main(argv=None):
             data_cfg, bands, opts = load_config(args.config) \
                 if args.config else ({}, {}, {})
             fid = fid or bands.get(args.band, {}).get("fiducial", 8)
-            pix_band = pix_band or opts.get("pix_band", "B2")
+            pix_band = pix_band or bands.get(args.band, {}).get(
+                "pix_band", opts.get("pix_band", "B2"))
         aggregate_results(args.aggregate, band=args.band,
                           fid_label=str(fid), pix_band=pix_band)
         return 0
@@ -1491,7 +1504,8 @@ def main(argv=None):
     # (PIX/AZ/EL). These are residual corrections to the APPLIED
     # calibration (rows flagged AS_DELTA); the pipeline consumes
     # only AS_MEASURED rows, which appear in the updated file.
-    pix_band = opts.get("pix_band", "B2")
+    # pix_band comes from the BAND config (NII->B1, CII->B2, ...)
+    pix_band = band_cfg.get("pix_band", opts.get("pix_band", "B2"))
     write_calibration(summaries, fid_label, pix_band,
                       outdir / f"offsets_{args.band}_deltas.txt")
     # -- update the master calibration file with the residuals ------
