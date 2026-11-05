@@ -1,0 +1,10 @@
+regions:
+  - name: G353 
+    frame: galactic      # or icrs
+    lon: 353.004 deg       # lon if galactic or RA if icrs
+    lat: 0.661 deg       # lat if galactic or Dec if icrs
+    radius: 400 arcsec   # ANGULAR half-size of the sub-image box
+    vel_ranges:          # km/s, multiple slices allowed
+      - [-11,3]
+      - [4, 15]
+    min_snr: 2.0

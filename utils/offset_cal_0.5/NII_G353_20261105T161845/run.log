@@ -1,0 +1,92 @@
+2026-11-05 17:18:45,016 INFO Config: bands ['CII', 'NII'], level1_root /Users/russ/GUSTO/gusto-datasystem/Data/level1/, level2_root /Users/russ/GUSTO/gusto-datasystem/Data/level2/
+2026-11-05 17:18:45,020 INFO Loaded 1 regions from G353NIIreg.yaml
+2026-11-05 17:18:45,594 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G353/G353_NII_0_at_1.0_G.fits: (220, 642, 412), SEQ_ID ext: (642, 412)
+2026-11-05 17:18:45,602 INFO auto-discovered mixers for G353 NII: [2, 3, 6]
+2026-11-05 17:18:46,212 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G353/G353_NII_3_at_1.0_G.fits: (220, 642, 412), SEQ_ID ext: (642, 412)
+2026-11-05 17:18:46,213 INFO grid: 3 pixels/beam, beam FWHM 1.0 arcmin -- sigmas inflated by 3
+2026-11-05 17:18:46,981 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G353/G353_NII_2_at_1.0_G.fits: (220, 642, 412), SEQ_ID ext: (642, 412)
+2026-11-05 17:18:46,983 INFO region G353: center (353.0040, 0.6610) deg -> cube pixel (212.9, 393.6), pixbox (193, 233, 374, 413), cube shape (412, 642)
+2026-11-05 17:18:46,984 WARNING velocity range -11.0..3.0 km/s partially outside the cube; clipped to pixels 189:203
+2026-11-05 17:18:46,984 WARNING velocity range 4.0..15.0 km/s partially outside the cube; clipped to pixels 203:216
+2026-11-05 17:18:46,999 INFO baseline: 1560 px linear, 0 px offset-only, 0 px skipped (25 line / 14 continuum channels)
+2026-11-05 17:18:47,013 INFO baseline: 1560 px linear, 0 px offset-only, 0 px skipped (25 line / 14 continuum channels)
+2026-11-05 17:18:47,014 WARNING velocity range -11.0..3.0 km/s partially outside the cube; clipped to pixels 189:203
+2026-11-05 17:18:47,015 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:47,015 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:47,015 INFO montage_extent: corners lon 353.1148,352.8926 lat 0.5523,0.7689 -> extent (-7.1074, -6.8852, 0.5523, 0.7689) galactic
+2026-11-05 17:18:47,223 INFO wrote offsets_runs/NII_G353_20261105T161845/img_2_G353_-11_3.png
+2026-11-05 17:18:47,226 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 1.329e+04 -1.110e+00  5.188e-01  2.443e+00  4.961e+00 -3.653e+03]
+2026-11-05 17:18:47,405 INFO wrote offsets_runs/NII_G353_20261105T161845/xcorr_2_G353_-11_3.png
+2026-11-05 17:18:47,405 INFO 2 G353 (-11, 3): dx=-1.110+-0.019 dy=0.519+-0.069 rho=0.00 (pixels)
+2026-11-05 17:18:47,474 WARNING no boresight AZ/EL keywords in NII_06267_16169_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:47,486 INFO G353 2: gondola at (-76.026, 39.329) deg, 34008 m, 2024-02-06T22:40:04.945
+2026-11-05 17:18:47,700 WARNING velocity range 4.0..15.0 km/s partially outside the cube; clipped to pixels 203:216
+2026-11-05 17:18:47,701 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:47,701 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:47,701 INFO montage_extent: corners lon 353.1148,352.8926 lat 0.5523,0.7689 -> extent (-7.1074, -6.8852, 0.5523, 0.7689) galactic
+2026-11-05 17:18:47,831 INFO wrote offsets_runs/NII_G353_20261105T161845/img_2_G353_4_15.png
+2026-11-05 17:18:47,835 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 1.406e+05 -4.682e-01 -1.089e+00  1.837e+01  2.725e+01 -1.362e+05]
+2026-11-05 17:18:47,942 INFO wrote offsets_runs/NII_G353_20261105T161845/xcorr_2_G353_4_15.png
+2026-11-05 17:18:47,942 INFO 2 G353 (4, 15): dx=-0.468+-0.103 dy=-1.089+-0.301 rho=0.00 (pixels)
+2026-11-05 17:18:47,949 WARNING no boresight AZ/EL keywords in NII_06267_16169_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:47,955 INFO G353 2: gondola at (-76.026, 39.329) deg, 34008 m, 2024-02-06T22:40:04.945
+2026-11-05 17:18:48,019 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G353/G353_NII_3_at_1.0_G.fits: (220, 642, 412), SEQ_ID ext: (642, 412)
+2026-11-05 17:18:48,026 INFO region G353: center (353.0040, 0.6610) deg -> cube pixel (212.9, 393.6), pixbox (193, 233, 374, 413), cube shape (412, 642)
+2026-11-05 17:18:48,026 WARNING velocity range -11.0..3.0 km/s partially outside the cube; clipped to pixels 189:203
+2026-11-05 17:18:48,027 WARNING velocity range 4.0..15.0 km/s partially outside the cube; clipped to pixels 203:216
+2026-11-05 17:18:48,041 INFO baseline: 1560 px linear, 0 px offset-only, 0 px skipped (25 line / 14 continuum channels)
+2026-11-05 17:18:48,056 INFO baseline: 1560 px linear, 0 px offset-only, 0 px skipped (25 line / 14 continuum channels)
+2026-11-05 17:18:48,057 WARNING velocity range -11.0..3.0 km/s partially outside the cube; clipped to pixels 189:203
+2026-11-05 17:18:48,057 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:48,057 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:48,058 INFO montage_extent: corners lon 353.1148,352.8926 lat 0.5523,0.7689 -> extent (-7.1074, -6.8852, 0.5523, 0.7689) galactic
+2026-11-05 17:18:48,176 INFO wrote offsets_runs/NII_G353_20261105T161845/img_3_G353_-11_3.png
+2026-11-05 17:18:48,177 INFO peak fit params [amp, x0, y0, w1, w2, off] = [3.897e+04 7.450e-17 5.192e-17 1.509e+00 2.537e+00 1.061e+04]
+2026-11-05 17:18:48,292 INFO wrote offsets_runs/NII_G353_20261105T161845/xcorr_3_G353_-11_3.png
+2026-11-05 17:18:48,292 INFO 3 G353 (-11, 3): dx=0.000+-0.022 dy=0.000+-0.042 rho=0.00 (pixels)
+2026-11-05 17:18:48,300 WARNING no boresight AZ/EL keywords in NII_06267_16169_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:48,305 INFO G353 3: gondola at (-76.026, 39.329) deg, 34008 m, 2024-02-06T22:40:04.945
+2026-11-05 17:18:48,311 WARNING velocity range 4.0..15.0 km/s partially outside the cube; clipped to pixels 203:216
+2026-11-05 17:18:48,312 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:48,312 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:48,312 INFO montage_extent: corners lon 353.1148,352.8926 lat 0.5523,0.7689 -> extent (-7.1074, -6.8852, 0.5523, 0.7689) galactic
+2026-11-05 17:18:48,429 INFO wrote offsets_runs/NII_G353_20261105T161845/img_3_G353_4_15.png
+2026-11-05 17:18:48,430 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 1.541e+04 -4.118e-17  4.759e-17  1.625e+00  2.261e+00  3.963e+03]
+2026-11-05 17:18:48,542 INFO wrote offsets_runs/NII_G353_20261105T161845/xcorr_3_G353_4_15.png
+2026-11-05 17:18:48,542 INFO 3 G353 (4, 15): dx=-0.000+-0.021 dy=0.000+-0.031 rho=0.00 (pixels)
+2026-11-05 17:18:48,550 WARNING no boresight AZ/EL keywords in NII_06267_16169_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:48,554 INFO G353 3: gondola at (-76.026, 39.329) deg, 34008 m, 2024-02-06T22:40:04.945
+2026-11-05 17:18:49,264 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G353/G353_NII_6_at_1.0_G.fits: (220, 642, 412), SEQ_ID ext: (642, 412)
+2026-11-05 17:18:49,274 INFO region G353: center (353.0040, 0.6610) deg -> cube pixel (212.9, 393.6), pixbox (193, 233, 374, 413), cube shape (412, 642)
+2026-11-05 17:18:49,275 WARNING velocity range -11.0..3.0 km/s partially outside the cube; clipped to pixels 189:203
+2026-11-05 17:18:49,275 WARNING velocity range 4.0..15.0 km/s partially outside the cube; clipped to pixels 203:216
+2026-11-05 17:18:49,290 INFO baseline: 1560 px linear, 0 px offset-only, 0 px skipped (25 line / 14 continuum channels)
+2026-11-05 17:18:49,305 INFO baseline: 1560 px linear, 0 px offset-only, 0 px skipped (25 line / 14 continuum channels)
+2026-11-05 17:18:49,305 WARNING velocity range -11.0..3.0 km/s partially outside the cube; clipped to pixels 189:203
+2026-11-05 17:18:49,306 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:49,306 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:49,307 INFO montage_extent: corners lon 353.1148,352.8926 lat 0.5523,0.7689 -> extent (-7.1074, -6.8852, 0.5523, 0.7689) galactic
+2026-11-05 17:18:49,489 INFO wrote offsets_runs/NII_G353_20261105T161845/img_6_G353_-11_3.png
+2026-11-05 17:18:49,491 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 1.234e+04 -1.282e+01  1.574e+01  1.731e+00  2.731e+00  1.071e+04]
+2026-11-05 17:18:49,610 INFO wrote offsets_runs/NII_G353_20261105T161845/xcorr_6_G353_-11_3.png
+2026-11-05 17:18:49,610 INFO 6 G353 (-11, 3): dx=-12.819+-0.073 dy=15.738+-0.136 rho=-0.00 (pixels)
+2026-11-05 17:18:49,632 WARNING no boresight AZ/EL keywords in NII_06268_16171_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:49,642 INFO G353 6: gondola at (-76.013, 39.333) deg, 34007 m, 2024-02-06T22:45:29.816
+2026-11-05 17:18:49,648 WARNING velocity range 4.0..15.0 km/s partially outside the cube; clipped to pixels 203:216
+2026-11-05 17:18:49,648 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:49,649 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:49,649 INFO montage_extent: corners lon 353.1148,352.8926 lat 0.5523,0.7689 -> extent (-7.1074, -6.8852, 0.5523, 0.7689) galactic
+2026-11-05 17:18:49,767 INFO wrote offsets_runs/NII_G353_20261105T161845/img_6_G353_4_15.png
+2026-11-05 17:18:49,771 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 1.112e+05 -2.036e+01 -5.226e+00  1.654e+01  1.998e+01 -1.052e+05]
+2026-11-05 17:18:49,881 INFO wrote offsets_runs/NII_G353_20261105T161845/xcorr_6_G353_4_15.png
+2026-11-05 17:18:49,881 INFO 6 G353 (4, 15): dx=-20.363+-0.545 dy=-5.226+-0.172 rho=0.02 (pixels)
+2026-11-05 17:18:49,888 WARNING no boresight AZ/EL keywords in NII_06268_16171_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:49,892 INFO G353 6: gondola at (-76.013, 39.333) deg, 34007 m, 2024-02-06T22:45:29.816
+2026-11-05 17:18:49,898 INFO 2: {'fx': <Quantity 0.00011475 deg>, 'sig_fx': <Quantity 0.012 deg>, 'chi2_fx': np.float64(0.32018080216273864), 'dof_fx': 1, 'fy': <Quantity 0.00466048 deg>, 'sig_fy': <Quantity 0.012 deg>, 'chi2_fy': np.float64(0.0010708131469460047), 'dof_fy': 1, 'n_meas': 2}
+2026-11-05 17:18:49,898 INFO 3: {'fx': <Quantity -2.32872696e-19 deg>, 'sig_fx': <Quantity 0.012 deg>, 'chi2_fx': np.float64(1.1321064559672125e-34), 'dof_fx': 1, 'fy': <Quantity -1.7526997e-19 deg>, 'sig_fy': <Quantity 0.012 deg>, 'chi2_fy': np.float64(1.3224082966241688e-33), 'dof_fy': 1, 'n_meas': 3}
+2026-11-05 17:18:49,898 INFO 6: {'fx': <Quantity -0.05664558 deg>, 'sig_fx': <Quantity 0.04871214 deg>, 'chi2_fx': np.float64(32.950821668866666), 'dof_fx': 1, 'fy': <Quantity 0.07831548 deg>, 'sig_fy': <Quantity 0.0381677 deg>, 'chi2_fy': np.float64(20.219413212062868), 'dof_fy': 1, 'n_meas': 2}
+2026-11-05 17:18:49,906 INFO wrote offsets_runs/NII_G353_20261105T161845/offsets_summary.txt
+2026-11-05 17:18:49,906 INFO wrote results tables to offsets_runs/NII_G353_20261105T161845
+2026-11-05 17:18:49,963 INFO wrote offsets_runs/NII_G353_20261105T161845/summary_offsets.png
+2026-11-05 17:18:49,967 INFO wrote offsets_runs/NII_G353_20261105T161845/offsets_NII_deltas.txt (3 measured pixels)
+2026-11-05 17:18:49,967 INFO cal_file set: run --aggregate to fold this run's residuals into offsets_cal.txt

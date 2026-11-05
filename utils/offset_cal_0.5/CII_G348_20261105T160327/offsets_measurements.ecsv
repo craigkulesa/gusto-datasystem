@@ -1,0 +1,77 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: band, datatype: string}
+# - {name: target, datatype: string}
+# - {name: mixer, datatype: int64}
+# - {name: region, datatype: string}
+# - {name: vel_lo, datatype: int64}
+# - {name: vel_hi, datatype: int64}
+# - {name: obstime, datatype: string}
+# - {name: gon_lat, unit: deg, datatype: float64}
+# - {name: gon_lon, unit: deg, datatype: float64}
+# - {name: gon_alt, unit: m, datatype: float64}
+# - {name: dx_pix, datatype: float64}
+# - {name: dy_pix, datatype: float64}
+# - {name: dlon, unit: arcsec, datatype: float64}
+# - {name: dlat, unit: arcsec, datatype: float64}
+# - {name: dlon_deg, unit: deg, datatype: float64}
+# - {name: dlat_deg, unit: deg, datatype: float64}
+# - {name: fx, unit: deg, datatype: float64}
+# - {name: fy, unit: deg, datatype: float64}
+# - {name: snr_corr, datatype: float64}
+# - {name: sig_fx, unit: deg, datatype: float64}
+# - {name: sig_fy, unit: deg, datatype: float64}
+# - {name: rho_f, datatype: float64}
+# delimiter: ','
+# meta: !!omap
+# - __serialized_columns__:
+#     dlat:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: &id001 !astropy.units.Unit {unit: arcsec}
+#       value: !astropy.table.SerializedColumn {name: dlat}
+#     dlat_deg:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: &id002 !astropy.units.Unit {unit: deg}
+#       value: !astropy.table.SerializedColumn {name: dlat_deg}
+#     dlon:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: dlon}
+#     dlon_deg:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: dlon_deg}
+#     fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: fx}
+#     fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: fy}
+#     gon_alt:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: !astropy.units.Unit {unit: m}
+#       value: !astropy.table.SerializedColumn {name: gon_alt}
+#     gon_lat:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: gon_lat}
+#     gon_lon:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: gon_lon}
+#     sig_fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: sig_fx}
+#     sig_fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: sig_fy}
+# schema: astropy-2.0
+band,target,mixer,region,vel_lo,vel_hi,obstime,gon_lat,gon_lon,gon_alt,dx_pix,dy_pix,dlon,dlat,dlon_deg,dlat_deg,fx,fy,snr_corr,sig_fx,sig_fy,rho_f
+CII,G348,5,G348,-15,-10,2024-02-12T00:04:58.075,-80.47594505058531,-13.997976500493934,36846.979946524065,-1.4207706509723772,-1.110424107542815,-28.41061432352788,-22.208482150856298,-0.007891837312091077,-0.006169022819682305,0.0020355546701995263,0.009807018324134725,2.3036701967968347,7.730347677476251e-06,1.2949933509830081e-05,-0.6961227310045209
+CII,G348,5,G348,-10,-6,2024-02-12T00:04:58.075,-80.47594505058531,-13.997976500493934,36846.979946524065,-1.2418181861263928,-0.7943898784462364,-24.83216944398005,-15.887797568924729,-0.006897824845550014,-0.004413277102479091,0.0009017382466503198,0.008138342033095412,2.6306330184788616,9.239020393441002e-06,1.2321747229987112e-05,-0.3991967062150928
+CII,G348,8,-,0,0,-,nan,nan,nan,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,nan,0.0,0.0,0.0

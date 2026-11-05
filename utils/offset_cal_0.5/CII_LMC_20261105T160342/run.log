@@ -1,0 +1,65 @@
+2026-11-05 17:03:42,023 INFO Config: bands ['CII', 'NII'], level1_root /Users/russ/GUSTO/gusto-datasystem/Data/level1/, level2_root /Users/russ/GUSTO/gusto-datasystem/Data/level2/
+2026-11-05 17:03:42,027 INFO Loaded 1 regions from LMCreg.yaml
+2026-11-05 17:03:42,735 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/LMC/LMC_CII_0_at_1.0_G.fits: (280, 310, 842), SEQ_ID ext: (310, 842)
+2026-11-05 17:03:42,744 INFO auto-discovered mixers for LMC CII: [5, 8]
+2026-11-05 17:03:43,551 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/LMC/LMC_CII_8_at_1.0_G.fits: (300, 317, 861), SEQ_ID ext: (317, 861)
+2026-11-05 17:03:43,552 INFO grid: 3 pixels/beam, beam FWHM 1.0 arcmin -- sigmas inflated by 3
+2026-11-05 17:03:44,740 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/LMC/LMC_CII_5_at_1.0_G.fits: (300, 317, 861), SEQ_ID ext: (317, 861)
+2026-11-05 17:03:44,743 INFO region LMC: center (84.9200, -69.7000) deg -> cube pixel (514.7, 110.2), pixbox (460, 570, 55, 165), cube shape (861, 317)
+2026-11-05 17:03:44,745 WARNING velocity range 235.0..240.0 km/s partially outside the cube; clipped to pixels 234:240
+2026-11-05 17:03:44,745 WARNING velocity range 240.0..245.0 km/s partially outside the cube; clipped to pixels 239:245
+2026-11-05 17:03:44,855 INFO baseline: 11977 px linear, 0 px offset-only, 123 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:44,964 INFO baseline: 11776 px linear, 0 px offset-only, 324 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:44,965 WARNING velocity range 235.0..240.0 km/s partially outside the cube; clipped to pixels 234:240
+2026-11-05 17:03:44,967 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:44,969 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:44,969 INFO montage_extent: corners lon 85.7865,83.9999 lat -70.0118,-69.4007 -> extent (83.9999, 85.7865, -70.0118, -69.4007) icrs
+2026-11-05 17:03:45,227 INFO wrote offsets_runs/CII_LMC_20261105T160342/img_5_LMC_235_240.png
+2026-11-05 17:03:45,232 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 1.383e+04  9.037e-01 -5.318e-01  6.364e+00  7.689e+00 -4.462e+03]
+2026-11-05 17:03:45,426 INFO wrote offsets_runs/CII_LMC_20261105T160342/xcorr_5_LMC_235_240.png
+2026-11-05 17:03:45,426 INFO 5 LMC (235, 240): dx=0.904+-0.060 dy=-0.532+-0.097 rho=-0.01 (pixels)
+2026-11-05 17:03:45,538 WARNING no boresight AZ/EL keywords in CII_07352_18480_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:45,551 INFO LMC 5: gondola at (-79.276, -3.203) deg, 37126 m, 2024-02-10T04:58:44.795
+2026-11-05 17:03:45,769 WARNING velocity range 240.0..245.0 km/s partially outside the cube; clipped to pixels 239:245
+2026-11-05 17:03:45,771 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:45,773 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:45,773 INFO montage_extent: corners lon 85.7865,83.9999 lat -70.0118,-69.4007 -> extent (83.9999, 85.7865, -70.0118, -69.4007) icrs
+2026-11-05 17:03:45,907 INFO wrote offsets_runs/CII_LMC_20261105T160342/img_5_LMC_240_245.png
+2026-11-05 17:03:45,909 INFO peak fit params [amp, x0, y0, w1, w2, off] = [6.154e+03 1.067e+00 2.823e-01 3.073e+00 2.925e+00 7.406e+03]
+2026-11-05 17:03:46,020 INFO wrote offsets_runs/CII_LMC_20261105T160342/xcorr_5_LMC_240_245.png
+2026-11-05 17:03:46,021 INFO 5 LMC (240, 245): dx=1.067+-0.042 dy=0.282+-0.040 rho=0.00 (pixels)
+2026-11-05 17:03:46,043 WARNING no boresight AZ/EL keywords in CII_07352_18480_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:46,049 INFO LMC 5: gondola at (-79.276, -3.203) deg, 37126 m, 2024-02-10T04:58:44.795
+2026-11-05 17:03:46,161 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/LMC/LMC_CII_8_at_1.0_G.fits: (300, 317, 861), SEQ_ID ext: (317, 861)
+2026-11-05 17:03:46,175 INFO region LMC: center (84.9200, -69.7000) deg -> cube pixel (514.7, 110.2), pixbox (460, 570, 55, 165), cube shape (861, 317)
+2026-11-05 17:03:46,176 WARNING velocity range 235.0..240.0 km/s partially outside the cube; clipped to pixels 234:240
+2026-11-05 17:03:46,176 WARNING velocity range 240.0..245.0 km/s partially outside the cube; clipped to pixels 239:245
+2026-11-05 17:03:46,287 INFO baseline: 11977 px linear, 0 px offset-only, 123 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:46,397 INFO baseline: 11977 px linear, 0 px offset-only, 123 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:46,398 WARNING velocity range 235.0..240.0 km/s partially outside the cube; clipped to pixels 234:240
+2026-11-05 17:03:46,400 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:46,401 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:46,402 INFO montage_extent: corners lon 85.7865,83.9999 lat -70.0118,-69.4007 -> extent (83.9999, 85.7865, -70.0118, -69.4007) icrs
+2026-11-05 17:03:46,514 INFO wrote offsets_runs/CII_LMC_20261105T160342/img_8_LMC_235_240.png
+2026-11-05 17:03:46,516 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 2.465e+04 -5.833e-17 -1.551e-16  1.580e+00  2.042e+00  9.100e+03]
+2026-11-05 17:03:46,622 INFO wrote offsets_runs/CII_LMC_20261105T160342/xcorr_8_LMC_235_240.png
+2026-11-05 17:03:46,622 INFO 8 LMC (235, 240): dx=-0.000+-0.019 dy=-0.000+-0.026 rho=-0.00 (pixels)
+2026-11-05 17:03:46,669 WARNING no boresight AZ/EL keywords in CII_07348_18472_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:46,681 INFO LMC 8: gondola at (-79.285, -3.049) deg, 37072 m, 2024-02-10T04:46:02.982
+2026-11-05 17:03:46,687 WARNING velocity range 240.0..245.0 km/s partially outside the cube; clipped to pixels 239:245
+2026-11-05 17:03:46,689 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:46,690 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:46,691 INFO montage_extent: corners lon 85.7865,83.9999 lat -70.0118,-69.4007 -> extent (83.9999, 85.7865, -70.0118, -69.4007) icrs
+2026-11-05 17:03:46,805 INFO wrote offsets_runs/CII_LMC_20261105T160342/img_8_LMC_240_245.png
+2026-11-05 17:03:46,807 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 2.831e+04  1.092e-16 -1.667e-16  1.600e+00  1.877e+00  1.504e+04]
+2026-11-05 17:03:46,915 INFO wrote offsets_runs/CII_LMC_20261105T160342/xcorr_8_LMC_240_245.png
+2026-11-05 17:03:46,915 INFO 8 LMC (240, 245): dx=0.000+-0.015 dy=-0.000+-0.018 rho=-0.00 (pixels)
+2026-11-05 17:03:46,939 WARNING no boresight AZ/EL keywords in CII_07348_18472_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:46,943 INFO LMC 8: gondola at (-79.285, -3.049) deg, 37072 m, 2024-02-10T04:46:02.982
+2026-11-05 17:03:46,948 INFO 5: {'fx': <Quantity 0.00190795 deg>, 'sig_fx': <Quantity 0.005 deg>, 'chi2_fx': np.float64(0.13769307021941246), 'dof_fx': 1, 'fy': <Quantity -0.00066791 deg>, 'sig_fy': <Quantity 0.005 deg>, 'chi2_fy': np.float64(0.27333085212179364), 'dof_fy': 1, 'n_meas': 2}
+2026-11-05 17:03:46,949 INFO 8: {'fx': <Quantity 5.98806935e-19 deg>, 'sig_fx': <Quantity 0.005 deg>, 'chi2_fx': np.float64(1.700969976436837e-33), 'dof_fx': 1, 'fy': <Quantity 6.65594556e-19 deg>, 'sig_fy': <Quantity 0.005 deg>, 'chi2_fy': np.float64(4.656656047803673e-34), 'dof_fy': 1, 'n_meas': 3}
+2026-11-05 17:03:47,017 INFO wrote offsets_runs/CII_LMC_20261105T160342/offsets_summary.txt
+2026-11-05 17:03:47,017 INFO wrote results tables to offsets_runs/CII_LMC_20261105T160342
+2026-11-05 17:03:47,069 INFO wrote offsets_runs/CII_LMC_20261105T160342/summary_offsets.png
+2026-11-05 17:03:47,070 INFO wrote offsets_runs/CII_LMC_20261105T160342/offsets_CII_deltas.txt (2 measured pixels)
+2026-11-05 17:03:47,070 INFO cal_file set: run --aggregate to fold this run's residuals into offsets_cal.txt

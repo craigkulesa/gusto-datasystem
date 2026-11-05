@@ -1,0 +1,51 @@
+data:
+  level1_root: /Users/russ/GUSTO/gusto-datasystem/Data/level1/        # Level-1 products: BAND_{seq}_{scanid}_L10.fits
+                                                          # (SEQ_ID matches the first field -- exact glob)
+  level2_root: /Users/russ/GUSTO/gusto-datasystem/Data/level2/        # Level-2 per-mixer cubes
+
+
+bands:
+  CII:
+    fiducial: 8                # boresight; offsets zero by definition
+    pix_band: B2
+    sig_floor_deg: 0.005
+  NII:
+    fiducial: 3                # best-behaved NII mixer
+    pix_band: B1
+    sys_floor_deg: 0.012   # NII override, if the data warrant it
+    # no explicit cubes -> defaults NII_L2_mixer3.fits etc. in l2_dir
+
+options:
+  baseline_pad: 8       # continuum channels each side (0 = off)
+  baseline_min_pts: 6   # below this -> offset; below 2 -> skip
+  cal_file: /Users/russ/GUSTO/gusto-datasystem/src/GUSTO_pipeline/calib/offsets.txt
+  beam: 1.0
+  kernel: G
+  min_snr: 2.0                      # global floor; region-level min_snr still applies
+  collapse: moment0                 # moment0 | mean
+  patch: 7                          # x-corr peak-fit patch (pixels)
+  launch_lat: -77.85                # deg, launch-site reference (lat/lon)
+  launch_lon: 166.67                # height comes per scan from GON_ALT
+  roll: 0.0                   # constant focal-plane roll (see roll note)
+  sig_floor_deg: 0.0025
+  destripe_kernel: 0
+  destripe_axis: "x"       # stripes perpendicular to this vanish
+  smooth_fwhm_px: 2
+  outlier_clip: 4.0
+  
+  selfcheck: true 
+
+cal_drop:
+   - B1M3   # Assumed fiducial for this set
+   - B2M8   # Boresight fiductial
+
+
+exclude:
+  - target: G353
+    mixer: 6
+    vel: [4, 15]
+    reason: "extra noisy data"
+  - target: G353
+    mixer: 6
+    vel: [-11, 3]
+    reason: "extra noisy data"

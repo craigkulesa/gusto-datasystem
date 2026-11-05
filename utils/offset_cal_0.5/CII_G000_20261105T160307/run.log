@@ -1,0 +1,43 @@
+2026-11-05 17:03:07,597 INFO Config: bands ['CII', 'NII'], level1_root /Users/russ/GUSTO/gusto-datasystem/Data/level1/, level2_root /Users/russ/GUSTO/gusto-datasystem/Data/level2/
+2026-11-05 17:03:07,602 INFO Loaded 1 regions from G000reg.yaml
+2026-11-05 17:03:07,602 WARNING reference (mixer 0) cube not found: /Users/russ/GUSTO/gusto-datasystem/Data/level2/G000/G000_CII_0_at_1.0_G.fits -- falling back to the fiducial mixer's WCS
+2026-11-05 17:03:07,650 INFO auto-discovered mixers for G000 CII: [5, 8]
+2026-11-05 17:03:08,797 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G000/G000_CII_8_at_1.0_G.fits: (350, 631, 380), SEQ_ID ext: (631, 380)
+2026-11-05 17:03:08,797 INFO grid: 3 pixels/beam, beam FWHM 1.0 arcmin -- sigmas inflated by 3
+2026-11-05 17:03:09,976 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G000/G000_CII_5_at_1.0_G.fits: (350, 631, 380), SEQ_ID ext: (631, 380)
+2026-11-05 17:03:09,978 INFO region G000: center (359.7500, -0.2820) deg -> cube pixel (236.4, 214.0), pixbox (189, 284, 167, 262), cube shape (380, 631)
+2026-11-05 17:03:09,979 WARNING velocity range 14.0..24.0 km/s partially outside the cube; clipped to pixels 214:225
+2026-11-05 17:03:10,058 INFO baseline: 9025 px linear, 0 px offset-only, 0 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:10,136 INFO baseline: 9025 px linear, 0 px offset-only, 0 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:10,137 WARNING velocity range 14.0..24.0 km/s partially outside the cube; clipped to pixels 214:225
+2026-11-05 17:03:10,140 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:10,141 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:10,142 INFO montage_extent: corners lon 360.0135,359.4857 lat -0.5433,-0.0155 -> extent (-0.5143, 0.0135, -0.5433, -0.0155) galactic
+2026-11-05 17:03:10,570 INFO wrote offsets_runs/CII_G000_20261105T160307/img_5_G000_14_24.png
+2026-11-05 17:03:10,582 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 3.536e+05 -1.047e+00 -7.369e-01  3.635e+00  4.544e+00  5.563e+05]
+2026-11-05 17:03:10,793 INFO wrote offsets_runs/CII_G000_20261105T160307/xcorr_5_G000_14_24.png
+2026-11-05 17:03:10,793 INFO 5 G000 (14, 24): dx=-1.047+-0.015 dy=-0.737+-0.023 rho=-0.00 (pixels)
+2026-11-05 17:03:10,873 WARNING no boresight AZ/EL keywords in CII_09483_22976_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:10,909 INFO G000 5: gondola at (-74.840, -23.209) deg, 39460 m, 2024-02-16T13:35:40.517
+2026-11-05 17:03:11,321 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G000/G000_CII_8_at_1.0_G.fits: (350, 631, 380), SEQ_ID ext: (631, 380)
+2026-11-05 17:03:11,334 INFO region G000: center (359.7500, -0.2820) deg -> cube pixel (236.4, 214.0), pixbox (189, 284, 167, 262), cube shape (380, 631)
+2026-11-05 17:03:11,335 WARNING velocity range 14.0..24.0 km/s partially outside the cube; clipped to pixels 214:225
+2026-11-05 17:03:11,413 INFO baseline: 9025 px linear, 0 px offset-only, 0 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:11,491 INFO baseline: 9025 px linear, 0 px offset-only, 0 px skipped (10 line / 17 continuum channels)
+2026-11-05 17:03:11,492 WARNING velocity range 14.0..24.0 km/s partially outside the cube; clipped to pixels 214:225
+2026-11-05 17:03:11,493 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:11,494 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:11,495 INFO montage_extent: corners lon 360.0135,359.4857 lat -0.5433,-0.0155 -> extent (-0.5143, 0.0135, -0.5433, -0.0155) galactic
+2026-11-05 17:03:11,612 INFO wrote offsets_runs/CII_G000_20261105T160307/img_8_G000_14_24.png
+2026-11-05 17:03:11,614 INFO peak fit params [amp, x0, y0, w1, w2, off] = [3.654e+05 4.122e-16 1.405e-15 1.813e+00 2.457e+00 7.750e+05]
+2026-11-05 17:03:11,726 INFO wrote offsets_runs/CII_G000_20261105T160307/xcorr_8_G000_14_24.png
+2026-11-05 17:03:11,726 INFO 8 G000 (14, 24): dx=0.000+-0.011 dy=0.000+-0.017 rho=-0.00 (pixels)
+2026-11-05 17:03:11,746 WARNING no boresight AZ/EL keywords in CII_09481_22972_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:11,768 INFO G000 8: gondola at (-74.790, -23.255) deg, 39473 m, 2024-02-16T13:24:43.310
+2026-11-05 17:03:11,773 INFO 5: {'fx': <Quantity -0.00151189 deg>, 'sig_fx': <Quantity 0.00500002 deg>, 'chi2_fx': 0.0, 'dof_fx': 0, 'fy': <Quantity 0.00695039 deg>, 'sig_fy': <Quantity 0.00500003 deg>, 'chi2_fy': 0.0, 'dof_fy': 0, 'n_meas': 1}
+2026-11-05 17:03:11,773 INFO 8: {'fx': <Quantity -3.63584284e-18 deg>, 'sig_fx': <Quantity 0.00500001 deg>, 'chi2_fx': 0.0, 'dof_fx': 0, 'fy': <Quantity -7.27870774e-18 deg>, 'sig_fy': <Quantity 0.00500001 deg>, 'chi2_fy': 0.0, 'dof_fy': 0, 'n_meas': 2}
+2026-11-05 17:03:11,791 INFO wrote offsets_runs/CII_G000_20261105T160307/offsets_summary.txt
+2026-11-05 17:03:11,791 INFO wrote results tables to offsets_runs/CII_G000_20261105T160307
+2026-11-05 17:03:11,848 INFO wrote offsets_runs/CII_G000_20261105T160307/summary_offsets.png
+2026-11-05 17:03:11,848 INFO wrote offsets_runs/CII_G000_20261105T160307/offsets_CII_deltas.txt (2 measured pixels)
+2026-11-05 17:03:11,848 INFO cal_file set: run --aggregate to fold this run's residuals into offsets_cal.txt

@@ -1,0 +1,71 @@
+2026-11-05 17:03:27,389 INFO Config: bands ['CII', 'NII'], level1_root /Users/russ/GUSTO/gusto-datasystem/Data/level1/, level2_root /Users/russ/GUSTO/gusto-datasystem/Data/level2/
+2026-11-05 17:03:27,401 INFO Loaded 1 regions from G348reg.yaml
+2026-11-05 17:03:27,727 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G348/G348_CII_0_at_1.0_G.fits: (160, 518, 380), SEQ_ID ext: (518, 380)
+2026-11-05 17:03:27,732 INFO auto-discovered mixers for G348 CII: [5, 8]
+2026-11-05 17:03:28,098 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G348/G348_CII_8_at_1.0_G.fits: (160, 518, 380), SEQ_ID ext: (518, 380)
+2026-11-05 17:03:28,098 INFO grid: 3 pixels/beam, beam FWHM 1.0 arcmin -- sigmas inflated by 3
+2026-11-05 17:03:28,460 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G348/G348_CII_5_at_1.0_G.fits: (160, 518, 380), SEQ_ID ext: (518, 380)
+2026-11-05 17:03:28,462 INFO region G348: center (348.7150, -1.0530) deg -> cube pixel (64.1, 67.0), pixbox (54, 74, 57, 76), cube shape (380, 518)
+2026-11-05 17:03:28,463 WARNING velocity range -18.0..-15.0 km/s partially outside the cube; clipped to pixels 131:135
+2026-11-05 17:03:28,463 WARNING velocity range -15.0..-10.0 km/s partially outside the cube; clipped to pixels 134:140
+2026-11-05 17:03:28,464 WARNING velocity range -10.0..-6.0 km/s partially outside the cube; clipped to pixels 139:145
+2026-11-05 17:03:28,468 INFO baseline: 380 px linear, 0 px offset-only, 0 px skipped (11 line / 19 continuum channels)
+2026-11-05 17:03:28,472 INFO baseline: 380 px linear, 0 px offset-only, 0 px skipped (11 line / 19 continuum channels)
+2026-11-05 17:03:28,472 WARNING velocity range -18.0..-15.0 km/s partially outside the cube; clipped to pixels 131:135
+2026-11-05 17:03:28,473 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:28,473 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:28,474 INFO montage_extent: corners lon 348.7713,348.6602 lat -1.1086,-1.0030 -> extent (-11.3398, -11.2287, -1.1086, -1.0030) galactic
+2026-11-05 17:03:28,686 INFO wrote offsets_runs/CII_G348_20261105T160327/img_5_G348_-18_-15.png
+2026-11-05 17:03:28,686 WARNING 5 G348 (-18, -15): SNR 2.3 below threshold, skip
+2026-11-05 17:03:28,687 WARNING velocity range -15.0..-10.0 km/s partially outside the cube; clipped to pixels 134:140
+2026-11-05 17:03:28,688 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:28,688 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:28,688 INFO montage_extent: corners lon 348.7713,348.6602 lat -1.1086,-1.0030 -> extent (-11.3398, -11.2287, -1.1086, -1.0030) galactic
+2026-11-05 17:03:28,802 INFO wrote offsets_runs/CII_G348_20261105T160327/img_5_G348_-15_-10.png
+2026-11-05 17:03:28,805 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 1.431e+05 -1.421e+00 -1.110e+00  6.912e+00  4.172e+00 -6.028e+04]
+2026-11-05 17:03:28,983 INFO wrote offsets_runs/CII_G348_20261105T160327/xcorr_5_G348_-15_-10.png
+2026-11-05 17:03:28,983 INFO 5 G348 (-15, -10): dx=-1.421+-0.017 dy=-1.110+-0.006 rho=0.01 (pixels)
+2026-11-05 17:03:29,052 WARNING no boresight AZ/EL keywords in CII_07982_19801_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:29,076 INFO G348 5: gondola at (-80.476, -13.998) deg, 36847 m, 2024-02-12T00:04:58.075
+2026-11-05 17:03:29,282 WARNING velocity range -10.0..-6.0 km/s partially outside the cube; clipped to pixels 139:145
+2026-11-05 17:03:29,282 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,283 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,283 INFO montage_extent: corners lon 348.7713,348.6602 lat -1.1086,-1.0030 -> extent (-11.3398, -11.2287, -1.1086, -1.0030) galactic
+2026-11-05 17:03:29,412 INFO wrote offsets_runs/CII_G348_20261105T160327/img_5_G348_-10_-6.png
+2026-11-05 17:03:29,414 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 6.529e+04 -1.242e+00 -7.944e-01  5.474e+00  4.146e+00 -2.192e+04]
+2026-11-05 17:03:29,530 INFO wrote offsets_runs/CII_G348_20261105T160327/xcorr_5_G348_-10_-6.png
+2026-11-05 17:03:29,530 INFO 5 G348 (-10, -6): dx=-1.242+-0.016 dy=-0.794+-0.009 rho=-0.01 (pixels)
+2026-11-05 17:03:29,537 WARNING no boresight AZ/EL keywords in CII_07982_19801_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:03:29,542 INFO G348 5: gondola at (-80.476, -13.998) deg, 36847 m, 2024-02-12T00:04:58.075
+2026-11-05 17:03:29,575 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G348/G348_CII_8_at_1.0_G.fits: (160, 518, 380), SEQ_ID ext: (518, 380)
+2026-11-05 17:03:29,579 INFO region G348: center (348.7150, -1.0530) deg -> cube pixel (64.1, 67.0), pixbox (54, 74, 57, 76), cube shape (380, 518)
+2026-11-05 17:03:29,580 WARNING velocity range -18.0..-15.0 km/s partially outside the cube; clipped to pixels 131:135
+2026-11-05 17:03:29,581 WARNING velocity range -15.0..-10.0 km/s partially outside the cube; clipped to pixels 134:140
+2026-11-05 17:03:29,581 WARNING velocity range -10.0..-6.0 km/s partially outside the cube; clipped to pixels 139:145
+2026-11-05 17:03:29,585 INFO baseline: 380 px linear, 0 px offset-only, 0 px skipped (11 line / 19 continuum channels)
+2026-11-05 17:03:29,589 INFO baseline: 380 px linear, 0 px offset-only, 0 px skipped (11 line / 19 continuum channels)
+2026-11-05 17:03:29,589 WARNING velocity range -18.0..-15.0 km/s partially outside the cube; clipped to pixels 131:135
+2026-11-05 17:03:29,590 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,590 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,590 INFO montage_extent: corners lon 348.7713,348.6602 lat -1.1086,-1.0030 -> extent (-11.3398, -11.2287, -1.1086, -1.0030) galactic
+2026-11-05 17:03:29,707 INFO wrote offsets_runs/CII_G348_20261105T160327/img_8_G348_-18_-15.png
+2026-11-05 17:03:29,707 WARNING 8 G348 (-18, -15): SNR 2.9 below threshold, skip
+2026-11-05 17:03:29,708 WARNING velocity range -15.0..-10.0 km/s partially outside the cube; clipped to pixels 134:140
+2026-11-05 17:03:29,708 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,708 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,709 INFO montage_extent: corners lon 348.7713,348.6602 lat -1.1086,-1.0030 -> extent (-11.3398, -11.2287, -1.1086, -1.0030) galactic
+2026-11-05 17:03:29,828 INFO wrote offsets_runs/CII_G348_20261105T160327/img_8_G348_-15_-10.png
+2026-11-05 17:03:29,828 WARNING 8 G348 (-15, -10): SNR 2.9 below threshold, skip
+2026-11-05 17:03:29,828 WARNING velocity range -10.0..-6.0 km/s partially outside the cube; clipped to pixels 139:145
+2026-11-05 17:03:29,829 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,829 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:03:29,830 INFO montage_extent: corners lon 348.7713,348.6602 lat -1.1086,-1.0030 -> extent (-11.3398, -11.2287, -1.1086, -1.0030) galactic
+2026-11-05 17:03:29,948 INFO wrote offsets_runs/CII_G348_20261105T160327/img_8_G348_-10_-6.png
+2026-11-05 17:03:29,949 WARNING 8 G348 (-10, -6): SNR 2.8 below threshold, skip
+2026-11-05 17:03:29,949 INFO 5: {'fx': <Quantity 0.00146865 deg>, 'sig_fx': <Quantity 0.005 deg>, 'chi2_fx': np.float64(0.025710719024552506), 'dof_fx': 1, 'fy': <Quantity 0.00897268 deg>, 'sig_fy': <Quantity 0.005 deg>, 'chi2_fy': np.float64(0.05568925540197476), 'dof_fy': 1, 'n_meas': 2}
+2026-11-05 17:03:29,949 INFO 8: {'n_meas': 1}
+2026-11-05 17:03:29,956 INFO wrote offsets_runs/CII_G348_20261105T160327/offsets_summary.txt
+2026-11-05 17:03:29,956 INFO wrote results tables to offsets_runs/CII_G348_20261105T160327
+2026-11-05 17:03:30,008 INFO wrote offsets_runs/CII_G348_20261105T160327/summary_offsets.png
+2026-11-05 17:03:30,008 INFO wrote offsets_runs/CII_G348_20261105T160327/offsets_CII_deltas.txt (2 measured pixels)
+2026-11-05 17:03:30,008 INFO cal_file set: run --aggregate to fold this run's residuals into offsets_cal.txt

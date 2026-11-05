@@ -1,0 +1,6 @@
+# exclusions applied at aggregate time
+# (config 'exclude:'; ECSV record unchanged)
+# target  region  mixer  vel_range(deg)
+# fx(deg)   fy(deg)   reason
+G353  G353  6  [-11.0,3.0]  -0.10535  +0.04017  extra noisy data
+G353  G353  6  [4.0,15.0]  -0.00793  +0.11651  extra noisy data

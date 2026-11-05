@@ -1,0 +1,10 @@
+regions:
+  - name: LMC 
+    frame: icrs      # or icrs
+    lon: 84.92 deg       # lon if galactic or RA if icrs
+    lat: -69.7 deg       # lat if galactic or Dec if icrs
+    radius: 1100 arcsec   # ANGULAR half-size of the sub-image box
+    vel_ranges:          # km/s, multiple slices allowed
+      - [235,240]
+      - [240, 245]
+    min_snr: 2.5

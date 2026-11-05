@@ -1,0 +1,16 @@
+regions:
+  - name: G333a 
+    frame: galactic      # or icrs
+    lon: 333.2387 deg       # lon if galactic or RA if icrs
+    lat: -0.4088 deg       # lat if galactic or Dec if icrs
+    radius: 615 arcsec   # ANGULAR half-size of the sub-image box
+    vel_ranges:          # km/s, multiple slices allowed
+      - [-57,-43]
+    min_snr: 2.0
+  - name: G333b 
+    frame: galactic      # or icrs
+    lon: 333.1616 deg       # lon if galactic or RA if icrs
+    lat: -0.1099 deg       # lat if galactic or Dec if icrs
+    radius: 615 arcsec   # ANGULAR half-size of the sub-image box
+    vel_ranges:          # km/s, multiple slices allowed
+      - [-101,-79]

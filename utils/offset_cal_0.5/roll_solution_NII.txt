@@ -1,0 +1,64 @@
+roll solution from 7 targets
+theta0 = +29.5420 +/- 50.6160 deg
+chi2 = 24.0 / 19 dof
+
+roll-corrected focal offsets (true frame):
+mixer  fx(deg)      sig     fy(deg)      sig
+    2  -0.003879  0.005104  -0.003145  0.005105
+    6  +0.026166  0.006037  -0.017499  0.006037
+
+interpretation: chi2/dof ~ 1 -> one common roll
+explains the target scatter, and the offsets above
+are the roll-corrected values. If instead chi2/dof
+>> 1, targets disagree beyond a single rotation --
+check per-field systematics before trusting these.
+
+to APPLY the roll: set  roll: <theta0>  in the
+config options and re-run the measurement pipeline
+(per-target runs), so the measured offsets come out
+in the true focal frame directly.
+
+per-target DE-ROTATED offsets (true focal frame):
+the individual deltas corrected by the solved roll;
+|u - u0| is the residual scatter (arcsec) around
+the mixer's combined offset -- this is where to
+check whether ONE roll really aligns the targets:
+residuals ~ half a pixel (10-20 arcsec) = roll does
+the job (chi2 excess = sigma bookkeeping); a
+beam-fraction outlier flags a per-field systematic.
+
+mixer  target               fx(deg)     fy(deg)   |u-u0|(")
+    2  G000                +0.006314  -0.021004      74.0
+    2  G333                -0.008333  -0.017107      52.8
+    2  G337                -0.018136  -0.001389      51.7
+    2  G345                -0.001398  +0.000113      14.7
+    2  G348                -0.004209  +0.000363      12.7
+    2  G351                -0.003710  +0.012867      57.6
+    2  G353                +0.002398  +0.003998      34.2
+    6  G000                +0.031295  +0.009844     100.1
+    6  G337                +0.020249  -0.011444      30.5
+    6  G345                +0.027247  -0.042666      90.7
+    6  G348                +0.033255  -0.039306      82.5
+    6  G351                +0.018780  -0.003912      55.7
+
+chi2(theta) profile (dof = 19):
+theta(deg)   chi2    chi2/dof
+  -45.0      24.0      1.27
+  -40.0      24.0      1.27
+  -35.0      24.0      1.27
+  -30.0      24.0      1.27
+  -25.0      24.0      1.27
+  -20.0      24.0      1.27
+  -15.0      24.0      1.27
+  -10.0      24.0      1.27
+   -5.0      24.0      1.27
+   +0.0      24.0      1.27
+   +5.0      24.0      1.27
+  +10.0      24.0      1.27
+  +15.0      24.0      1.27
+  +20.0      24.0      1.27
+  +25.0      24.0      1.27
+  +30.0      24.0      1.27
+  +35.0      24.0      1.27
+  +40.0      24.0      1.27
+  +45.0      24.0      1.27

@@ -1,0 +1,71 @@
+2026-11-05 17:18:20,035 INFO Config: bands ['CII', 'NII'], level1_root /Users/russ/GUSTO/gusto-datasystem/Data/level1/, level2_root /Users/russ/GUSTO/gusto-datasystem/Data/level2/
+2026-11-05 17:18:20,048 INFO Loaded 2 regions from G333NIIreg.yaml
+2026-11-05 17:18:20,318 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G333/G333_NII_0_at_1.0_G.fits: (210, 465, 268), SEQ_ID ext: (465, 268)
+2026-11-05 17:18:20,323 INFO auto-discovered mixers for G333 NII: [2, 3]
+2026-11-05 17:18:20,638 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G333/G333_NII_3_at_1.0_G.fits: (210, 465, 268), SEQ_ID ext: (465, 268)
+2026-11-05 17:18:20,638 INFO grid: 3 pixels/beam, beam FWHM 1.0 arcmin -- sigmas inflated by 3
+2026-11-05 17:18:21,062 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G333/G333_NII_2_at_1.0_G.fits: (210, 465, 268), SEQ_ID ext: (465, 268)
+2026-11-05 17:18:21,064 INFO region G333a: center (333.2387, -0.4088) deg -> cube pixel (146.5, 145.3), pixbox (116, 177, 115, 176), cube shape (268, 465)
+2026-11-05 17:18:21,066 WARNING velocity range -57.0..-43.0 km/s partially outside the cube; clipped to pixels 132:147
+2026-11-05 17:18:21,099 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (14 line / 17 continuum channels)
+2026-11-05 17:18:21,132 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (14 line / 17 continuum channels)
+2026-11-05 17:18:21,133 WARNING velocity range -57.0..-43.0 km/s partially outside the cube; clipped to pixels 132:147
+2026-11-05 17:18:21,134 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:21,135 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:21,135 INFO montage_extent: corners lon 333.4082,333.0693 lat -0.5774,-0.2385 -> extent (-26.9307, -26.5918, -0.5774, -0.2385) galactic
+2026-11-05 17:18:21,362 INFO wrote offsets_runs/NII_G333_20261105T161820/img_2_G333a_-57_-43.png
+2026-11-05 17:18:21,365 INFO peak fit params [amp, x0, y0, w1, w2, off] = [2.645e+04 3.341e+00 1.669e+00 4.417e+00 4.515e+00 2.156e+04]
+2026-11-05 17:18:21,540 INFO wrote offsets_runs/NII_G333_20261105T161820/xcorr_2_G333a_-57_-43.png
+2026-11-05 17:18:21,540 INFO 2 G333a (-57, -43): dx=3.341+-0.077 dy=1.669+-0.080 rho=-0.02 (pixels)
+2026-11-05 17:18:21,617 WARNING no boresight AZ/EL keywords in NII_00777_03994_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:21,624 INFO G333a 2: gondola at (-84.288, 10.405) deg, 39050 m, 2024-01-17T17:28:14.936
+2026-11-05 17:18:21,835 INFO region G333b: center (333.1616, -0.1099) deg -> cube pixel (160.4, 199.1), pixbox (130, 191, 169, 230), cube shape (268, 465)
+2026-11-05 17:18:21,835 WARNING velocity range -101.0..-79.0 km/s partially outside the cube; clipped to pixels 88:112
+2026-11-05 17:18:21,869 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (21 line / 19 continuum channels)
+2026-11-05 17:18:21,903 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (21 line / 19 continuum channels)
+2026-11-05 17:18:21,903 WARNING velocity range -101.0..-79.0 km/s partially outside the cube; clipped to pixels 88:112
+2026-11-05 17:18:21,904 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:21,905 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:21,905 INFO montage_extent: corners lon 333.3304,332.9915 lat -0.2774,0.0615 -> extent (-27.0085, -26.6696, -0.2774, 0.0615) galactic
+2026-11-05 17:18:22,034 INFO wrote offsets_runs/NII_G333_20261105T161820/img_2_G333b_-101_-79.png
+2026-11-05 17:18:22,036 INFO peak fit params [amp, x0, y0, w1, w2, off] = [6.314e+04 1.384e+00 3.284e+00 6.968e+00 8.449e+00 1.715e+04]
+2026-11-05 17:18:22,147 INFO wrote offsets_runs/NII_G333_20261105T161820/xcorr_2_G333b_-101_-79.png
+2026-11-05 17:18:22,147 INFO 2 G333b (-101, -79): dx=1.384+-0.051 dy=3.284+-0.086 rho=-0.02 (pixels)
+2026-11-05 17:18:22,156 WARNING no boresight AZ/EL keywords in NII_00777_03994_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:22,160 INFO G333b 2: gondola at (-84.288, 10.405) deg, 39050 m, 2024-01-17T17:28:14.936
+2026-11-05 17:18:22,192 INFO Loaded /Users/russ/GUSTO/gusto-datasystem/Data/level2/G333/G333_NII_3_at_1.0_G.fits: (210, 465, 268), SEQ_ID ext: (465, 268)
+2026-11-05 17:18:22,195 INFO region G333a: center (333.2387, -0.4088) deg -> cube pixel (146.5, 145.3), pixbox (116, 177, 115, 176), cube shape (268, 465)
+2026-11-05 17:18:22,196 WARNING velocity range -57.0..-43.0 km/s partially outside the cube; clipped to pixels 132:147
+2026-11-05 17:18:22,229 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (14 line / 17 continuum channels)
+2026-11-05 17:18:22,263 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (14 line / 17 continuum channels)
+2026-11-05 17:18:22,263 WARNING velocity range -57.0..-43.0 km/s partially outside the cube; clipped to pixels 132:147
+2026-11-05 17:18:22,264 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:22,265 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:22,265 INFO montage_extent: corners lon 333.4082,333.0693 lat -0.5774,-0.2385 -> extent (-26.9307, -26.5918, -0.5774, -0.2385) galactic
+2026-11-05 17:18:22,392 INFO wrote offsets_runs/NII_G333_20261105T161820/img_3_G333a_-57_-43.png
+2026-11-05 17:18:22,394 INFO peak fit params [amp, x0, y0, w1, w2, off] = [3.685e+04 3.851e-17 2.938e-17 1.997e+00 2.127e+00 5.205e+04]
+2026-11-05 17:18:22,502 INFO wrote offsets_runs/NII_G333_20261105T161820/xcorr_3_G333a_-57_-43.png
+2026-11-05 17:18:22,502 INFO 3 G333a (-57, -43): dx=0.000+-0.029 dy=0.000+-0.031 rho=0.00 (pixels)
+2026-11-05 17:18:22,526 WARNING no boresight AZ/EL keywords in NII_00778_03996_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:22,532 INFO G333a 3: gondola at (-84.292, 10.292) deg, 39020 m, 2024-01-17T17:33:20.839
+2026-11-05 17:18:22,538 INFO region G333b: center (333.1616, -0.1099) deg -> cube pixel (160.4, 199.1), pixbox (130, 191, 169, 230), cube shape (268, 465)
+2026-11-05 17:18:22,539 WARNING velocity range -101.0..-79.0 km/s partially outside the cube; clipped to pixels 88:112
+2026-11-05 17:18:22,572 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (21 line / 19 continuum channels)
+2026-11-05 17:18:22,606 INFO baseline: 3721 px linear, 0 px offset-only, 0 px skipped (21 line / 19 continuum channels)
+2026-11-05 17:18:22,606 WARNING velocity range -101.0..-79.0 km/s partially outside the cube; clipped to pixels 88:112
+2026-11-05 17:18:22,607 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:22,608 INFO preprocess: outlier_clip=4.0 destripe=offpx/x smooth=2.0px  (0 = step off)
+2026-11-05 17:18:22,608 INFO montage_extent: corners lon 333.3304,332.9915 lat -0.2774,0.0615 -> extent (-27.0085, -26.6696, -0.2774, 0.0615) galactic
+2026-11-05 17:18:22,731 INFO wrote offsets_runs/NII_G333_20261105T161820/img_3_G333b_-101_-79.png
+2026-11-05 17:18:22,733 INFO peak fit params [amp, x0, y0, w1, w2, off] = [ 5.750e+04  1.798e-17 -3.452e-17  1.485e+00  2.136e+00  1.080e+05]
+2026-11-05 17:18:22,842 INFO wrote offsets_runs/NII_G333_20261105T161820/xcorr_3_G333b_-101_-79.png
+2026-11-05 17:18:22,842 INFO 3 G333b (-101, -79): dx=0.000+-0.021 dy=-0.000+-0.033 rho=-0.00 (pixels)
+2026-11-05 17:18:22,852 WARNING no boresight AZ/EL keywords in NII_00778_03996_L10.fits -- continuing (not needed for the offset math)
+2026-11-05 17:18:22,856 INFO G333b 3: gondola at (-84.292, 10.292) deg, 39020 m, 2024-01-17T17:33:20.839
+2026-11-05 17:18:22,861 INFO 2: {'fx': <Quantity 0.00118498 deg>, 'sig_fx': <Quantity 0.012 deg>, 'chi2_fx': np.float64(0.6813709216630064), 'dof_fx': 1, 'fy': <Quantity -0.01899213 deg>, 'sig_fy': <Quantity 0.012 deg>, 'chi2_fy': np.float64(6.592918551256643e-05), 'dof_fy': 1, 'n_meas': 2}
+2026-11-05 17:18:22,862 INFO 3: {'fx': <Quantity 1.28644784e-19 deg>, 'sig_fx': <Quantity 0.012 deg>, 'chi2_fx': np.float64(7.047722307390072e-35), 'dof_fx': 1, 'fy': <Quantity -9.02510974e-20 deg>, 'sig_fy': <Quantity 0.012 deg>, 'chi2_fy': np.float64(4.1401088530016565e-34), 'dof_fy': 1, 'n_meas': 3}
+2026-11-05 17:18:22,871 INFO wrote offsets_runs/NII_G333_20261105T161820/offsets_summary.txt
+2026-11-05 17:18:22,871 INFO wrote results tables to offsets_runs/NII_G333_20261105T161820
+2026-11-05 17:18:22,979 INFO wrote offsets_runs/NII_G333_20261105T161820/summary_offsets.png
+2026-11-05 17:18:22,979 INFO wrote offsets_runs/NII_G333_20261105T161820/offsets_NII_deltas.txt (2 measured pixels)
+2026-11-05 17:18:22,979 INFO cal_file set: run --aggregate to fold this run's residuals into offsets_cal.txt

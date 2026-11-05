@@ -1,0 +1,73 @@
+roll solution from 8 targets
+theta0 = +25.0451 +/- 46.8915 deg
+chi2 = 35.8 / 33 dof
+
+roll-corrected focal offsets (true frame):
+mixer  fx(deg)      sig     fy(deg)      sig
+('CII', np.int64(5))  +0.001555  0.001866  +0.002574  0.001848
+('NII', np.int64(2))  -0.003620  0.004729  -0.003439  0.004729
+('NII', np.int64(6))  +0.027457  0.005593  -0.015393  0.005593
+
+interpretation: chi2/dof ~ 1 -> one common roll
+explains the target scatter, and the offsets above
+are the roll-corrected values. If instead chi2/dof
+>> 1, targets disagree beyond a single rotation --
+check per-field systematics before trusting these.
+
+to APPLY the roll: set  roll: <theta0>  in the
+config options and re-run the measurement pipeline
+(per-target runs), so the measured offsets come out
+in the true focal frame directly.
+
+per-target DE-ROTATED offsets (true focal frame):
+the individual deltas corrected by the solved roll;
+|u - u0| is the residual scatter (arcsec) around
+the mixer's combined offset -- this is where to
+check whether ONE roll really aligns the targets:
+residuals ~ half a pixel (10-20 arcsec) = roll does
+the job (chi2 excess = sigma bookkeeping); a
+beam-fraction outlier flags a per-field systematic.
+
+mixer  target               fx(deg)     fy(deg)   |u-u0|(")
+('CII', np.int64(5))  G000                +0.001573  +0.006937      15.7
+('CII', np.int64(5))  G333                -0.003078  -0.006142      35.5
+('CII', np.int64(5))  G337                -0.005555  -0.001421      29.4
+('CII', np.int64(5))  G345                +0.002971  +0.003347       5.8
+('CII', np.int64(5))  G348                +0.005129  +0.007507      21.9
+('CII', np.int64(5))  G351                +0.005086  +0.003953      13.6
+('CII', np.int64(5))  G353                +0.005578  +0.007896      24.0
+('CII', np.int64(5))  LMC                 +0.001446  -0.001413      14.4
+('NII', np.int64(2))  G000                +0.007942  -0.020444      74.0
+('NII', np.int64(2))  G333                -0.006966  -0.017708      52.8
+('NII', np.int64(2))  G337                -0.017971  -0.002807      51.7
+('NII', np.int64(2))  G345                -0.001403  +0.000003      14.7
+('NII', np.int64(2))  G348                -0.004224  +0.000032      12.7
+('NII', np.int64(2))  G351                -0.004708  +0.012537      57.6
+('NII', np.int64(2))  G353                +0.002077  +0.004174      34.2
+('NII', np.int64(6))  G000                +0.030427  +0.012267     100.1
+('NII', np.int64(6))  G337                +0.021084  -0.009821      30.5
+('NII', np.int64(6))  G345                +0.030508  -0.040398      90.7
+('NII', np.int64(6))  G348                +0.036234  -0.036577      82.5
+('NII', np.int64(6))  G351                +0.019029  -0.002427      55.7
+
+chi2(theta) profile (dof = 33):
+theta(deg)   chi2    chi2/dof
+  -45.0      35.9      1.09
+  -40.0      35.9      1.09
+  -35.0      35.9      1.09
+  -30.0      35.9      1.09
+  -25.0      35.9      1.09
+  -20.0      35.9      1.09
+  -15.0      35.9      1.09
+  -10.0      35.9      1.09
+   -5.0      35.9      1.09
+   +0.0      35.9      1.09
+   +5.0      35.9      1.09
+  +10.0      35.8      1.09
+  +15.0      35.8      1.09
+  +20.0      35.8      1.09
+  +25.0      35.8      1.09
+  +30.0      35.8      1.09
+  +35.0      35.8      1.09
+  +40.0      35.8      1.09
+  +45.0      35.9      1.09

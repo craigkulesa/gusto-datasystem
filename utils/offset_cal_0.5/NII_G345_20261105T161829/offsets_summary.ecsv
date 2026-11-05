@@ -1,0 +1,45 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: mixer, datatype: int64}
+# - {name: input, datatype: string}
+# - {name: fx, unit: deg, datatype: float64}
+# - {name: sig_fx, unit: deg, datatype: float64}
+# - {name: chi2_fx, datatype: float64}
+# - {name: dof_fx, datatype: int64}
+# - {name: fy, unit: deg, datatype: float64}
+# - {name: sig_fy, unit: deg, datatype: float64}
+# - {name: chi2_fy, datatype: float64}
+# - {name: dof_fy, datatype: int64}
+# - {name: n_meas, datatype: int64}
+# delimiter: ','
+# meta: !!omap
+# - __serialized_columns__:
+#     fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: &id001 !astropy.units.Unit {unit: deg}
+#       value: !astropy.table.SerializedColumn {name: fx}
+#     fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: fy}
+#     sig_fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: sig_fx}
+#     sig_fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: sig_fy}
+# schema: astropy-2.0
+mixer,input,fx,sig_fx,chi2_fx,dof_fx,fy,sig_fy,chi2_fy,dof_fy,n_meas
+2,"G345a [-22,-8]",-0.0004920570532256831,0.012000105972139175,0.0,0,-0.00416334436348211,0.012000370648976048,0.0,0,1
+2,"G345b [-25,-16]",-0.0020529420569812434,0.012000249740574299,0.0,0,0.002981231399359851,0.012000078423618728,0.0,0,1
+2,G345a,-0.0004920570532256831,0.012000105972139175,0.0,0,-0.00416334436348211,0.012000370648976048,0.0,0,1
+2,G345b,-0.0020529420569812434,0.012000249740574299,0.0,0,0.002981231399359851,0.012000078423618728,0.0,0,1
+2,COMBINED,-0.0012724902049922784,0.012,0.008459339500193737,1,-0.000590969490930315,0.012,0.17723282165234733,1,2
+6,"G345a [-22,-8]",0.04976911449343252,0.012048649248958947,0.0,0,-0.029141803643167343,0.012003584998185435,0.0,0,1
+6,"G345b [-25,-16]",0.03974323683397196,0.012013035486688878,0.0,0,-0.018230173105491677,0.012000819768563596,0.0,0,1
+6,G345a,0.04976911449343252,0.012048649248958947,0.0,0,-0.029141803643167343,0.012003584998185435,0.0,0,1
+6,G345b,0.03974323683397196,0.012013035486688878,0.0,0,-0.018230173105491677,0.012000819768563596,0.0,0,1
+6,COMBINED,0.0447413363685645,0.012,0.3472336308013911,1,-0.023684731389876944,0.012,0.41326384535204796,1,2

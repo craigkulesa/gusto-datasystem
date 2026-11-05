@@ -1,0 +1,9 @@
+regions:
+  - name: G337 
+    frame: galactic      # or icrs
+    lon: 336.778 deg       # lon if galactic or RA if icrs
+    lat: -.0367 deg       # lat if galactic or Dec if icrs
+    radius: 985 arcsec   # ANGULAR half-size of the sub-image box
+    vel_ranges:          # km/s, multiple slices allowed
+      - [-79, -65]
+    min_snr: 2.0

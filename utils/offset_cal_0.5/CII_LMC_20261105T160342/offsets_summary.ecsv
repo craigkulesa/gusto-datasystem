@@ -1,0 +1,39 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: mixer, datatype: int64}
+# - {name: input, datatype: string}
+# - {name: fx, unit: deg, datatype: float64}
+# - {name: sig_fx, unit: deg, datatype: float64}
+# - {name: chi2_fx, datatype: float64}
+# - {name: dof_fx, datatype: int64}
+# - {name: fy, unit: deg, datatype: float64}
+# - {name: sig_fy, unit: deg, datatype: float64}
+# - {name: chi2_fy, datatype: float64}
+# - {name: dof_fy, datatype: int64}
+# - {name: n_meas, datatype: int64}
+# delimiter: ','
+# meta: !!omap
+# - __serialized_columns__:
+#     fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: &id001 !astropy.units.Unit {unit: deg}
+#       value: !astropy.table.SerializedColumn {name: fx}
+#     fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: fy}
+#     sig_fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: sig_fx}
+#     sig_fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: sig_fy}
+# schema: astropy-2.0
+mixer,input,fx,sig_fx,chi2_fx,dof_fx,fy,sig_fy,chi2_fy,dof_fy,n_meas
+5,"LMC [235,240]",0.0032200330671642665,0.0050004187574062345,0.0,0,0.0011807599049072186,0.00500049112863831,0.0,0,1
+5,"LMC [240,245]",0.0005960304585767037,0.00500011587582415,0.0,0,-0.002516292692150312,0.005000114448740776,0.0,0,1
+5,LMC,0.001907952290913244,0.005,0.13769307021941246,1,-0.0006679056457279005,0.005,0.27333085212179364,1,2
+5,COMBINED,0.001907952290913244,0.005,0.13769307021941246,1,-0.0006679056457279005,0.005,0.27333085212179364,1,2

@@ -1,0 +1,79 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: band, datatype: string}
+# - {name: target, datatype: string}
+# - {name: mixer, datatype: int64}
+# - {name: region, datatype: string}
+# - {name: vel_lo, datatype: int64}
+# - {name: vel_hi, datatype: int64}
+# - {name: obstime, datatype: string}
+# - {name: gon_lat, unit: deg, datatype: float64}
+# - {name: gon_lon, unit: deg, datatype: float64}
+# - {name: gon_alt, unit: m, datatype: float64}
+# - {name: dx_pix, datatype: float64}
+# - {name: dy_pix, datatype: float64}
+# - {name: dlon, unit: arcsec, datatype: float64}
+# - {name: dlat, unit: arcsec, datatype: float64}
+# - {name: dlon_deg, unit: deg, datatype: float64}
+# - {name: dlat_deg, unit: deg, datatype: float64}
+# - {name: fx, unit: deg, datatype: float64}
+# - {name: fy, unit: deg, datatype: float64}
+# - {name: snr_corr, datatype: float64}
+# - {name: sig_fx, unit: deg, datatype: float64}
+# - {name: sig_fy, unit: deg, datatype: float64}
+# - {name: rho_f, datatype: float64}
+# delimiter: ','
+# meta: !!omap
+# - __serialized_columns__:
+#     dlat:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: &id001 !astropy.units.Unit {unit: arcsec}
+#       value: !astropy.table.SerializedColumn {name: dlat}
+#     dlat_deg:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: &id002 !astropy.units.Unit {unit: deg}
+#       value: !astropy.table.SerializedColumn {name: dlat_deg}
+#     dlon:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id001
+#       value: !astropy.table.SerializedColumn {name: dlon}
+#     dlon_deg:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: dlon_deg}
+#     fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: fx}
+#     fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: fy}
+#     gon_alt:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: !astropy.units.Unit {unit: m}
+#       value: !astropy.table.SerializedColumn {name: gon_alt}
+#     gon_lat:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: gon_lat}
+#     gon_lon:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: gon_lon}
+#     sig_fx:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: sig_fx}
+#     sig_fy:
+#       __class__: astropy.units.quantity.Quantity
+#       unit: *id002
+#       value: !astropy.table.SerializedColumn {name: sig_fy}
+# schema: astropy-2.0
+band,target,mixer,region,vel_lo,vel_hi,obstime,gon_lat,gon_lon,gon_alt,dx_pix,dy_pix,dlon,dlat,dlon_deg,dlat_deg,fx,fy,snr_corr,sig_fx,sig_fy,rho_f
+CII,LMC,5,LMC,235,240,2024-02-10T04:58:44.795,-79.27571937858262,-3.2031642537418095,37126.427230046946,0.9036952478853914,-0.5317643404191768,6.270481992975457,-10.635286808383535,0.0017418005536042934,-0.002954246335662093,0.0032200330671642665,0.0011807599049072186,4.460416359916161,6.471282268693758e-05,7.008229156096379e-05,0.44155702524704576
+CII,LMC,5,LMC,240,245,2024-02-10T04:58:44.795,-79.27571937858262,-3.2031642537418095,37126.427230046946,1.0666884232583347,0.28227562192442057,7.401444862975577,5.645512438488412,0.0020559569063821046,0.0015681978995801145,0.0005960304585767037,-0.002516292692150312,5.21401254511091,3.4040735431319826e-05,3.383046713061169e-05,-0.0517116120607362
+CII,LMC,8,LMC,235,240,2024-02-10T04:46:02.982,-79.28509060186329,-3.0490596932209777,37071.599531615924,-5.833428574667828e-17,-1.5514192332823423e-16,-4.04764868691686e-16,-3.1028384665646843e-15,-1.1243468574769056e-19,-8.618995740457456e-19,4.529903277544821e-19,7.418895903072959e-19,13.101259200681888,1.8529386532721895e-05,1.9720334242075218e-05,0.28540791243489255
+CII,LMC,8,LMC,240,245,2024-02-10T04:46:02.982,-79.28509060186329,-3.0490596932209777,37071.599531615924,1.0915893138841838e-16,-1.6666935313456254e-16,7.574224997256244e-16,-3.333387062691251e-15,2.1039513881267346e-19,-9.259408507475697e-19,7.446226345890383e-19,5.893000893256656e-19,11.509279776807347,1.3706539084870294e-05,1.4243831201840598e-05,0.17610154791949936
+CII,LMC,8,-,0,0,-,nan,nan,nan,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,nan,0.0,0.0,0.0

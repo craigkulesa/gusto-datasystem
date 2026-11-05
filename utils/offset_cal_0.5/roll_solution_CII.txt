@@ -1,0 +1,59 @@
+roll solution from 8 targets
+theta0 = +24.9816 +/- 45.0000 deg
+chi2 = 11.8 / 13 dof
+
+roll-corrected focal offsets (true frame):
+mixer  fx(deg)      sig     fy(deg)      sig
+    5  +0.001552  0.001790  +0.002576  0.001774
+
+interpretation: chi2/dof ~ 1 -> one common roll
+explains the target scatter, and the offsets above
+are the roll-corrected values. If instead chi2/dof
+>> 1, targets disagree beyond a single rotation --
+check per-field systematics before trusting these.
+
+to APPLY the roll: set  roll: <theta0>  in the
+config options and re-run the measurement pipeline
+(per-target runs), so the measured offsets come out
+in the true focal frame directly.
+
+per-target DE-ROTATED offsets (true focal frame):
+the individual deltas corrected by the solved roll;
+|u - u0| is the residual scatter (arcsec) around
+the mixer's combined offset -- this is where to
+check whether ONE roll really aligns the targets:
+residuals ~ half a pixel (10-20 arcsec) = roll does
+the job (chi2 excess = sigma bookkeeping); a
+beam-fraction outlier flags a per-field systematic.
+
+mixer  target               fx(deg)     fy(deg)   |u-u0|(")
+    5  G000                +0.001565  +0.006939      15.7
+    5  G333                -0.003071  -0.006145      35.5
+    5  G337                -0.005554  -0.001427      29.4
+    5  G345                +0.002967  +0.003350       5.8
+    5  G348                +0.005121  +0.007513      21.9
+    5  G351                +0.005082  +0.003959      13.6
+    5  G353                +0.005569  +0.007903      24.0
+    5  LMC                 +0.001447  -0.001411      14.4
+
+chi2(theta) profile (dof = 13):
+theta(deg)   chi2    chi2/dof
+  -45.0      11.8      0.91
+  -40.0      11.8      0.91
+  -35.0      11.8      0.91
+  -30.0      11.9      0.91
+  -25.0      11.9      0.91
+  -20.0      11.9      0.91
+  -15.0      11.9      0.91
+  -10.0      11.9      0.91
+   -5.0      11.8      0.91
+   +0.0      11.8      0.91
+   +5.0      11.8      0.91
+  +10.0      11.8      0.91
+  +15.0      11.8      0.91
+  +20.0      11.8      0.91
+  +25.0      11.8      0.91
+  +30.0      11.8      0.91
+  +35.0      11.8      0.91
+  +40.0      11.8      0.91
+  +45.0      11.8      0.91

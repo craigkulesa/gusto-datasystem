@@ -1,0 +1,11 @@
+regions:
+  - name: G348 
+    frame: galactic      # or icrs
+    lon: 348.715 deg       # lon if galactic or RA if icrs
+    lat: -1.053 deg       # lat if galactic or Dec if icrs
+    radius: 200 arcsec   # ANGULAR half-size of the sub-image box
+    vel_ranges:          # km/s, multiple slices allowed
+      - [-18, -15]
+      - [-15, -10]
+      - [-10, -6]
+    min_snr: 3.0
