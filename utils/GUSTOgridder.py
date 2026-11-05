@@ -126,7 +126,7 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType, args):
             else:
                 osel = np.argwhere((data['scan_type'] == 'OTF') & ((data['ROW_FLAG'] & rfl)==0) & ((data['MIXER']==2) | (data['MIXER']==3) | (data['MIXER']==6))).flatten()
 
-        if len(osel) <= 0:
+        if len(osel) <= 1:
             print('WARNING: No OTF spectra available in ', ifile)
             continue
 
