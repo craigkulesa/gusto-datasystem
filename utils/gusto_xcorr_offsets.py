@@ -60,12 +60,17 @@ def load_config(path):
 
     Returns (data_cfg, bands, options).
     """
+    global _SYS_FLOOR_DEG, _SYS_FLOOR_BY_BAND
     with open(path) as f:
         cfg = yaml.safe_load(f)
     data_cfg = cfg["data"]
     # read options BEFORE the band loop: per-band values may fall
     # back to the global option (pix_band)
     options = cfg.get("options", {})
+    # systematic floor on measurement sigmas (deg), in quadrature
+    # everywhere inputs are combined; default 0.005 deg = 18"
+    _SYS_FLOOR_DEG = float(options.get("sys_floor_deg", 0.005))
+    _SYS_FLOOR_BY_BAND = {}
     bands = {}
     for band, b in cfg["bands"].items():
         fid = b["fiducial"]
@@ -80,6 +85,10 @@ def load_config(path):
         # a global setting mislabels one band's rows (NII mixers
         # written as B2M* when they are really B1M*).
         pix_band = b.get("pix_band", options.get("pix_band", "B2"))
+        # per-band systematic floor override (deg): e.g. NII
+        # typically needs a larger floor than the CII default
+        if b.get("sys_floor_deg") is not None:
+            _SYS_FLOOR_BY_BAND[band] = float(b["sys_floor_deg"])
         # optional explicit cube filenames (see main(); default is
         # the naming convention <target>_<band>_<mixer>_at_<Beam>_<kernel>.fits,
         # which needs the target/beam/kernel resolved at run time)
@@ -257,6 +266,134 @@ def collapse(subcube, method="moment0"):
     else:
         raise ValueError(f"unknown collapse method: {method}")
     return img
+
+
+def preprocess_image(img, opts):
+    """Clean a collapsed 2D image BEFORE cross-correlation.
+
+    Three optional steps, applied IDENTICALLY to every mixer image
+    (same recipe, same parameters), so they suppress noise without
+    biasing the measured offsets:
+
+    1. OUTLIER REJECTION (outlier_clip, robust sigma; 0 = off):
+       MAD-based sigma clip around the image median; outlier pixels
+       (spikes, bad detector samples) are replaced by the local
+       3x3 median.
+    2. DESTRIPING (destripe_kernel px, destripe_axis 'x' or 'y';
+       0 = off): subtract a background estimated by a MEDIAN FILTER
+       ALONG destripe_axis with width destripe_kernel:
+       out = img - median_filter(img, size). The filter follows
+       structure that is EXTENDED along its direction, so stripes
+       running PARALLEL to destripe_axis are estimated and
+       subtracted away; compact sources (narrower than the kernel
+       along that direction) do not enter the median and SURVIVE
+       the subtraction. Rule: set destripe_axis to the direction
+       the stripes RUN along (scan direction), NOT across them.
+       CRITICAL WHY: the stripes otherwise sit in the correlation
+       surface as spurious bumps that can beat a weak real peak
+       (random lock-on offsets, not zero-shift -- the stripes are
+       per-mixer, not common-mode).
+    3. SMOOTHING (smooth_fwhm_px; 0 = off): small Gaussian; raises
+       the correlation SNR, broadens (never shifts) the peak.
+
+    Config (options:): outlier_clip: 5.0, destripe_kernel: 25,
+    destripe_axis: "x", smooth_fwhm_px: 0 -- tune per band; NII
+    typically benefits from all three. NaNs are filled before
+    filtering and re-masked after, so coverage holes stay holes.
+    """
+    from scipy import ndimage
+    if not np.any(np.isfinite(img)):
+        return img
+    out = np.array(img, dtype=float)
+    mask = ~np.isfinite(out)
+    fill = float(np.nanmedian(out))
+    out[mask] = fill
+
+    clip = float(opts.get("outlier_clip", 0.0))
+    if clip > 0:
+        med = np.median(out)
+        mad = np.median(np.abs(out - med)) * 1.4826
+        if mad > 0:
+            bad = np.abs(out - med) > clip * mad
+            if np.any(bad):
+                local = ndimage.median_filter(out, size=3)
+                out[bad] = local[bad]
+
+    k = int(opts.get("destripe_kernel", 0))
+    if k > 2:
+        axis = str(opts.get("destripe_axis", "x")).lower()
+        size = (1, k) if axis == "x" else (k, 1)
+        out = out - ndimage.median_filter(out, size=size,
+                                          mode="nearest")
+
+    fwhm = float(opts.get("smooth_fwhm_px", 0.0))
+    if fwhm > 0:
+        out = ndimage.gaussian_filter(out, fwhm / 2.3548,
+                                      mode="nearest")
+
+    out[mask] = np.nan
+    log.info("preprocess: outlier_clip=%s destripe=%spx/%s "
+             "smooth=%spx  (0 = step off)",
+             clip if clip else "off",
+             k if k else "off",
+             str(opts.get("destripe_axis", "x")).lower(),
+             fwhm if fwhm else "off")
+    return out
+
+
+def baseline_correct(subcube, vel_ranges, wcs, pix0, min_pts=6):
+    """Per-pixel SPECTRAL baseline correction -- the FIRST image step.
+
+    The subcube must span the UNION of the region's velocity ranges
+    EXTENDED by `baseline_pad` spectral elements on each side (the
+    caller cuts it that way; see main). LINE channels -- inside ANY
+    of the region's vel_ranges, overlapping/adjacent ranges combine
+    into one exclusion window -- are EXCLUDED from the fit. A LINEAR
+    (deg-1) baseline is fit per SPATIAL PIXEL on the remaining
+    continuum channels and subtracted over ALL channels
+    (extrapolated across the line window).
+
+    Pathological cubes (NII: data dropouts limiting the valid
+    spectral coverage per pixel): fall back to an OFFSET (deg 0)
+    when fewer than `min_pts` valid continuum channels remain;
+    pixels with < 2 valid points are left UNCORRECTED (counted and
+    logged). vel_ranges are km/s; pix0 is the absolute spectral
+    index of the subcube's first channel, so the line window is
+    located in world velocity, robust against per-cube grid
+    offsets."""
+    nch, ny, nx = subcube.shape
+    with u.set_enabled_equivalencies(u.spectral()):
+        v = wcs.spectral.pixel_to_world(
+            np.arange(pix0, pix0 + nch)).to_value(u.km / u.s)
+    line = np.zeros(nch, dtype=bool)
+    for lo, hi in vel_ranges:
+        line |= (v >= min(lo, hi)) & (v <= max(lo, hi))
+    base = np.where(~line)[0]
+    if base.size < 2:
+        log.warning("baseline: no continuum channels outside the "
+                    "line window (pad too small?) -- NOT correcting")
+        return subcube
+    out = np.array(subcube, dtype=float)
+    n_lin = n_off = n_skip = 0
+    for iy in range(ny):
+        for ix in range(nx):
+            spec = out[:, iy, ix]
+            good = base[np.isfinite(spec[base])]
+            if good.size >= min_pts:
+                x = v[good]
+                A = np.vstack([x, np.ones_like(x)]).T
+                sol, *_ = np.linalg.lstsq(A, spec[good], rcond=None)
+                out[:, iy, ix] -= sol[0] * v + sol[1]
+                n_lin += 1
+            elif good.size >= 2:
+                out[:, iy, ix] -= float(np.mean(spec[good]))
+                n_off += 1
+            else:
+                n_skip += 1
+    log.info("baseline: %d px linear, %d px offset-only, %d px "
+             "skipped (%d line / %d continuum channels)",
+             n_lin, n_off, n_skip, int(line.sum()), base.size)
+    return out
 
 
 def snr_gate(img, min_snr):
@@ -606,13 +743,54 @@ def scaled_uncertainty(sig_int, chi2, dof):
     return sig_int * np.sqrt(max(1.0, chi2 / dof))
 
 
-def combine_measurements(rows):
+_SYS_FLOOR_DEG = 0.005     # systematic floor on per-measurement
+                           # sigmas (deg), added in quadrature in
+                           # combine_measurements; overruled by the
+                           # config option sys_floor_deg in
+                           # load_config. Rationale: the formal LM
+                           # sigmas are ~1 order optimistic (patch
+                           # pixels are correlated AND the Gaussian
+                           # model-shape error is systematic); without
+                           # a floor, targets with ONE measurement
+                           # (chi2 undefined, no PDG inflation) and
+                           # targets whose slices "agree" within
+                           # optimistic errors keep absurdly small
+                           # sigmas and dominate every weighted mean.
+_SYS_FLOOR_BY_BAND = {}    # per-band override, set in load_config
+                           # from bands.<BAND>.sys_floor_deg -- e.g.
+                           # NII typically needs a larger floor than
+                           # CII (noisier data, weaker lines)
+
+
+def _floor_of(row):
+    """systematic floor applying to one measurement row (deg):
+    its band's override when configured, else the global floor."""
+    band = str(row.get("band", "")) if "band" in row else ""
+    return _SYS_FLOOR_BY_BAND.get(band, _SYS_FLOOR_DEG)
+
+
+def combine_measurements(rows, floor_cap=False):
     """Combine all measurement rows of one mixer (both axes
     independently). Returns summary dict.
 
     Per mixer also the inverse-variance weighted mean sky offset
     from the fiducial in DEGREES (dlon_deg/dlat_deg + sigma), for
-    calibration use."""
+    calibration use. Each input sigma is inflated in quadrature by
+    the systematic floor (_SYS_FLOOR_DEG) BEFORE the weighted mean,
+    so chi2 and the PDG rescaling operate on honest errors: with
+    floor >> formal sigma, a single-slice target's sigma IS the
+    floor (no more fake chi2=0 dominance), and multi-slice chi2
+    measures real disagreement.
+
+    floor_cap=True for combines WITHIN one target/epoch (per-run
+    summaries, per-region rows, per-target summaries): overlapping
+    or continuous velocity ranges make those slices CORRELATED, so
+    averaging cannot beat the systematic floor -- the mean's sigma
+    is capped at the floor (it otherwise shrinks as floor/sqrt(n),
+    which is exactly what drives chi2/dof << 1 for correlated
+    near-duplicate slices). Cross-target combines (floor_cap=False,
+    default) keep the 1/sqrt(N) shrinkage: different fields/epochs
+    are genuinely independent."""
     out = {}
     # focal-plane offsets (fx, fy) in DEGREES: the calibration
     # quantities. With roll=0, fx ~ azimuthal angular offset,
@@ -620,13 +798,19 @@ def combine_measurements(rows):
     for axis in ("fx", "fy"):
         xs = [r[axis].to_value(u.deg) for r in rows
               if r["sig_" + axis].value > 0]
-        ss = [r["sig_" + axis].to_value(u.deg) for r in rows
-              if r["sig_" + axis].value > 0]
+        ss = [np.hypot(r["sig_" + axis].to_value(u.deg),
+                       _floor_of(r))
+              for r in rows if r["sig_" + axis].value > 0]
         if not xs:
             continue
         m, sig_int, chi2, dof = weighted_mean(xs, ss)
+        sig = scaled_uncertainty(sig_int, chi2, dof)
+        if floor_cap:
+            # correlated slices share the systematic: the mean is
+            # no better known than one measurement
+            sig = max(sig, _floor_of(rows[0]))
         out[axis] = m * u.deg
-        out["sig_" + axis] = scaled_uncertainty(sig_int, chi2, dof) * u.deg
+        out["sig_" + axis] = sig * u.deg
         out["chi2_" + axis] = chi2
         out["dof_" + axis] = dof
     out["n_meas"] = len(rows)
@@ -670,6 +854,14 @@ def plot_region_montage(images, labels, extent, region,
         else float(rc.ra.to_value(u.deg))
     cy = float(rc.b.to_value(u.deg)) if frame == "galactic" \
         else float(rc.dec.to_value(u.deg))
+    # WRAP: the extent may be display-normalized (a box straddling
+    # l=0 / RA=0 shows as negative longitudes, montage_extent), so
+    # shift the marker into the SAME convention -- else it lands
+    # 360 deg away from the panel (marker "missing" near the wrap)
+    while cx < ext4[0] - 180.0:
+        cx += 360.0
+    while cx > ext4[1] + 180.0:
+        cx -= 360.0
     lonlab = "Gal. lon (deg)" if frame == "galactic" else "RA (deg)"
     latlab = "Gal. lat (deg)" if frame == "galactic" else "Dec (deg)"
     from matplotlib.ticker import MaxNLocator
@@ -861,7 +1053,8 @@ def write_calibration_rows(rows, outfile, version="0.5"):
                      f"\t{c['comment']}")
     outfile.write_text("\n".join(lines) + "\n")
     log.info("wrote %s", outfile)
-def aggregate_results(root, band=None, fid_label=None, pix_band=None):
+def aggregate_results(root, band=None, fid_label=None, pix_band=None,
+                      roll=None, opts=None):
     """Sweep a tree of per-run output directories and combine.
 
     Each run directory (created by main()) holds an
@@ -885,21 +1078,33 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None):
     structure survives for solving the roll theta0 later.
     """
     root = Path(root)
-    rows = []
+    rows, all_rows = [], []
     n_runs = 0
     for mfile in sorted(root.glob(f"*/offsets_measurements.ecsv")):
         rdir = mfile.parent.name
+        t = QTable.read(mfile)
+        # target per run: the table's own column when present
+        # (newer runs), else parsed from the run-dir name
+        # <BAND>_<TARGET>_<TIMESTAMP>
+        rows_ = []
+        for r in t:
+            d = dict(zip(t.colnames, [r[c] for c in t.colnames]))
+            if "target" not in d or not str(d["target"]):
+                parts = rdir.split("_")
+                d["target"] = parts[1] if len(parts) > 1 else rdir
+            rows_.append(d)
+        # all_rows: EVERY band -- for the band-independent roll
+        # solve (theta0 is a gondola property, common to all bands)
+        all_rows.extend(rows_)
         if band and not rdir.startswith(str(band) + "_"):
             continue
-        t = QTable.read(mfile)
-        rows.extend([dict(zip(t.colnames, [r[c] for c in t.colnames]))
-                     for r in t])
+        rows.extend(rows_)
         n_runs += 1
         log.info("aggregate: read %s (%d rows)", mfile, len(t))
     if not rows:
         raise SystemExit(f"no offsets_measurements.ecsv found under {root}")
     log.info("aggregate: %d runs, %d measurement rows", n_runs, len(rows))
-    master = QTable(rows=rows)
+    master = QTable(rows=round_rows(rows))
     master.write(root / "all_measurements.ecsv", overwrite=True,
                  format="ascii.ecsv", delimiter=",")
     summaries = {}
@@ -908,25 +1113,167 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None):
                  and str(r["region"]) != "-"]
         if mrows:
             summaries[label] = combine_measurements(mrows)
-    # summary WITH input breakdown: one row per (mixer, region)
-    # across all runs, then the COMBINED weighted average per mixer
-    st = QTable(rows=summary_rows(
-        [r for r in rows if str(r["region"]) != "-"], summaries))
+    # summary WITH full input breakdown: one row per (mixer,
+    # region, velocity slice) across all runs, then per region,
+    # then the COMBINED weighted average per mixer; the fiducial
+    # is excluded (reference, not a measurement)
+    st = QTable(rows=round_rows(summary_rows(
+        [r for r in rows if str(r["region"]) != "-"], summaries,
+        fid_label)))
     st.write(root / "all_summary.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
     if fid_label and pix_band:
-        # banded filenames, matching the per-run outputs, so the
-        # L1 pipeline can consume the combined values directly
+        # combined RESIDUALS per band (measured-minus-applied), the
+        # provenance record for what offsets_cal.txt folds in
         suffix = f"_{band}" if band else ""
         write_calibration(summaries, fid_label, pix_band,
                           root / f"offsets{suffix}_deltas.txt")
-        cal_file = os.environ.get("GUSTO_CAL_FILE")
+        # THE combined calibration file: applied + combined
+        # residuals -> AS_MEASURED totals, ONE file for the whole
+        # aggregate, directly consumable by L1. cal_file (config)
+        # or GUSTO_CAL_FILE (env): the [offsets] file whose values
+        # were applied when the L1/L2 data were made.
+        opts = opts or {}
+        cal_file = opts.get("cal_file") or \
+            os.environ.get("GUSTO_CAL_FILE")
         if cal_file:
             cal_rows = read_calibration(cal_file)
             upd = update_calibration(cal_rows, summaries, fid_label,
                                      pix_band)
-            write_calibration_rows(upd,
-                                   root / f"offsets{suffix}_cal_updated.txt")
+            write_calibration_rows(upd, root / "offsets_cal.txt")
+        else:
+            log.warning("no cal_file (config 'cal_file:' or "
+                        "GUSTO_CAL_FILE env) -- offsets_cal.txt not "
+                        "written; combined residuals are in "
+                        "offsets%s_deltas.txt", suffix)
+    # per-target combined summaries for the aggregate overview plot
+    band_roll_sol = None
+    if fid_label:
+        per_target = {}
+        for tgt in sorted({str(r["target"]) for r in rows}):
+            trows = [r for r in rows if str(r["target"]) == tgt
+                     and str(r["region"]) != "-"]
+            if not trows:
+                continue
+            sm = {}
+            for label in sorted({r["mixer"] for r in trows}):
+                mrows = [r for r in trows if r["mixer"] == label]
+                if mrows:
+                    # within one target: slices are correlated
+                    # (overlapping/continuous vel ranges) -- cap
+                    # the mean's sigma at the systematic floor
+                    sm[label] = combine_measurements(mrows,
+                                                     floor_cap=True)
+            per_target[tgt] = sm
+        suffix = f"_{band}" if band else ""
+        band_roll_sol = solve_roll(
+            per_target, root / f"roll_solution{suffix}.txt")
+        # the CONFIG roll, when set, is AUTHORITATIVE for the
+        # aggregate outputs (plot right panel, _rot files): the
+        # solved theta0 stays in roll_solution*.txt as a diagnostic
+        # but is NOT applied. This keeps measurement and aggregate
+        # in the SAME convention (e.g. roll: 0.0 everywhere).
+        if roll is not None and band_roll_sol is not None:
+            band_roll_sol = {**band_roll_sol,
+                             "solved_theta0_deg":
+                                 band_roll_sol["theta0_deg"],
+                             "theta0_deg": float(roll) * u.deg,
+                             "config_roll": True}
+        plot_aggregate_summary(
+            per_target, str(fid_label), str(band or ""),
+            root / f"summary_offsets{suffix}.png")
+
+    # -- band-INDEPENDENT roll solve ----------------------------------
+    # CII and NII are in the SAME focal plane, so the solved roll
+    # is one shared parameter across bands: each (band, mixer)
+    # pixel keeps its OWN true offset, all share the ONE theta0.
+    # Mixers are keyed (band, mixer) because the same number in
+    # different bands is a different physical pixel. Noisy bands
+    # (NII: low signal) contribute what they can -- every extra
+    # target/epoch tightens the shared theta0 regardless of SNR.
+    bands_seen = sorted({str(r["band"]) for r in all_rows})
+    if len(bands_seen) > 1:
+        per_target_all = {}
+        for tgt in sorted({str(r["target"]) for r in all_rows}):
+            trows = [r for r in all_rows if str(r["target"]) == tgt
+                     and str(r["region"]) != "-"]
+            if not trows:
+                continue
+            sm = {}
+            for key in sorted({(str(r["band"]), str(r["mixer"]))
+                               for r in trows}):
+                mrows = [r for r in trows
+                         if (str(r["band"]), str(r["mixer"])) == key]
+                if mrows:
+                    # within one target: correlated slices -> cap
+                    sm[key] = combine_measurements(mrows,
+                                                   floor_cap=True)
+            per_target_all[tgt] = sm
+        log.info("cross-band roll solve: bands %s, %d targets",
+                 bands_seen, len(per_target_all))
+        cross_sol = solve_roll(per_target_all, root / "roll_solution.txt")
+        # config roll overrides the cross-band solution as well
+        if roll is not None and cross_sol is not None:
+            cross_sol = {**cross_sol,
+                         "solved_theta0_deg": cross_sol["theta0_deg"],
+                         "theta0_deg": float(roll) * u.deg,
+                         "config_roll": True}
+
+    # -- calibration in ROLL-CORRECTED focal coords ---------------
+    # The roll de-rotation is LINEAR, so rotating the COMBINED
+    # offsets by -theta0 at the end is mathematically identical to
+    # re-running every per-target measurement with roll set in the
+    # config: the _rot files below are exactly what those re-runs
+    # would have produced. Sigmas rotate through the covariance
+    # (C' = R C R^T, reported per axis). The uncorrected files
+    # remain for comparison. Prefer the cross-band solution (same
+    # focal plane); fall back to the per-band one.
+    theta_sol = None
+    if len(bands_seen) > 1:
+        theta_sol = cross_sol
+    elif fid_label:
+        theta_sol = band_roll_sol
+    if theta_sol and fid_label and pix_band and "theta0_deg" in theta_sol:
+        th = np.radians(float(theta_sol["theta0_deg"].to_value(u.deg)))
+        # with roll = 0 (config-authoritative, the standard setup)
+        # the _rot files would be BYTE-IDENTICAL duplicates of the
+        # plain ones -- only write them for a NONZERO rotation
+        if abs(th) > 1e-6:
+            c, s_ = np.cos(th), np.sin(th)  # de-rotation R(-theta0)
+            Rm = np.array([[c, s_], [-s_, c]])
+            summ_corr = {}
+            for label, s in summaries.items():
+                if "fx" not in s or "fy" not in s:
+                    continue
+                v = np.array([s["fx"].to_value(u.deg),
+                              s["fy"].to_value(u.deg)])
+                sg = np.array([s["sig_fx"].to_value(u.deg),
+                               s["sig_fy"].to_value(u.deg)])
+                u0 = Rm @ v
+                sp = np.sqrt(np.diag(Rm @ np.diag(sg ** 2) @ Rm.T))
+                # the roll solve's PDG scale carries the cross-target
+                # scatter into these corrected sigmas too
+                pdg = theta_sol.get("pdg_scale", 1.0)
+                if pdg > 1.0:
+                    sp = sp * pdg
+                summ_corr[label] = {"fx": u0[0] * u.deg,
+                                    "fy": u0[1] * u.deg,
+                                    "sig_fx": sp[0] * u.deg,
+                                    "sig_fy": sp[1] * u.deg}
+            suffix = f"_{band}" if band else ""
+            write_calibration(summ_corr, fid_label, pix_band,
+                             root / f"offsets{suffix}_deltas_rot.txt")
+            cal_file = (opts or {}).get("cal_file") or \
+                os.environ.get("GUSTO_CAL_FILE")
+            if cal_file:
+                cal_rows = read_calibration(cal_file)
+                upd = update_calibration(cal_rows, summ_corr,
+                                         fid_label, pix_band)
+                write_calibration_rows(
+                    upd, root / f"offsets{suffix}_cal_updated_rot.txt")
+            log.info("wrote roll-corrected calibration files "
+                     "(theta0 = %+.3f deg)",
+                     float(theta_sol["theta0_deg"].to_value(u.deg)))
     return summaries
 
 
@@ -1002,6 +1349,300 @@ def plot_summary(summary_by_mixer, outfile):
     log.info("wrote %s", outfile)
 
 
+def plot_aggregate_summary(per_target, fid_label, band, outfile):
+    """Aggregate offsets, one PANEL PER MIXER, all targets overlaid.
+
+    per_target: {target: {mixer: summary}}. One panel per measured
+    mixer (relative to the fiducial, number only in the title); all
+    targets in LIGHT BLACK (alpha 0.5 -- vectors + 1/2-sigma
+    ellipses, floored sigmas) so the cluster reads at a glance, the
+    COMBINED weighted mean in FULL-ALPHA crimson on top (no text
+    label needed -- the color carries it), which MUST sit inside
+    the cluster. Axes in ARCSEC (degrees are unreadable at these
+    scales). The COMBINED ellipse is clipped at the axes, not
+    accommodated, so the per-target data sets the scale."""
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Ellipse
+    mixers = sorted({m for tgt in per_target for m in per_target[tgt]})
+    # drop the fiducial from the panels (zero by definition)
+    mixers = [m for m in mixers if str(m) != str(fid_label)]
+    if not mixers:
+        log.info("aggregate plot: no measured mixers, skipping")
+        return
+    ncol = min(3, len(mixers))
+    nrow = int(np.ceil(len(mixers) / ncol))
+    fig, axes = plt.subplots(nrow, ncol, figsize=(5 * ncol, 5 * nrow),
+                             squeeze=False)
+    for ax in axes.ravel()[len(mixers):]:
+        ax.set_visible(False)          # unused panels
+    for ax, label in zip(axes.ravel(), mixers):
+        pts = []                       # (target, x, y, sx, sy) in ARCSEC
+        for tgt, sm in per_target.items():
+            s = sm.get(label)
+            if not s or "fx" not in s:
+                continue
+            pts.append((tgt,
+                        s["fx"].to_value(u.deg) * 3600.0,
+                        s["fy"].to_value(u.deg) * 3600.0,
+                        float(s.get("sig_fx", 1 * u.deg).to_value(u.deg))
+                        * 3600.0,
+                        float(s.get("sig_fy", 1 * u.deg).to_value(u.deg))
+                        * 3600.0))
+        # combined over targets (crimson): weighted mean of the
+        # per-target summaries (select sm[label], NOT the dict)
+        tgt_sm = [sm[label] for sm in per_target.values()
+                  if label in sm and "fx" in sm[label]]
+        combined = combine_measurements(tgt_sm) if len(tgt_sm) > 1 \
+            else None
+        # scale from the per-target points only; tight margin so a
+        # near-zero cluster doesn't drown in empty space
+        xmax = ymax = 0.0
+        for tgt, x, y, sx, sy in pts:
+            xmax = max(xmax, abs(x) + 2.5 * sx)
+            ymax = max(ymax, abs(y) + 2.5 * sy)
+        lim = max(xmax, ymax) * 1.08 if (xmax or ymax) else 20.0
+
+        def inlim(v, frac=0.94):
+            """clamp a label position inside the axes"""
+            return float(np.clip(v, -lim * frac, lim * frac))
+
+        for tgt, x, y, sx, sy in pts:
+            # individuals: LIGHT so the cluster is readable and
+            # the crimson COMBINED stands out on top
+            ax.annotate("", xy=(x, y), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle="->", lw=1.2,
+                                        alpha=0.5))
+            ax.plot(x, y, "o", ms=4, alpha=0.5)
+            for k, a in ((1, 0.5), (2, 0.25)):
+                ax.add_patch(Ellipse((x, y), 2 * k * sx, 2 * k * sy,
+                                     color="k", lw=1, fill=False,
+                                     alpha=a))
+            ax.text(inlim(x), inlim(y + 2 * sy), tgt, fontsize=7,
+                    alpha=0.6)
+        if combined and "fx" in combined:
+            xc = combined["fx"].to_value(u.deg) * 3600.0
+            yc = combined["fy"].to_value(u.deg) * 3600.0
+            scx = float(combined.get("sig_fx",
+                                     1 * u.deg).to_value(u.deg)) * 3600.0
+            scy = float(combined.get("sig_fy",
+                                     1 * u.deg).to_value(u.deg)) * 3600.0
+            # COMBINED: full alpha, no text label (color says it)
+            for k, a in ((1, 1.0), (2, 0.6)):
+                ax.add_patch(Ellipse((xc, yc), 2 * k * scx, 2 * k * scy,
+                                     color="crimson", lw=2, fill=False,
+                                     alpha=a))
+            ax.annotate("", xy=(xc, yc), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle="->", lw=2.5,
+                                        color="crimson"))
+            ax.plot(xc, yc, "o", ms=6, color="crimson")
+        ax.axhline(0, color="gray", lw=0.5)
+        ax.axvline(0, color="gray", lw=0.5)
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
+        ax.set_aspect("equal")
+        ax.set_xlabel("focal-plane x (arcsec)")
+        ax.set_ylabel("focal-plane y (arcsec)")
+        ax.set_title(f"Mixer {label} vs {fid_label}", fontsize=11)
+    fig.suptitle(f"{band} offsets by target "
+                 f"(fiducial = mixer {fid_label})")
+    fig.tight_layout()
+    fig.savefig(outfile, dpi=120)
+    plt.close(fig)
+    log.info("wrote %s", outfile)
+
+
+def solve_roll(per_target, outfile=None):
+    """Solve the constant gondola roll theta0 from per-target offsets.
+
+    MODEL: the measured focal offset of mixer m in target/epoch i is
+    the TRUE focal offset v0_m rotated by the constant roll theta0:
+        v_im = R(theta0) . v0_m
+    All targets and mixers share the SAME theta0 (theta0 is a
+    property of the gondola; the epoch-dependent sky geometry is
+    already handled by M_frame in the measurement pipeline -- what
+    leaks through when roll=0 is ASSUMED is this single common
+    rotation). Per-target offsets that disagree in direction but
+    agree once rotated by a common theta0 are exactly this
+    signature (e.g. one target's fy flip vs the others).
+
+    FIT: 1 shared theta0 + 2 parameters (v0_m) per mixer. For fixed
+    theta0 each mixer's v0_m is the weighted mean of the
+    de-rotated offsets (weights 1/sigma^2, sigmas rotated with the
+    offsets); chi2(theta0) is profiled on a +/-45 deg grid with
+    parabolic refinement. sigma_theta0 from the delta-chi2=1
+    crossings; chi2/dof flags whether ONE common roll explains the
+    target-to-target scatter (chi2/dof ~ 1: yes -- and then the
+    per-mixer v0_m are the roll-corrected offsets; >> 1: something
+    else varies between targets -- field systematics, not roll).
+
+    Needs >=2 targets with measured mixers; returns None otherwise.
+    """
+    data = {}                     # mixer -> [(target, vec, sig), ...]
+    for tgt, sm in per_target.items():
+        for label, s in sm.items():
+            if "fx" not in s or "fy" not in s:
+                continue
+            data.setdefault(label, []).append((
+                tgt,
+                np.array([s["fx"].to_value(u.deg),
+                          s["fy"].to_value(u.deg)]),
+                np.array([float(s["sig_fx"].to_value(u.deg)),
+                          float(s["sig_fy"].to_value(u.deg))])))
+    if len(per_target) < 2 or not data:
+        log.info("roll solve: need >=2 targets with measured "
+                 "mixers -- skipping")
+        return None
+
+    def chi2_of(theta):
+        """total chi2 of the one-roll model at theta (radians)."""
+        # de-rotate into the true focal frame: u = R(-theta) v
+        c, s_ = np.cos(theta), np.sin(theta)
+        Rm = np.array([[c, s_], [-s_, c]])
+        tot, nd = 0.0, 0
+        for m, items in data.items():
+            us, sv = [], []
+            for tgt, v, sg in items:
+                us.append(Rm @ v)
+                # sigmas rotate with the offsets: per-axis variance
+                # of the rotated diagonal covariance
+                Cr = Rm @ np.diag(sg ** 2) @ Rm.T
+                sv.append(np.sqrt(np.diag(Cr)))
+            us, sv = np.array(us), np.array(sv)
+            w = 1.0 / sv ** 2
+            u0 = np.sum(us * w, axis=0) / np.sum(w, axis=0)
+            tot += float(np.sum((us - u0) ** 2 / sv ** 2))
+            nd += 2 * len(us)
+        return tot, nd
+
+    # profile scan
+    thetas = np.radians(np.arange(-45.0, 45.001, 0.25))
+    chi2 = np.array([chi2_of(t)[0] for t in thetas])
+    k = int(np.argmin(chi2))
+    t0 = thetas[k]
+    if 0 < k < len(thetas) - 1:            # parabolic refinement
+        d = np.gradient(chi2, thetas)
+        t0 = thetas[k] - d[k] / (2.0 * (chi2[k + 1] - 2 * chi2[k]
+                                        + chi2[k - 1]) /
+                                 (thetas[k + 1] - thetas[k]) ** 2)
+    c2_min, nd = chi2_of(t0)
+    npar = 1 + 2 * len(data)
+    dof = max(nd - npar, 1)
+
+    # sigma from delta-chi2 = 1 crossings
+    def crossing(sign):
+        for i in range(k, len(thetas) - 1) if sign > 0 \
+                else range(k, 0, -1):
+            j = i if sign > 0 else i - 1
+            if sign < 0:
+                i, j = j, j + 1
+            if chi2[j] - c2_min >= 1.0:
+                # interpolate between thetas[i], thetas[j]
+                d0 = chi2[i] - c2_min
+                d1 = chi2[j] - c2_min
+                return abs(thetas[j] - thetas[i]) * (1.0 - d0) / \
+                    (d1 - d0) if d1 > d0 else abs(thetas[j] - thetas[i])
+        return np.radians(45.0)
+    sig_t = max(crossing(+1), crossing(-1))
+
+    # PDG scaling: with the (known-optimistic) formal per-target
+    # sigmas, chi2/dof >> 1 does NOT mean the roll is wrong -- the
+    # FIT MINIMUM (theta0 value) is insensitive to the sigma scale,
+    # but its reported UNCERTAINTY is not. Inflate sig_theta0 and
+    # the per-mixer offset sigmas by sqrt(chi2/dof), the standard
+    # honest-error rescale. chi2/dof ~ 1 -> no change.
+    pdg = np.sqrt(c2_min / dof)
+    sig_t = sig_t * pdg if pdg > 1.0 else sig_t
+
+    # per-mixer roll-corrected offsets at the solution
+    c, s_ = np.cos(t0), np.sin(t0)
+    Rm = np.array([[c, s_], [-s_, c]])
+    mixers = {}
+    detgt_rows = []               # per-target de-rotated values + residuals
+    for m, items in data.items():
+        us, sv, tgs = [], [], []
+        for tgt, v, sg in items:
+            us.append(Rm @ v)
+            Cr = Rm @ np.diag(sg ** 2) @ Rm.T
+            sv.append(np.sqrt(np.diag(Cr)))
+            tgs.append(tgt)
+        us, sv = np.array(us), np.array(sv)
+        w = 1.0 / sv ** 2
+        u0 = np.sum(us * w, axis=0) / np.sum(w, axis=0)
+        su = np.sqrt(1.0 / np.sum(w, axis=0))
+        if pdg > 1.0:
+            su = su * pdg
+        mixers[m] = (u0, su)
+        for tgt, ui, sgi in zip(tgs, us, sv):
+            detgt_rows.append(
+                (m, tgt, ui[0], ui[1],
+                 float(np.linalg.norm(ui - u0)) * 3600.0))
+    sol = {"theta0_deg": np.degrees(t0) * u.deg,
+           "sig_theta0_deg": np.degrees(sig_t) * u.deg,
+           "chi2": c2_min, "dof": dof,
+           "chi2_per_dof": c2_min / dof, "pdg_scale": pdg,
+           "n_targets": len(per_target), "mixers": mixers}
+    log.info("roll solution: theta0 = %.3f +/- %.3f deg "
+             "(chi2/dof = %.1f -> sigmas PDG-inflated by %.1f, "
+             "%d targets)",
+             sol["theta0_deg"].value, sol["sig_theta0_deg"].value,
+             sol["chi2_per_dof"], pdg, len(per_target))
+    if outfile:
+        lines = [f"roll solution from {len(per_target)} targets",
+                 f"theta0 = {sol['theta0_deg'].value:+.4f} "
+                 f"+/- {sol['sig_theta0_deg'].value:.4f} deg",
+                 f"chi2 = {c2_min:.1f} / {dof} dof",
+                 "",
+                 "roll-corrected focal offsets (true frame):",
+                 "mixer  fx(deg)      sig     fy(deg)      sig"]
+        for m, (u0, su) in sorted(mixers.items()):
+            # m may be a plain mixer number (per-band solve) or a
+            # (band, mixer) tuple (cross-band solve): str() so the
+            # alignment spec works for both
+            lines.append(f"{str(m):>5}  {u0[0]:+.6f}  {su[0]:.6f}  "
+                         f"{u0[1]:+.6f}  {su[1]:.6f}")
+        lines += ["",
+                  "interpretation: chi2/dof ~ 1 -> one common roll",
+                  "explains the target scatter, and the offsets above",
+                  "are the roll-corrected values. If instead chi2/dof",
+                  ">> 1, targets disagree beyond a single rotation --",
+                  "check per-field systematics before trusting these.",
+                  "",
+                  "to APPLY the roll: set  roll: <theta0>  in the",
+                  "config options and re-run the measurement pipeline",
+                  "(per-target runs), so the measured offsets come out",
+                  "in the true focal frame directly."]
+        lines += ["",
+                  "per-target DE-ROTATED offsets (true focal frame):",
+                  "the individual deltas corrected by the solved roll;",
+                  "|u - u0| is the residual scatter (arcsec) around",
+                  "the mixer's combined offset -- this is where to",
+                  "check whether ONE roll really aligns the targets:",
+                  "residuals ~ half a pixel (10-20 arcsec) = roll does",
+                  "the job (chi2 excess = sigma bookkeeping); a",
+                  "beam-fraction outlier flags a per-field systematic.",
+                  "",
+                  "mixer  target               fx(deg)     fy(deg)   |u-u0|(\")"]
+        for m, tgt, ux, uy, res in detgt_rows:
+            lines.append(f"{str(m):>5}  {str(tgt):<18}  "
+                         f"{ux:+.6f}  {uy:+.6f}  {res:8.1f}")
+        # chi2(theta) profile: the shape that matters for judging
+        # constraint. A sharp basin ~1 deg wide = constrained; a
+        # flat curve (sigma hits the scan-boundary fallback, e.g.
+        # "theta0 = -42 +/- 45") = UNCONSTRAINED -- the offsets are
+        # too short relative to their sigmas for any rotation to
+        # matter (tip displacement |v|*theta0 is below the noise);
+        # theta0 is then consistent with 0 and should NOT be applied.
+        lines += ["",
+                  "chi2(theta) profile (dof = %d):" % dof,
+                  "theta(deg)   chi2    chi2/dof"]
+        for tt in np.arange(-45.0, 45.01, 5.0):
+            c2t, _ = chi2_of(np.radians(tt))
+            lines.append(f"{tt:+7.1f}  {c2t:8.1f}   {c2t / dof:7.2f}")
+        Path(outfile).write_text("\n".join(lines) + "\n")
+        log.info("wrote %s", outfile)
+    return sol
+
+
 def montage_extent(wcs_celestial, pixbox):
     """World-coordinate extent of the pixel box, computed from the
     ORIGINAL cube WCS, in the cube's NATIVE frame (no frame
@@ -1034,7 +1675,26 @@ def montage_extent(wcs_celestial, pixbox):
     # ascending ranges (lon may decrease along +x; for RA the
     # extent handed to imshow then runs descending, which is
     # CORRECT: RA increases to the left)
-    return (min(lon_a, lon_b), max(lon_a, lon_b),
+    # WRAP: near l=0 / RA=0 the two lon corners sit on either side
+    # of the wrap (e.g. 359.7 and 0.3); naive min/max would give
+    # an extent covering ~all 360 deg. Unwrap to the SHORT way
+    # around, then DISPLAY-NORMALIZE: a box straddling the wrap
+    # is shown as NEGATIVE longitudes (359.7..360.3 -> -0.3..+0.3)
+    # instead of an axis that runs across 360 deg -- and callers
+    # must normalize markers with the same convention.
+    if lon_b - lon_a > 180.0:
+        lon_a += 360.0
+    elif lon_a - lon_b > 180.0:
+        lon_b += 360.0
+    lo, hi = min(lon_a, lon_b), max(lon_a, lon_b)
+    if lo > 180.0:
+        lo -= 360.0
+        hi -= 360.0
+    log.info("montage_extent: corners lon %.4f,%.4f lat %.4f,%.4f "
+             "-> extent (%.4f, %.4f, %.4f, %.4f) %s",
+             lon_a, lon_b, lat_a, lat_b,
+             lo, hi, min(lat_a, lat_b), max(lat_a, lat_b), frame)
+    return (lo, hi,
             min(lat_a, lat_b), max(lat_a, lat_b), frame)
 
 
@@ -1042,43 +1702,97 @@ def montage_extent(wcs_celestial, pixbox):
 # 7. Output
 # ----------------------------------------------------------------------
 
-def summary_rows(measurements, summaries):
-    """Per-mixer summary rows WITH input breakdown.
+def summary_rows(measurements, summaries, fid_label):
+    """Per-mixer summary rows WITH full input breakdown.
 
-    For each mixer: one row per REGION (weighted mean over that
-    region's velocity slices), then one COMBINED row (weighted mean
-    over everything) -- so the table shows both the separate inputs
-    and the combined result they average into. The COMBINED row is
-    what write_calibration / update_calibration consume.
+    For each mixer (EXCLUDING the fiducial, whose offset is zero by
+    definition -- including its self-check row -- so the summary only
+    lists real measurements):
+      - one row per (region, velocity range): the individual slice,
+        input labeled '<region> [vel_lo,vel_hi]'
+      - one row per region: weighted mean over that region's slices,
+        input labeled '<region>'
+      - one COMBINED row: weighted mean over everything.
+    The COMBINED row is what write_calibration / update_calibration
+    consume. chi2 flags on slice rows are meaningless (n=1, dof=0);
+    on region rows they show slice agreement; on COMBINED they show
+    region agreement.
     """
     rows = []
     for label in sorted({r["mixer"] for r in measurements}):
-        regions = sorted({str(r["region"]) for r in measurements
-                          if r["mixer"] == label and str(r["region"]) != "-"})
-        for rg in regions:
-            mrows = [r for r in measurements
-                     if r["mixer"] == label and str(r["region"]) == rg]
+        if str(label) == str(fid_label):
+            continue          # fiducial: reference, not a measurement
+        m_all = [r for r in measurements
+                 if r["mixer"] == label and str(r["region"]) != "-"]
+        if not m_all:
+            continue
+        # per (region, velocity range): individual slice rows
+        for r in m_all:
+            rows.append({"mixer": label,
+                         "input": f"{r['region']} "
+                                  f"[{r['vel_lo']},{r['vel_hi']}]",
+                         **combine_measurements([r])})
+        # per region: weighted mean over that region's slices
+        # (correlated when the vel ranges overlap/are continuous --
+        # sigma capped at the floor)
+        for rg in sorted({str(r["region"]) for r in m_all}):
+            mrows = [r for r in m_all if str(r["region"]) == rg]
             rows.append({"mixer": label, "input": rg,
-                         **combine_measurements(mrows)})
+                         **combine_measurements(mrows,
+                                                floor_cap=True)})
         if label in summaries:
             rows.append({"mixer": label, "input": "COMBINED",
                          **summaries[label]})
     return rows
 
 
-def save_results(measurements, summaries, outdir):
-    """Save per-measurement and summary tables (ECSV + FITS).
+def round_rows(rows):
+    """Round numeric columns for ECSV output -- readability.
 
-    The summary table has one row per (mixer, region) -- the
-    separate inputs -- plus a COMBINED row per mixer with the
-    weighted average over all inputs (summary_rows)."""
-    mt = QTable(rows=measurements)
+    ECSV otherwise serializes float64 with ~15 significant digits:
+    a 18 arcsec sigma carrying nano-degree precision is unreadable
+    and misleading. Degree columns keep 6 decimals (0.0036 arcsec
+    resolution -- far below the systematic floor, so no information
+    the analysis uses is lost), velocities 1, snr/chi2 2, dof int."""
+    prec = {"fx": 6, "fy": 6, "sig_fx": 6, "sig_fy": 6,
+            "dlon_deg": 6, "dlat_deg": 6,
+            "sig_dlon_deg": 6, "sig_dlat_deg": 6,
+            "snr_corr": 2, "peak_snr": 2, "snr": 2,
+            "chi2_fx": 2, "chi2_fy": 2,
+            "dof_fx": 0, "dof_fy": 0,
+            "vel_lo": 1, "vel_hi": 1}
+    out = []
+    for r in rows:
+        rr = dict(r)
+        for k, nd in prec.items():
+            if k not in rr or rr[k] is None:
+                continue
+            v = rr[k]
+            try:
+                if hasattr(v, "unit"):
+                    rr[k] = np.round(v.value, nd) * v.unit
+                else:
+                    rr[k] = np.round(v, nd)
+            except (TypeError, ValueError):
+                pass
+        out.append(rr)
+    return out
+
+
+def save_results(measurements, summaries, fid_label, outdir):
+    """Save the per-measurement table and the summary table (ECSV).
+
+    The summary table shows ALL inputs -- one row per (mixer,
+    region, velocity range), then per region, then the COMBINED
+    weighted average per mixer (summary_rows). The measurements
+    table remains the full inventory with epoch/attitude per row."""
+    mt = QTable(rows=round_rows(measurements))
     # ECSV: comma delimiter (astropy default is space, which makes
     # the data block awkward to eyeball / ingest in other tools)
     mt.write(outdir / "offsets_measurements.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
-    mt.write(outdir / "offsets_measurements.fits", overwrite=True)
-    st = QTable(rows=summary_rows(measurements, summaries))
+    st = QTable(rows=round_rows(summary_rows(measurements, summaries,
+                                             fid_label)))
     st.write(outdir / "offsets_summary.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
     log.info("wrote results tables to %s", outdir)
@@ -1106,7 +1820,8 @@ def parse_args(argv=None):
                    help="combined (mixer 0) reference cube; only sets "
                         "the common WCS grid; default resolved from "
                         "the naming convention")
-    p.add_argument("--regions", default=None, help="YAML region file")
+    p.add_argument("-r", "--regions", default=None,
+                   help="YAML region file (short form: -r)")
     p.add_argument("--beam", default=None,
                    help="beam size used in the regridding (part of "
                         "the cube filename); default from config")
@@ -1170,7 +1885,9 @@ def main(argv=None):
             pix_band = pix_band or bands.get(args.band, {}).get(
                 "pix_band", opts.get("pix_band", "B2"))
         aggregate_results(args.aggregate, band=args.band,
-                          fid_label=str(fid), pix_band=pix_band)
+                          fid_label=str(fid), pix_band=pix_band,
+                          roll=opts.get("roll", None),
+                          opts=options)
         return 0
 
     # measurement mode: target + regions ARE required (argparse can't
@@ -1340,6 +2057,35 @@ def main(argv=None):
                     f"cube footprint (pixel {rxp:.1f}, {ryp:.1f} vs "
                     f"shape {shape2d}) -- check frame/coordinates")
 
+            # -- optional SPECTRAL BASELINE correction (FIRST) -----
+            # cut the UNION of the region's velocity ranges,
+            # extended by baseline_pad spectral elements on BOTH
+            # sides, correct per pixel EXCLUDING all line channels
+            # (overlapping/adjacent ranges combine), then slice
+            # each range from the corrected cube below.
+            bpad = int(opts.get("baseline_pad", 0))
+            bmin = int(opts.get("baseline_min_pts", 6))
+            fid_base = mix_base = None
+            pad_lo = 0
+            if bpad > 0 and region.vel_ranges:
+                vsl = [vel_to_slice(ref_wcs, (lo, hi))
+                       for (lo, hi) in region.vel_ranges]
+                u0 = min(s[0] for s in vsl)
+                u1 = max(s[1] for s in vsl)
+                pad_lo = max(u0 - bpad, 0)
+                fid_base, _ = extract_subcube(
+                    fid_data, fid_wcs, pixbox,
+                    (pad_lo, min(u1 + bpad, fid_data.shape[0])))
+                fid_base = baseline_correct(
+                    fid_base, region.vel_ranges, fid_wcs,
+                    pad_lo, min_pts=bmin)
+                mix_base, _ = extract_subcube(
+                    m_data, m_wcs, pixbox,
+                    (pad_lo, min(u1 + bpad, m_data.shape[0])))
+                mix_base = baseline_correct(
+                    mix_base, region.vel_ranges, m_wcs,
+                    pad_lo, min_pts=bmin)
+
             for (vlo, vhi) in region.vel_ranges:
                 vslice = vel_to_slice(ref_wcs, (vlo, vhi))
 
@@ -1362,13 +2108,30 @@ def main(argv=None):
                 # (set to 0, or solved from epoch scatter)
 
                 # -- extract the same sub-cube from fiducial & mixer --
-                ref_sub, subwcs = extract_subcube(fid_data, fid_wcs,
-                                                  pixbox, vslice)
-                mix_sub, _ = extract_subcube(m_data, m_wcs,
-                                             pixbox, vslice)
+                if fid_base is not None:
+                    # slice the range out of the BASELINE-CORRECTED
+                    # padded cube: spatial pass-through, relative
+                    # spectral window (extract_subcube keeps the
+                    # subwcs contract for downstream QA panels)
+                    ref_sub, subwcs = extract_subcube(
+                        fid_base, fid_wcs,
+                        (0, fid_base.shape[2], 0, fid_base.shape[1]),
+                        (vslice[0] - pad_lo, vslice[1] - pad_lo))
+                    mix_sub, _ = extract_subcube(
+                        mix_base, m_wcs,
+                        (0, mix_base.shape[2], 0, mix_base.shape[1]),
+                        (vslice[0] - pad_lo, vslice[1] - pad_lo))
+                else:
+                    ref_sub, subwcs = extract_subcube(fid_data,
+                                                      fid_wcs,
+                                                      pixbox, vslice)
+                    mix_sub, _ = extract_subcube(m_data, m_wcs,
+                                                pixbox, vslice)
 
-                ref_img = collapse(ref_sub, collapse_method)
-                mix_img = collapse(mix_sub, collapse_method)
+                ref_img = preprocess_image(
+                    collapse(ref_sub, collapse_method), opts)
+                mix_img = preprocess_image(
+                    collapse(mix_sub, collapse_method), opts)
 
                 # -- QA montage: region images BEFORE the SNR gate ---
                 # ALWAYS written, also for skipped measurements, so
@@ -1448,7 +2211,8 @@ def main(argv=None):
                 # chain (placeholder removed)
 
                 measurements.append(dict(
-                    band=args.band, mixer=label, region=region.name,
+                    band=args.band, target=args.target,
+                    mixer=label, region=region.name,
                     vel_lo=vlo, vel_hi=vhi,
                     # epoch + gondola position: essential bookkeeping
                     # when COMBINING runs across fields/epochs (and
@@ -1477,7 +2241,8 @@ def main(argv=None):
     # measurement rows only. (Kept as columns so the table is
     # rectangular; treat "-" as "not applicable", not "unknown".)
     measurements.append(dict(
-        band=args.band, mixer=fid_label, region="-", vel_lo=0, vel_hi=0,
+        band=args.band, target=args.target, mixer=fid_label,
+        region="-", vel_lo=0, vel_hi=0,
         obstime="-", gon_lat=np.nan * u.deg, gon_lon=np.nan * u.deg,
         gon_alt=np.nan * u.m,
         dx_pix=0.0, dy_pix=0.0, dlon=0 * u.arcsec, dlat=0 * u.arcsec,
@@ -1492,10 +2257,13 @@ def main(argv=None):
     mixers = sorted({m["mixer"] for m in measurements})
     for label in mixers:
         rows = [m for m in measurements if m["mixer"] == label]
-        summaries[label] = combine_measurements(rows)
+        # within one run/epoch: slices are correlated (overlapping
+        # vel ranges) -- cap the mean's sigma at the floor
+        summaries[label] = combine_measurements(rows,
+                                                floor_cap=True)
         log.info("%s: %s", label, summaries[label])
 
-    save_results(measurements, summaries, outdir)
+    save_results(measurements, summaries, fid_label, outdir)
     plot_summary(summaries, outdir / "summary_offsets.png")
     # measured offsets in the calibration-file format (PIX/AZ/EL).
     # pix_band: which array this run's band belongs to (B1/B2) --
@@ -1514,15 +2282,14 @@ def main(argv=None):
     # xcorr offsets are residuals; the updated file is written to
     # the output dir (the original is never modified in place).
     cal_file = opts.get("cal_file")
+    # NOTE: no per-run updated-cal file is written: the combined
+    # calibration (offsets_cal.txt, applied + combined residuals)
+    # is produced ONCE by --aggregate over all runs; per-region
+    # cal files were not needed.
+    cal_file = opts.get("cal_file")
     if cal_file:
-        cal_rows = read_calibration(cal_file)
-        rows = update_calibration(cal_rows, summaries, fid_label,
-                                  pix_band)
-        write_calibration_rows(
-            rows, outdir / f"offsets_{args.band}_cal_updated.txt")
-    else:
-        log.info("no cal_file in config -- measured offsets written "
-                 "as standalone residuals only")
+        log.info("cal_file set: run --aggregate to fold this "
+                 "run's residuals into offsets_cal.txt")
     return 0
 
 
