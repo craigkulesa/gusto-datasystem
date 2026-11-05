@@ -71,6 +71,10 @@ def load_config(path):
     # everywhere inputs are combined; default 0.005 deg = 18"
     _SYS_FLOOR_DEG = float(options.get("sys_floor_deg", 0.005))
     _SYS_FLOOR_BY_BAND = {}
+    # top-level analysis-time exclusion list (see apply_exclusions):
+    # entries match band/target/region/mixer/vel subsets, each with
+    # a 'reason'; the ECSV measurement record is NEVER edited
+    options["exclude"] = cfg.get("exclude", []) or []
     bands = {}
     for band, b in cfg["bands"].items():
         fid = b["fiducial"]
@@ -804,6 +808,10 @@ def combine_measurements(rows, floor_cap=False):
         if not xs:
             continue
         m, sig_int, chi2, dof = weighted_mean(xs, ss)
+        if dof == 0:
+            # single-measurement combine: chi2 undefined; zero it
+            # EXACTLY (weighted_mean returns ~1e-32 float noise)
+            chi2 = 0.0
         sig = scaled_uncertainty(sig_int, chi2, dof)
         if floor_cap:
             # correlated slices share the systematic: the mean is
@@ -995,7 +1003,8 @@ def read_calibration(path):
     return rows
 
 
-def update_calibration(cal_rows, summaries, fid_label, pix_band):
+def update_calibration(cal_rows, summaries, fid_label, pix_band,
+                       drop=()):
     """Fold the xcorr-measured RESIDUAL offsets into the calibration.
 
     The L2 cubes were built from L1 data with the calibration-file
@@ -1013,6 +1022,12 @@ def update_calibration(cal_rows, summaries, fid_label, pix_band):
       AS_MEASURED row is dropped and a new AS_MEASURED row is
       appended (az/el = applied value + measured residual).
     - FIDUCIAL and other rows pass through unchanged.
+    - `drop`: PIX names whose AS_MEASURED rows are REMOVED even
+      without a current measurement -- the escape hatch for stale
+      rows that crept into an earlier version (e.g. a fiducial
+      measured against itself and written out as AS_MEASURED);
+      config key 'cal_drop:'. THEORY/FIDUCIAL rows of that PIX
+      pass through: the pixel reverts to its theory value.
 
     cal_rows: ordered list of (pix, {az, el, comment}) from
     read_calibration_rows; returns the new ordered list.
@@ -1034,6 +1049,11 @@ def update_calibration(cal_rows, summaries, fid_label, pix_band):
     for pix, c in cal_rows:
         if pix in meas and c["comment"] == "AS_MEASURED":
             continue          # superseded: new row appended below
+        if c["comment"] == "AS_MEASURED" and pix in drop:
+            log.info("cal_drop: removed stale AS_MEASURED row "
+                     "for %s (reverts to its THEORY/FIDUCIAL row)",
+                     pix)
+            continue
         out.append((pix, dict(c)))
     # appended: fresh AS_MEASURED rows for currently measured mixers
     for pix, (dfx, dfy) in sorted(meas.items()):
@@ -1043,9 +1063,26 @@ def update_calibration(cal_rows, summaries, fid_label, pix_band):
     return out
 
 
+def read_cal_version(path):
+    """Calibration data version from the [offsets] header line
+    ('[offsets] version = 0.5' -> 0.5). This version identifies the
+    calibration DATA and is carried into the L1 products; it is
+    bumped on every combined run of record (see aggregate_results).
+    Defaults to 0.5 if the header carries no version."""
+    for line in Path(path).read_text().splitlines():
+        if line.strip().lower().startswith("[offsets]"):
+            parts = line.replace("=", " ").split()
+            try:
+                return float(parts[-1])
+            except ValueError:
+                break
+    return 0.5
+
+
 def write_calibration_rows(rows, outfile, version="0.5"):
     """Write [(pix, {az, el, comment}), ...] in the [offsets] format.
-    Used for the updated calibration file."""
+    Used for the updated calibration file. `version` is the
+    calibration DATA version (see read_cal_version)."""
     lines = [f"[offsets] version = {version}",
              "PIX\tAZ\t\tEL\t\tCOMMENT"]
     for pix, c in rows:
@@ -1053,8 +1090,8 @@ def write_calibration_rows(rows, outfile, version="0.5"):
                      f"\t{c['comment']}")
     outfile.write_text("\n".join(lines) + "\n")
     log.info("wrote %s", outfile)
-def aggregate_results(root, band=None, fid_label=None, pix_band=None,
-                      roll=None, opts=None):
+def aggregate_results(root, band=None, fid_by_band=None,
+                      pix_band_by_band=None, roll=None, opts=None):
     """Sweep a tree of per-run output directories and combine.
 
     Each run directory (created by main()) holds an
@@ -1078,7 +1115,7 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None,
     structure survives for solving the roll theta0 later.
     """
     root = Path(root)
-    rows, all_rows = [], []
+    rows = []
     n_runs = 0
     for mfile in sorted(root.glob(f"*/offsets_measurements.ecsv")):
         rdir = mfile.parent.name
@@ -1093,9 +1130,9 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None,
                 parts = rdir.split("_")
                 d["target"] = parts[1] if len(parts) > 1 else rdir
             rows_.append(d)
-        # all_rows: EVERY band -- for the band-independent roll
-        # solve (theta0 is a gondola property, common to all bands)
-        all_rows.extend(rows_)
+        # (the band filter below selects one band in -b mode; with
+        # no -b, rows keep EVERY band -- the cross-band run of
+        # record -- and all combines are per (band, mixer))
         if band and not rdir.startswith(str(band) + "_"):
             continue
         rows.extend(rows_)
@@ -1104,114 +1141,169 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None,
     if not rows:
         raise SystemExit(f"no offsets_measurements.ecsv found under {root}")
     log.info("aggregate: %d runs, %d measurement rows", n_runs, len(rows))
-    master = QTable(rows=round_rows(rows))
-    master.write(root / "all_measurements.ecsv", overwrite=True,
-                 format="ascii.ecsv", delimiter=",")
-    summaries = {}
-    for label in sorted({r["mixer"] for r in rows}):
-        mrows = [r for r in rows if r["mixer"] == label
+    # analysis-time exclusions (config 'exclude:'): ECSVs stay the
+    # complete record; excludes only what enters the combines
+    rows_all = rows
+    excl = (opts or {}).get("exclude", [])
+    suffix = f"_{band}" if band else ""
+    rows = apply_exclusions(rows, excl,
+                            root / f"exclusions{suffix}.txt")
+    # analysis-time mixer filter ('include_mixers: [5]' in config):
+    # slice WHO enters the combine WITHOUT re-running measurements
+    # -- restricting at measurement time OVERWRITES the per-run
+    # record (mixers 2/3 were lost that way once)
+    only = [str(m) for m in (opts or {}).get("include_mixers", [])]
+    if only:
+        n0 = len(rows)
+        rows = [r for r in rows if str(r["mixer"]) in only]
+        log.info("include_mixers %s: kept %d/%d rows",
+                 only, len(rows), n0)
+    # EXACT-duplicate safety net: the same run present TWICE under
+    # the root (same band/target/region/mixer/vel/obstime AND
+    # identical values to 1e-12 deg). Independent measurements are
+    # never bit-identical; double-counting makes COMBINED sigmas
+    # over-confident by sqrt(2), so the copy is DROPPED with a
+    # loud warning pointing at the tree, not silently merged.
+    seen = {}
+    dedup = []
+    n_dup = 0
+    for r in rows:
+        key = (str(r.get("band", "")), str(r["target"]),
+               str(r["region"]), str(r["mixer"]),
+               float(r["vel_lo"]), float(r["vel_hi"]),
+               str(r.get("obstime", "")))
+        sig = (round(float(r["fx"].to_value(u.deg)), 12),
+               round(float(r["fy"].to_value(u.deg)), 12))
+        if seen.get(key) == sig:
+            n_dup += 1
+            continue
+        seen[key] = sig
+        dedup.append(r)
+    if n_dup:
+        log.warning("dropped %d EXACT duplicate rows: the same run "
+                    "is present twice under the aggregate root "
+                    "-- check the 'aggregate: read ...' log lines "
+                    "and clean the tree", n_dup)
+        rows = dedup
+    master = QTable(rows=rows_all)
+    master.write(root / f"all_measurements{suffix}.ecsv",
+                 overwrite=True, format="ascii.ecsv",
+                 delimiter=",")
+    opts = opts or {}
+    cal_file = opts.get("cal_file") or \
+        os.environ.get("GUSTO_CAL_FILE")
+    # stale AS_MEASURED rows to REMOVE from the carried-over
+    # calibration (pixels that crept in historically -- e.g. a
+    # pixel later adopted as fiducial -- and have no current
+    # measurement to supersede them). Their THEORY/FIDUCIAL rows
+    # pass through: the pixel reverts to that value.
+    cal_drop = set(opts.get("cal_drop", []) or [])
+
+    # ---- PER-BAND processing --------------------------------------
+    # The same mixer number in different bands is a DIFFERENT
+    # physical pixel (B1M5 vs B2M5), so summaries, tables, plots,
+    # roll solutions and calibration deltas are built PER BAND, in
+    # banded (-b) AND cross-band (no -b) mode. All root-level
+    # tables are band-suffixed, so a second band's -b aggregate
+    # can no longer overwrite the first band's outputs.
+    bands_present = sorted({str(r["band"]) for r in rows})
+    fid_by_band = fid_by_band or {}
+    pix_band_by_band = pix_band_by_band or {}
+    band_summaries = {}         # band -> {mixer: summary}
+    band_roll_sols = {}         # band -> roll solution
+    per_target_all = {}         # tgt -> {(band, mixer): summary}
+    for b in bands_present:
+        brows = [r for r in rows if str(r["band"]) == b
                  and str(r["region"]) != "-"]
-        if mrows:
-            summaries[label] = combine_measurements(mrows)
-    # summary WITH full input breakdown: one row per (mixer,
-    # region, velocity slice) across all runs, then per region,
-    # then the COMBINED weighted average per mixer; the fiducial
-    # is excluded (reference, not a measurement)
-    st = QTable(rows=round_rows(summary_rows(
-        [r for r in rows if str(r["region"]) != "-"], summaries,
-        fid_label)))
-    st.write(root / "all_summary.ecsv", overwrite=True,
-             format="ascii.ecsv", delimiter=",")
-    if fid_label and pix_band:
-        # combined RESIDUALS per band (measured-minus-applied), the
-        # provenance record for what offsets_cal.txt folds in
-        suffix = f"_{band}" if band else ""
-        write_calibration(summaries, fid_label, pix_band,
-                          root / f"offsets{suffix}_deltas.txt")
-        # THE combined calibration file: applied + combined
-        # residuals -> AS_MEASURED totals, ONE file for the whole
-        # aggregate, directly consumable by L1. cal_file (config)
-        # or GUSTO_CAL_FILE (env): the [offsets] file whose values
-        # were applied when the L1/L2 data were made.
-        opts = opts or {}
-        cal_file = opts.get("cal_file") or \
-            os.environ.get("GUSTO_CAL_FILE")
-        if cal_file:
-            cal_rows = read_calibration(cal_file)
-            upd = update_calibration(cal_rows, summaries, fid_label,
-                                     pix_band)
-            write_calibration_rows(upd, root / "offsets_cal.txt")
-        else:
-            log.warning("no cal_file (config 'cal_file:' or "
-                        "GUSTO_CAL_FILE env) -- offsets_cal.txt not "
-                        "written; combined residuals are in "
-                        "offsets%s_deltas.txt", suffix)
-    # per-target combined summaries for the aggregate overview plot
-    band_roll_sol = None
-    if fid_label:
+        if not brows:
+            continue
+        fid = str(fid_by_band.get(b, "")) or None
+        pixb = pix_band_by_band.get(b, "B2")
+        # combined summaries for THIS band's mixers. The FIDUCIAL
+        # is skipped: it is the reference (zero by definition), and
+        # any self-measurement rows (fiducial configured in a run's
+        # usable list, or self-check rows) must NOT become
+        # AS_MEASURED calibration rows or pull the roll solve.
+        summ = {}
+        for label in sorted({r["mixer"] for r in brows}):
+            if str(label) == str(fid):
+                continue
+            mrows = [r for r in brows if r["mixer"] == label]
+            if mrows:
+                summ[label] = combine_measurements(mrows)
+        band_summaries[b] = summ
+        # summary WITH full input breakdown (ECSV + eyeball text)
+        srows = summary_rows(brows, summ, fid)
+        st = QTable(rows=srows)
+        st.write(root / f"all_summary_{b}.ecsv", overwrite=True,
+                 format="ascii.ecsv", delimiter=",")
+        write_text_table(srows, root / f"all_summary_{b}.txt")
+        # per-target summaries (within one target: slices are
+        # correlated -- the mean's sigma is capped at the floor)
         per_target = {}
-        for tgt in sorted({str(r["target"]) for r in rows}):
-            trows = [r for r in rows if str(r["target"]) == tgt
-                     and str(r["region"]) != "-"]
+        for tgt in sorted({str(r["target"]) for r in brows}):
+            trows = [r for r in brows
+                     if str(r["target"]) == tgt]
             if not trows:
                 continue
             sm = {}
             for label in sorted({r["mixer"] for r in trows}):
+                if str(label) == str(fid):
+                    # fiducial: reference, not a measurement --
+                    # keep it out of the roll solve and the plot
+                    continue
                 mrows = [r for r in trows if r["mixer"] == label]
                 if mrows:
-                    # within one target: slices are correlated
-                    # (overlapping/continuous vel ranges) -- cap
-                    # the mean's sigma at the systematic floor
                     sm[label] = combine_measurements(mrows,
                                                      floor_cap=True)
             per_target[tgt] = sm
-        suffix = f"_{band}" if band else ""
+            per_target_all[tgt] = {
+                **per_target_all.get(tgt, {}),
+                **{(b, label): v for label, v in sm.items()}}
+        if not fid:
+            log.warning("band %s: no fiducial in config "
+                        "(bands.%s.fiducial) -- roll solve, plot "
+                        "and calibration deltas skipped", b, b)
+            continue
         band_roll_sol = solve_roll(
-            per_target, root / f"roll_solution{suffix}.txt")
+            per_target, root / f"roll_solution_{b}.txt")
+        band_roll_sols[b] = band_roll_sol
         # the CONFIG roll, when set, is AUTHORITATIVE for the
-        # aggregate outputs (plot right panel, _rot files): the
-        # solved theta0 stays in roll_solution*.txt as a diagnostic
-        # but is NOT applied. This keeps measurement and aggregate
-        # in the SAME convention (e.g. roll: 0.0 everywhere).
+        # aggregate outputs: the solved theta0 stays in
+        # roll_solution*.txt as a diagnostic but is NOT applied.
+        # Measurement and aggregate stay in the SAME convention
+        # (e.g. roll: 0.0 everywhere).
         if roll is not None and band_roll_sol is not None:
-            band_roll_sol = {**band_roll_sol,
-                             "solved_theta0_deg":
-                                 band_roll_sol["theta0_deg"],
-                             "theta0_deg": float(roll) * u.deg,
-                             "config_roll": True}
+            band_roll_sols[b] = {**band_roll_sol,
+                                 "solved_theta0_deg":
+                                     band_roll_sol["theta0_deg"],
+                                 "theta0_deg": float(roll) * u.deg,
+                                 "config_roll": True}
         plot_aggregate_summary(
-            per_target, str(fid_label), str(band or ""),
-            root / f"summary_offsets{suffix}.png")
+            per_target, fid, b,
+            root / f"summary_offsets_{b}.png")
+        # combined RESIDUALS per band (measured-minus-applied): the
+        # provenance record for what offsets_cal.txt folds in
+        if pixb:
+            write_calibration(summ, fid, pixb,
+                              root / f"offsets_{b}_deltas.txt")
+    # per-target combined summaries: built PER BAND in the loop
+    # above (band_summaries / per_target_all)
 
     # -- band-INDEPENDENT roll solve ----------------------------------
     # CII and NII are in the SAME focal plane, so the solved roll
     # is one shared parameter across bands: each (band, mixer)
     # pixel keeps its OWN true offset, all share the ONE theta0.
     # Mixers are keyed (band, mixer) because the same number in
-    # different bands is a different physical pixel. Noisy bands
-    # (NII: low signal) contribute what they can -- every extra
-    # target/epoch tightens the shared theta0 regardless of SNR.
-    bands_seen = sorted({str(r["band"]) for r in all_rows})
-    if len(bands_seen) > 1:
-        per_target_all = {}
-        for tgt in sorted({str(r["target"]) for r in all_rows}):
-            trows = [r for r in all_rows if str(r["target"]) == tgt
-                     and str(r["region"]) != "-"]
-            if not trows:
-                continue
-            sm = {}
-            for key in sorted({(str(r["band"]), str(r["mixer"]))
-                               for r in trows}):
-                mrows = [r for r in trows
-                         if (str(r["band"]), str(r["mixer"])) == key]
-                if mrows:
-                    # within one target: correlated slices -> cap
-                    sm[key] = combine_measurements(mrows,
-                                                   floor_cap=True)
-            per_target_all[tgt] = sm
+    # different bands is a different physical pixel. per_target_all
+    # is built in the per-band loop above from the EXCLUSION-
+    # FILTERED rows (the same population as every other output).
+    cross_sol = None
+    if len(bands_present) > 1:
         log.info("cross-band roll solve: bands %s, %d targets",
-                 bands_seen, len(per_target_all))
-        cross_sol = solve_roll(per_target_all, root / "roll_solution.txt")
+                 bands_present, len(per_target_all))
+        cross_sol = solve_roll(per_target_all,
+                               root / "roll_solution.txt")
         # config roll overrides the cross-band solution as well
         if roll is not None and cross_sol is not None:
             cross_sol = {**cross_sol,
@@ -1219,62 +1311,97 @@ def aggregate_results(root, band=None, fid_label=None, pix_band=None,
                          "theta0_deg": float(roll) * u.deg,
                          "config_roll": True}
 
-    # -- calibration in ROLL-CORRECTED focal coords ---------------
+    # -- per-band roll-corrected files (only for NONZERO rotation) --
     # The roll de-rotation is LINEAR, so rotating the COMBINED
     # offsets by -theta0 at the end is mathematically identical to
     # re-running every per-target measurement with roll set in the
-    # config: the _rot files below are exactly what those re-runs
-    # would have produced. Sigmas rotate through the covariance
-    # (C' = R C R^T, reported per axis). The uncorrected files
-    # remain for comparison. Prefer the cross-band solution (same
-    # focal plane); fall back to the per-band one.
-    theta_sol = None
-    if len(bands_seen) > 1:
-        theta_sol = cross_sol
-    elif fid_label:
-        theta_sol = band_roll_sol
-    if theta_sol and fid_label and pix_band and "theta0_deg" in theta_sol:
-        th = np.radians(float(theta_sol["theta0_deg"].to_value(u.deg)))
-        # with roll = 0 (config-authoritative, the standard setup)
-        # the _rot files would be BYTE-IDENTICAL duplicates of the
-        # plain ones -- only write them for a NONZERO rotation
-        if abs(th) > 1e-6:
-            c, s_ = np.cos(th), np.sin(th)  # de-rotation R(-theta0)
-            Rm = np.array([[c, s_], [-s_, c]])
-            summ_corr = {}
-            for label, s in summaries.items():
-                if "fx" not in s or "fy" not in s:
-                    continue
-                v = np.array([s["fx"].to_value(u.deg),
-                              s["fy"].to_value(u.deg)])
-                sg = np.array([s["sig_fx"].to_value(u.deg),
-                               s["sig_fy"].to_value(u.deg)])
-                u0 = Rm @ v
-                sp = np.sqrt(np.diag(Rm @ np.diag(sg ** 2) @ Rm.T))
-                # the roll solve's PDG scale carries the cross-target
-                # scatter into these corrected sigmas too
-                pdg = theta_sol.get("pdg_scale", 1.0)
-                if pdg > 1.0:
-                    sp = sp * pdg
-                summ_corr[label] = {"fx": u0[0] * u.deg,
-                                    "fy": u0[1] * u.deg,
-                                    "sig_fx": sp[0] * u.deg,
-                                    "sig_fy": sp[1] * u.deg}
-            suffix = f"_{band}" if band else ""
-            write_calibration(summ_corr, fid_label, pix_band,
-                             root / f"offsets{suffix}_deltas_rot.txt")
-            cal_file = (opts or {}).get("cal_file") or \
-                os.environ.get("GUSTO_CAL_FILE")
-            if cal_file:
-                cal_rows = read_calibration(cal_file)
-                upd = update_calibration(cal_rows, summ_corr,
-                                         fid_label, pix_band)
-                write_calibration_rows(
-                    upd, root / f"offsets{suffix}_cal_updated_rot.txt")
-            log.info("wrote roll-corrected calibration files "
-                     "(theta0 = %+.3f deg)",
-                     float(theta_sol["theta0_deg"].to_value(u.deg)))
-    return summaries
+    # config. Sigmas rotate through the covariance (C' = R C R^T).
+    # Prefer the cross-band solution (same focal plane); fall back
+    # to the per-band one. With roll = 0 (the standard setup) the
+    # _rot files would be BYTE-IDENTICAL duplicates -- skipped.
+    for b, summ in band_summaries.items():
+        fid = str(fid_by_band.get(b, "")) or None
+        pixb = pix_band_by_band.get(b, "B2")
+        theta_sol = cross_sol if cross_sol is not None \
+            else band_roll_sols.get(b)
+        if not (theta_sol and fid and pixb
+                and "theta0_deg" in theta_sol):
+            continue
+        th = np.radians(
+            float(theta_sol["theta0_deg"].to_value(u.deg)))
+        if abs(th) <= 1e-6:
+            continue
+        c, s_ = np.cos(th), np.sin(th)   # de-rotation R(-theta0)
+        Rm = np.array([[c, s_], [-s_, c]])
+        summ_corr = {}
+        for label, s in summ.items():
+            if "fx" not in s or "fy" not in s:
+                continue
+            v = np.array([s["fx"].to_value(u.deg),
+                          s["fy"].to_value(u.deg)])
+            sg = np.array([s["sig_fx"].to_value(u.deg),
+                           s["sig_fy"].to_value(u.deg)])
+            u0 = Rm @ v
+            sp = np.sqrt(np.diag(Rm @ np.diag(sg ** 2) @ Rm.T))
+            # the roll solve's PDG scale carries the cross-target
+            # scatter into these corrected sigmas too
+            pdg = theta_sol.get("pdg_scale", 1.0)
+            if pdg > 1.0:
+                sp = sp * pdg
+            summ_corr[label] = {"fx": u0[0] * u.deg,
+                                "fy": u0[1] * u.deg,
+                                "sig_fx": sp[0] * u.deg,
+                                "sig_fy": sp[1] * u.deg}
+        write_calibration(summ_corr, fid, pixb,
+                          root / f"offsets_{b}_deltas_rot.txt")
+        if cal_file:
+            cal_rows = read_calibration(cal_file)
+            upd = update_calibration(cal_rows, summ_corr,
+                                     fid, pixb, drop=cal_drop)
+            write_calibration_rows(
+                upd, root / f"offsets_{b}_cal_updated_rot.txt")
+        log.info("wrote roll-corrected calibration files "
+                 "(theta0 = %+.3f deg)",
+                 float(theta_sol["theta0_deg"].to_value(u.deg)))
+
+    # -- THE combined calibration file --------------------------------
+    # offsets_cal.txt is the run-of-record product of the CROSS-
+    # BAND aggregate (no -b): ONE file for the whole array, each
+    # band's residuals folded in SEQUENTIALLY (applied + delta ->
+    # AS_MEASURED). A -b aggregate writes only that band's deltas
+    # file and never touches offsets_cal.txt -- two -b runs would
+    # otherwise clobber each other's bands.
+    if band:
+        log.info("offsets_cal.txt is written only by the "
+                 "cross-band aggregate (--aggregate without -b); "
+                 "this -b run wrote offsets_%s_deltas.txt", band)
+    elif cal_file and band_summaries:
+        cal_rows = read_calibration(cal_file)
+        upd = cal_rows
+        for b in bands_present:
+            if b in band_summaries and fid_by_band.get(b):
+                upd = update_calibration(
+                    upd, band_summaries[b], str(fid_by_band[b]),
+                    pix_band_by_band.get(b, "B2"),
+                    drop=cal_drop)
+        # VERSION BUMP: source + 0.1 per run of record, or an
+        # explicit 'cal_version:' (e.g. 1.0 for the flight-ready
+        # file); the DATA version lives on offsets_cal.txt (git)
+        src_v = read_cal_version(cal_file)
+        new_v = float(opts.get("cal_version", 0.0)) or \
+            round(src_v + 0.1, 1)
+        write_calibration_rows(upd, root / "offsets_cal.txt",
+                               version=new_v)
+        log.info("calibration version: %.1f -> %.1f "
+                 "(offsets_cal.txt -> L1 products)", src_v, new_v)
+    else:
+        log.warning("no cal_file (config 'cal_file:' or "
+                    "GUSTO_CAL_FILE env) -- offsets_cal.txt not "
+                    "written; combined residuals are in "
+                    "offsets_<band>_deltas.txt")
+    if band:
+        return band_summaries.get(str(band), {})
+    return band_summaries
 
 
 def write_calibration(summaries, fid_label, pix_band, outfile):
@@ -1746,37 +1873,105 @@ def summary_rows(measurements, summaries, fid_label):
     return rows
 
 
-def round_rows(rows):
-    """Round numeric columns for ECSV output -- readability.
+def write_text_table(rows, outfile):
+    """Human-readable FIXED-WIDTH text version of summary rows.
 
-    ECSV otherwise serializes float64 with ~15 significant digits:
-    a 18 arcsec sigma carrying nano-degree precision is unreadable
-    and misleading. Degree columns keep 6 decimals (0.0036 arcsec
-    resolution -- far below the systematic floor, so no information
-    the analysis uses is lost), velocities 1, snr/chi2 2, dof int."""
-    prec = {"fx": 6, "fy": 6, "sig_fx": 6, "sig_fy": 6,
-            "dlon_deg": 6, "dlat_deg": 6,
-            "sig_dlon_deg": 6, "sig_dlat_deg": 6,
-            "snr_corr": 2, "peak_snr": 2, "snr": 2,
-            "chi2_fx": 2, "chi2_fy": 2,
-            "dof_fx": 0, "dof_fy": 0,
-            "vel_lo": 1, "vel_hi": 1}
-    out = []
+    The ECSV files remain the FULL-PRECISION machine record
+    (reverting earlier rounding: a data file should carry what the
+    fit produced, and re-analysis must not depend on display
+    choices). This is the EYEBALL copy: degrees at 5 decimals
+    (0.036 arcsec), floats at 6 significant digits, aligned
+    columns -- readable directly, no other program needed."""
+    if not rows:
+        return
+    keys = []
     for r in rows:
-        rr = dict(r)
-        for k, nd in prec.items():
-            if k not in rr or rr[k] is None:
-                continue
-            v = rr[k]
-            try:
-                if hasattr(v, "unit"):
-                    rr[k] = np.round(v.value, nd) * v.unit
-                else:
-                    rr[k] = np.round(v, nd)
-            except (TypeError, ValueError):
-                pass
-        out.append(rr)
-    return out
+        for k in r:
+            if k not in keys:
+                keys.append(k)
+
+    def fmt(v):
+        if v is None:
+            return "-"
+        if hasattr(v, "unit"):
+            x = float(v.value)
+            if v.unit == u.deg:
+                return f"{x:+.5f}"
+            return f"{x:.6g}"
+        if isinstance(v, (float, np.floating)):
+            return f"{v:.6g}"
+        return str(v)
+
+    headers = []
+    for k in keys:
+        sample = next((r[k] for r in rows
+                       if k in r and r[k] is not None), None)
+        unit = getattr(sample, "unit", None)
+        headers.append(f"{k} [{unit}]" if unit is not None else k)
+    cols = []
+    for k, h in zip(keys, headers):
+        vals = [fmt(r.get(k)) for r in rows]
+        w = max([len(h)] + [len(v) for v in vals])
+        cols.append((h.ljust(w), [v.ljust(w) for v in vals]))
+    lines = ["  ".join(h for h, _ in cols),
+             "  ".join("-" * len(h) for h, _ in cols)]
+    for i in range(len(rows)):
+        lines.append("  ".join(v[i] for _, v in cols))
+    Path(outfile).write_text("\n".join(lines) + "\n")
+    log.info("wrote %s", outfile)
+
+
+def _row_matches(r, e):
+    """Does measurement row r match one config 'exclude:' entry?
+    An entry matches on EVERY field it specifies: band, target,
+    region, mixer, vel ([lo,hi], matched on overlap)."""
+    for key in ("band", "target", "region", "mixer"):
+        if key in e and str(r[key]) != str(e[key]):
+            return False
+    if "vel" in e:
+        vlo, vhi = sorted(float(x) for x in e["vel"])
+        if not (float(r["vel_lo"]) <= vhi and float(r["vel_hi"]) >= vlo):
+            return False
+    return True
+
+
+def apply_exclusions(rows, excl, outfile):
+    """Apply the analysis-time exclusion list; write an AUDIT file.
+
+    Outliers identified in the figures are excluded by CONFIG
+    (top-level 'exclude:' list), never by editing the ECSV record.
+    Matching rows are kept out of ALL combines (summaries, roll
+    solve, calibration); the measurement ECSVs stay complete, and
+    every exclusion is documented with its reason in
+    <outfile> -- the record the manual line-deletion never left."""
+    if not excl:
+        return rows
+    kept, out = [], []
+    for r in rows:
+        hit = next((e for e in excl if _row_matches(r, e)), None)
+        if hit is not None:
+            out.append((r, hit))      # audit pairs (row, entry)
+        else:
+            kept.append(r)            # BARE rows -- not pairs!
+    if out:
+        lines = ["# exclusions applied at aggregate time",
+                 "# (config 'exclude:'; ECSV record unchanged)",
+                 "# target  region  mixer  vel_range(deg)",
+                 "# fx(deg)   fy(deg)   reason"]
+        for r, e in out:
+            lines.append(f"{r['target']}  {r['region']}  "
+                         f"{r['mixer']}  "
+                         f"[{float(r['vel_lo']):.1f},"
+                         f"{float(r['vel_hi']):.1f}]  "
+                         f"{float(r['fx'].to_value(u.deg)):+.5f}  "
+                         f"{float(r['fy'].to_value(u.deg)):+.5f}  "
+                         f"{e.get('reason', '')}")
+        Path(outfile).write_text("\n".join(lines) + "\n")
+        log.info("exclusions: %d rows removed (audit: %s)",
+                 len(out), outfile)
+    else:
+        log.info("exclusions: config list matched no rows")
+    return kept
 
 
 def save_results(measurements, summaries, fid_label, outdir):
@@ -1786,15 +1981,17 @@ def save_results(measurements, summaries, fid_label, outdir):
     region, velocity range), then per region, then the COMBINED
     weighted average per mixer (summary_rows). The measurements
     table remains the full inventory with epoch/attitude per row."""
-    mt = QTable(rows=round_rows(measurements))
+    mt = QTable(rows=measurements)
     # ECSV: comma delimiter (astropy default is space, which makes
     # the data block awkward to eyeball / ingest in other tools)
     mt.write(outdir / "offsets_measurements.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
-    st = QTable(rows=round_rows(summary_rows(measurements, summaries,
-                                             fid_label)))
+    # eyeball copy: fixed-width text table, readable precision
+    srows = summary_rows(measurements, summaries, fid_label)
+    st = QTable(rows=srows)
     st.write(outdir / "offsets_summary.ecsv", overwrite=True,
              format="ascii.ecsv", delimiter=",")
+    write_text_table(srows, outdir / "offsets_summary.txt")
     log.info("wrote results tables to %s", outdir)
 
 
@@ -1807,8 +2004,10 @@ def parse_args(argv=None):
     p.add_argument("-c", "--config", required=True,
                    help="general config YAML: root directories, "
                         "per-band fiducial + usable mixers, options")
-    p.add_argument("-b", "--band", required=True,
-                   help="band label, e.g. CII")
+    p.add_argument("-b", "--band", default=None,
+                   help="band label, e.g. CII; optional with "
+                        "--aggregate (no -b = cross-band run of "
+                        "record over all bands)")
     p.add_argument("-t", "--target", default=None,
                    help="target name; data live under "
                         "<level1_root>/<target>/ and "
@@ -1850,7 +2049,12 @@ def parse_args(argv=None):
     p.add_argument("--pix-band", default=None,
                    help="aggregate mode: B1/B2 pixel band tag "
                         "(default from config or B2)")
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    if not args.band and not args.aggregate:
+        p.error("-b/--band is required for a measurement run; "
+                "--aggregate may be run with or without -b "
+                "(without = cross-band run of record)")
+    return args
 
 
 def main(argv=None):
@@ -1875,19 +2079,32 @@ def main(argv=None):
     # (GUSTO_CAL_FILE env var: path of the APPLIED calibration file;
     # when set, an updated [offsets] file is written too)
     if args.aggregate:
-        fid = args.fid
-        pix_band = args.pix_band
-        if fid is None or pix_band is None:
-            # fall back to the config for whichever is missing
-            data_cfg, bands, opts = load_config(args.config) \
-                if args.config else ({}, {}, {})
-            fid = fid or bands.get(args.band, {}).get("fiducial", 8)
-            pix_band = pix_band or bands.get(args.band, {}).get(
-                "pix_band", opts.get("pix_band", "B2"))
+        # Aggregate combines per-run results. The CROSS-BAND run of
+        # record (no -b) needs EVERY band's fiducial + pix_band tag
+        # -- all from the config; CLI --fid/--pix-band override only
+        # the single band of a -b run.
+        data_cfg, bands, opts = load_config(args.config) \
+            if args.config else ({}, {}, {})
+        fid_by_band = {b: str(bc.get("fiducial"))
+                       for b, bc in bands.items()
+                       if bc.get("fiducial") is not None}
+        pix_band_by_band = {
+            b: bc.get("pix_band", opts.get("pix_band", "B2"))
+            for b, bc in bands.items()}
+        if args.band:
+            if args.fid is not None:
+                fid_by_band[args.band] = str(args.fid)
+            if args.pix_band is not None:
+                pix_band_by_band[args.band] = args.pix_band
+        if not fid_by_band:
+            raise SystemExit("no band fiducials in config "
+                             "(bands.<band>.fiducial) -- required "
+                             "for --aggregate")
         aggregate_results(args.aggregate, band=args.band,
-                          fid_label=str(fid), pix_band=pix_band,
+                          fid_by_band=fid_by_band,
+                          pix_band_by_band=pix_band_by_band,
                           roll=opts.get("roll", None),
-                          opts=options)
+                          opts=opts)
         return 0
 
     # measurement mode: target + regions ARE required (argparse can't
