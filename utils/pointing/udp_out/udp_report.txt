@@ -1,0 +1,21 @@
+GUSTO UDP telemetry extraction report
+files processed: 23432
+intervals: 23446
+fix events: 18   adj events: 0
+C (ra/dec vs attitude offset): median 1104.4"  min 41.9  max 1202.8
+files with C_std > 0.5": 10650
+pointing jitter: median 15.28"  p90 2359.56"
+roll drift rate: median -112"/min  p90 |rate| 1763"/min
+roll oscillation amplitude: median 110"  p90 2979"
+q_attT changed within file (nonzero): 0 files
+
+bias / scale-factor regression (fix intervals >= 120 s):
+  x-axis: net angle vs duration: slope -11.13"/min (R2 0.000, n 9403)
+  x-axis: net angle vs path:   slope +0.09436 (R2 0.006)
+  y-axis: net angle vs duration: slope -18.06"/min (R2 0.000, n 9403)
+  y-axis: net angle vs path:   slope -0.05562 (R2 0.001)
+  z-axis: net angle vs duration: slope +144.11"/min (R2 0.001, n 9403)
+  z-axis: net angle vs path:   slope +0.15733 (R2 0.012)
+  C change within intervals: median |dC| 1124.51", p90 1189.89"
+
+uploads to chat: udp_hourly.tsv + udp_regress_binned.tsv + udp_report.txt (keep the rest local)
