@@ -1,0 +1,188 @@
+GUSTO command-log extraction summary
+input : command.txt
+lines : 958182   time span: 2023-12-14T22:44:34Z -> 2024-02-26T23:46:53Z (UTC)
+
+== event counts (events.tsv) ==
+  BIASCMD  64
+  BIASEST  60
+  BIASFAIL 2
+  CAMCFG   1995
+  CAMCONN  242
+  CAMPWR   37
+  DRIFT    60
+  FIT      959
+  FIXCMD   1088
+  FOGOFF   22
+  MECH     289
+  OFFCMD   75
+  OFFSET   70
+  QUAT     56
+  UNKCMD   422
+
+== star-fix timeline ==
+completed star fixes: 9807 in-scan GOOD + 959 interactive (deduped 7443)
+BAD star fixes: 815 ; "Attitude calibration with STARCAM": 9432
+minutes between consecutive fixes: median=5.7 mean=12.8 p90=11.3 max=9484.4
+gaps > 30 min: 314 ; > 60 min: 152 ; > 120 min: 76
+longest gaps (drift-suspect windows):
+  2023-12-23T03:02:27Z -> 2023-12-24T21:20:31Z  = 2538.1 min
+  2023-12-25T03:31:39Z -> 2023-12-31T17:36:00Z  = 9484.4 min
+  2024-01-02T01:04:00Z -> 2024-01-02T12:17:15Z  =  673.2 min
+  2024-01-03T16:58:14Z -> 2024-01-04T02:01:00Z  =  542.8 min
+  2024-01-04T19:01:24Z -> 2024-01-05T02:05:15Z  =  423.9 min
+  2024-01-06T00:11:05Z -> 2024-01-06T15:03:36Z  =  892.5 min
+  2024-01-09T22:36:14Z -> 2024-01-10T06:54:08Z  =  497.9 min
+  2024-02-01T00:57:34Z -> 2024-02-01T08:40:28Z  =  462.9 min
+  2024-02-01T09:00:37Z -> 2024-02-01T15:26:33Z  =  385.9 min
+  2024-02-02T11:18:07Z -> 2024-02-02T18:24:35Z  =  426.5 min
+  2024-02-03T19:05:18Z -> 2024-02-04T14:00:53Z  = 1135.6 min
+  2024-02-06T13:59:48Z -> 2024-02-06T20:11:25Z  =  371.6 min
+  2024-02-07T11:14:33Z -> 2024-02-07T17:33:22Z  =  378.8 min
+  2024-02-08T09:51:38Z -> 2024-02-08T16:46:01Z  =  414.4 min
+  2024-02-09T01:02:54Z -> 2024-02-09T07:55:33Z  =  412.6 min
+  2024-02-09T14:58:41Z -> 2024-02-09T22:10:13Z  =  431.5 min
+  2024-02-22T01:11:39Z -> 2024-02-22T07:13:09Z  =  361.5 min
+  2024-02-24T23:44:39Z -> 2024-02-25T06:20:06Z  =  395.4 min
+  2024-02-25T21:19:22Z -> 2024-02-26T06:50:20Z  =  571.0 min
+  2024-02-26T12:15:08Z -> 2024-02-26T18:09:14Z  =  354.1 min
+
+== BAD-fix windows (gyro-only drift windows) ==
+bad windows: 230 (total 79.2 h)
+  2024-01-06T00:15:34Z -> 2024-01-06T15:03:36Z   888.0 min  (6 bad fixes)
+  2024-02-25T21:23:44Z -> 2024-02-26T06:50:20Z   566.6 min  (2 bad fixes)
+  2024-01-03T17:00:10Z -> 2024-01-04T02:01:00Z   540.8 min  (1 bad fixes)
+  2024-02-22T01:13:23Z -> 2024-02-22T07:13:09Z   359.8 min  (2 bad fixes)
+  2023-12-31T20:16:43Z -> 2024-01-01T00:13:42Z   237.0 min  (1 bad fixes)
+  2024-02-20T03:15:57Z -> 2024-02-20T06:21:48Z   185.8 min  (57 bad fixes)
+  2024-01-03T14:37:27Z -> 2024-01-03T16:58:14Z   140.8 min  (4 bad fixes)
+  2024-02-21T03:54:01Z -> 2024-02-21T05:16:47Z   82.8 min  (12 bad fixes)
+  2024-01-16T05:01:50Z -> 2024-01-16T06:14:30Z   72.7 min  (9 bad fixes)
+  2024-01-02T22:10:23Z -> 2024-01-02T23:12:16Z   61.9 min  (1 bad fixes)
+  2024-01-01T13:25:02Z -> 2024-01-01T14:26:52Z   61.8 min  (2 bad fixes)
+  2024-01-05T01:04:37Z -> 2024-01-05T02:05:15Z   60.6 min  (9 bad fixes)
+  2024-01-11T19:10:28Z -> 2024-01-11T20:04:12Z   53.7 min  (26 bad fixes)
+  2024-01-02T23:52:01Z -> 2024-01-03T00:42:25Z   50.4 min  (2 bad fixes)
+  2024-01-08T18:25:43Z -> 2024-01-08T19:10:40Z   45.0 min  (4 bad fixes)
+  2024-01-28T18:18:44Z -> 2024-01-28T19:02:43Z   44.0 min  (50 bad fixes)
+  2024-01-01T21:00:18Z -> 2024-01-01T21:43:29Z   43.2 min  (10 bad fixes)
+  2024-01-13T22:18:04Z -> 2024-01-13T23:00:37Z   42.5 min  (19 bad fixes)
+  2024-01-01T02:11:38Z -> 2024-01-01T02:52:29Z   40.9 min  (2 bad fixes)
+  2024-01-09T01:54:49Z -> 2024-01-09T02:34:46Z   40.0 min  (18 bad fixes)
+
+== posFix stats (45818 posFix lines) ==
+DAng deg: median=0.88 p90=3.11 max=154.18 ; DO Star Fix: 9660 (21.1%)
+
+== interactive fits (fix()/estBias()): attitude error at fix time ==
+n=959 ; RA Diff is in HOURS (x15->deg), Dec Diff in DEG
+methods: A:521, C:291, V:147
+RA diff arcsec: median=-6.6 p90=988.7 max_abs=1299941.5
+Dec diff arcsec: median=13.1 p90=1129.0 max_abs=256423.6
+RMS fit error px: median=0.90 p90=1.08
+
+== per-day counts (good fixes / bad fixes / attcal) ==
+  2023-12-21  good=0     bad=0    attcal=13   
+  2023-12-22  good=15    bad=1    attcal=14   
+  2023-12-23  good=4     bad=0    attcal=4    
+  2023-12-24  good=23    bad=1    attcal=23   
+  2023-12-25  good=39    bad=10   attcal=39   
+  2023-12-31  good=0     bad=23   attcal=0    
+  2024-01-01  good=4     bad=32   attcal=0    
+  2024-01-02  good=0     bad=15   attcal=0    
+  2024-01-03  good=2     bad=6    attcal=2    
+  2024-01-04  good=39    bad=0    attcal=31   
+  2024-01-05  good=17    bad=10   attcal=5    
+  2024-01-06  good=1     bad=14   attcal=5    
+  2024-01-07  good=2     bad=12   attcal=7    
+  2024-01-08  good=19    bad=12   attcal=23   
+  2024-01-09  good=75    bad=25   attcal=41   
+  2024-01-10  good=71    bad=0    attcal=58   
+  2024-01-11  good=7     bad=34   attcal=40   
+  2024-01-12  good=64    bad=20   attcal=29   
+  2024-01-13  good=101   bad=65   attcal=16   
+  2024-01-14  good=71    bad=6    attcal=27   
+  2024-01-15  good=134   bad=38   attcal=95   
+  2024-01-16  good=108   bad=13   attcal=76   
+  2024-01-17  good=235   bad=0    attcal=224  
+  2024-01-18  good=195   bad=0    attcal=193  
+  2024-01-19  good=257   bad=4    attcal=257  
+  2024-01-20  good=256   bad=3    attcal=256  
+  2024-01-21  good=249   bad=4    attcal=244  
+  2024-01-22  good=221   bad=6    attcal=220  
+  2024-01-23  good=247   bad=3    attcal=246  
+  2024-01-24  good=264   bad=0    attcal=264  
+  2024-01-25  good=247   bad=7    attcal=245  
+  2024-01-26  good=252   bad=7    attcal=248  
+  2024-01-27  good=247   bad=0    attcal=241  
+  2024-01-28  good=232   bad=51   attcal=226  
+  2024-01-29  good=232   bad=53   attcal=227  
+  2024-01-30  good=216   bad=20   attcal=211  
+  2024-01-31  good=237   bad=15   attcal=231  
+  2024-02-01  good=204   bad=2    attcal=200  
+  2024-02-02  good=215   bad=1    attcal=207  
+  2024-02-03  good=330   bad=8    attcal=324  
+  2024-02-04  good=100   bad=0    attcal=99   
+  2024-02-05  good=207   bad=11   attcal=202  
+  2024-02-06  good=271   bad=46   attcal=267  
+  2024-02-07  good=217   bad=38   attcal=212  
+  2024-02-08  good=239   bad=0    attcal=236  
+  2024-02-09  good=207   bad=2    attcal=198  
+  2024-02-10  good=192   bad=7    attcal=187  
+  2024-02-11  good=243   bad=4    attcal=234  
+  2024-02-12  good=238   bad=2    attcal=229  
+  2024-02-13  good=247   bad=7    attcal=241  
+  2024-02-14  good=249   bad=10   attcal=245  
+  2024-02-15  good=250   bad=0    attcal=247  
+  2024-02-16  good=256   bad=4    attcal=252  
+  2024-02-17  good=247   bad=13   attcal=237  
+  2024-02-18  good=223   bad=1    attcal=217  
+  2024-02-19  good=237   bad=0    attcal=229  
+  2024-02-20  good=199   bad=72   attcal=186  
+  2024-02-21  good=200   bad=37   attcal=190  
+  2024-02-22  good=160   bad=5    attcal=151  
+  2024-02-23  good=164   bad=13   attcal=154  
+  2024-02-24  good=169   bad=10   attcal=159  
+  2024-02-25  good=146   bad=12   attcal=142  
+  2024-02-26  good=14    bad=0    attcal=106  
+
+== command frequency (all commands, incl. routine) ==
+  mst                      1167
+  fix                      1088
+  ngPSet                   455
+  msw                      287
+  nvRamShow                228
+  ngStarCamGet             228
+  gotoRaDec                216
+  gotoAz                   193
+  OTShow                   179
+  obs2Do                   165
+  devVideoSet              160
+  ace                      145
+  OTStats                  145
+  mike.akHere              145
+  spiral                   140
+  gotoGal                  131
+  ngPGet                   125
+  gotoEl                   124
+  RESETTING                120
+  print                    118
+  dacOn                    113
+  ngStarFixParams          112
+  OTRangeSet               109
+  c.fix                    108
+  posFixGetWait            97
+  ngscImgType              92
+  starCamSend              74
+  max3Calibrate            74
+  DACHskpListen            66
+  Taking                   65
+  watch                    63
+  DONE                     63
+  mike.stars               60
+  mike.ngLast              59
+  gotoEphem                57
+  mike.ephDrift            57
+  camsConnect              56
+  eph                      51
+  dacStart                 50
+  LOSShow                  48
+  ... 492 distinct command names total
