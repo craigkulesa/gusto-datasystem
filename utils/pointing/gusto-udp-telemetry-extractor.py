@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""GUSTO UDP telemetry extractor (v1.0).
+"""GUSTO UDP telemetry extractor (v1.1).
 
 Parses the per-scanid UDP/telemetry binary files (udp_XXXXX.dat, ICD
 7503-9035, 156-byte records) and distills them into small TSV files of
-attitude/pointing metrics. Pure stdlib, Python 3. Run on the Mac where
-the udp_*.dat files live; upload only the compact outputs.
+attitude/pointing metrics. Pure stdlib, Python 3. Run on the machine
+where the udp_*.dat files live; upload only the bundle.
 
 Record format (little-endian, 156 B, '<2I5f2I15d'):
   0  tsec   uint32  Unix seconds        1  tnsec uint32 nanoseconds
@@ -17,28 +17,35 @@ Record format (little-endian, 156 B, '<2I5f2I15d'):
   17-20 q_att  4xf64 live attitude
   21-23 tel    3xf64 = (tAzD, -tElD, ~1)/norm in rad  (verified vs cmd log)
 
-Verified decode (udp_03047, 2024-01-15 22:18 UTC):
-  - stored ra/dec = constant rotation C applied to rot(q_att, tel);
-    C = 629.01" +- 0.01" in that file. C per file is a calibration
-    constant to be tracked across the mission.
-  - q_att is live at 0.4 s cadence; ra/dec jitter 2.1" 2D-rms;
-    gondola rolls about the boresight (body-z) with a ~10-15 s torsional
-    oscillation on top of a net drift (+342"/min in that file) -
-    invisible to pointing position, visible to slit/camera.
+v1.1 changes (after full-mission run showed raster scan motion pollutes
+the interval regression, and that C is a geometric, position-dependent
+quantity):
+  - stare-only regression: files with jitter < 30" (pointing stares);
+    regressions use NET POINTING MOTION vs stare duration (the quantity
+    the sawtooth/de-drift model needs), plus body-axis components and a
+    scale-factor test vs accumulated path.
+  - per-file mean pointing position (from the records' own ra/dec), so C
+    can be modelled geometrically without the dataLog.
+  - new outputs: udp_C_grid.tsv (0.5-deg sky grid, all files),
+    udp_stare_C.tsv (clean stare C values, deduped by position+offsets).
+  - upload/udp_v11.tar.gz: gzipped bundle of the five small files -
+    upload ONLY this (rename to .txt if the uploader complains).
 
 Outputs (written to -o OUTDIR):
-  udp_file_summary.tsv   one row per file (full detail; keep local)
-  udp_intervals.tsv      one row per within-file fix interval (keep local)
-  udp_fix_events.tsv     fixNum changes + q_adj changes (keep local)
-  udp_hourly.tsv         hourly aggregates            <- UPLOAD (small)
-  udp_regress_binned.tsv binned dq vs dt / path        <- UPLOAD (small)
-  udp_report.txt         regression results + findings <- UPLOAD (small)
+  udp_file_summary.tsv   one row per file (keep local)
+  udp_intervals.tsv      one row per within-file interval (keep local)
+  udp_fix_events.tsv     fixNum/q_adj changes (keep local)
+  udp_hourly.tsv         hourly aggregates              (in bundle)
+  udp_regress_binned.tsv stare-only binned drift         (in bundle)
+  udp_C_grid.tsv         C on a 0.5-deg sky grid         (in bundle)
+  udp_stare_C.tsv        clean stare C vs position       (in bundle)
+  udp_report.txt         regression results + findings   (in bundle)
+  upload/udp_v11.tar.gz  the five bundle files, gzipped
 
 Usage:
   python3 gusto_udp_extract.py /path/to/udps -o udp_out
   python3 gusto_udp_extract.py udp_03047.dat -o udp_out          (one file)
   python3 gusto_udp_extract.py /path/to/udps -o udp_out --verbose-first
-      --verbose-first prints the per-record table of the first file
 """
 
 import argparse
@@ -47,6 +54,7 @@ import math
 import os
 import struct
 import sys
+import tarfile
 from datetime import datetime, timezone
 
 FMT = '<2I5f2I15d'
@@ -128,7 +136,8 @@ def analyze(path, recs, verbose=False):
     intervals = []
     keys = ('span_s', 'fixn0', 'fixn1', 'nfix', 'nadj', 'tazd', 'teld',
             'cmean', 'cstd', 'jit', 'netx', 'nety', 'netz',
-            'rollrate', 'oscamp', 'nt_attT', 'attT_off', 'starc0', 'starc1')
+            'rollrate', 'oscamp', 'nt_attT', 'attT_off', 'starc0', 'starc1',
+            'mra', 'mde')
     if len(recs) < 2:
         row['err'] = 'nrec<2'
         for k in keys:
@@ -184,7 +193,7 @@ def analyze(path, recs, verbose=False):
     row['cmean'] = cmean
     row['cstd'] = cstd
 
-    # --- stored pointing jitter about mean ---
+    # --- stored pointing: jitter about mean + mean position ---
     ra = [math.degrees(r[5]) for r in recs]
     de = [math.degrees(r[6]) for r in recs]
     mra = sum(ra) / len(ra)
@@ -193,6 +202,8 @@ def analyze(path, recs, verbose=False):
     sx = math.sqrt(sum(((r - mra) * 3600.0 * cd) ** 2 for r in ra) / len(ra))
     sy = math.sqrt(sum(((d - mde) * 3600.0) ** 2 for d in de) / len(de))
     row['jit'] = math.hypot(sx, sy)
+    row['mra'] = mra
+    row['mde'] = mde
 
     # --- net rotation & roll drift (body axes) ---
     dq = qmul(qconj(q_att[0]), q_att[-1])
@@ -242,6 +253,12 @@ def analyze(path, recs, verbose=False):
                                 + p[2] * p_prev[2]))
             path_point += math.acos(dot)
             p_prev = p
+        # net pointing motion (angle between pointing dir at start and end)
+        p0 = qrot(q_att[i0], tel[i0])
+        p1 = qrot(q_att[i1], tel[i1])
+        dot = max(-1.0, min(1.0, p0[0] * p1[0] + p0[1] * p1[1]
+                            + p0[2] * p1[2]))
+        net_point = math.acos(dot) * AS
         csub = offs[i0:i1 + 1]
         cm = sum(csub) / len(csub)
         csd = math.sqrt(sum((x - cm) ** 2 for x in csub) / len(csub))
@@ -249,7 +266,8 @@ def analyze(path, recs, verbose=False):
                           dur, th * ax[0] * AS, th * ax[1] * AS, th * ax[2] * AS,
                           path_total * AS, path_point * AS, cm, csd,
                           recs[i0][7], recs[i1][7],
-                          tel[i0][0] * AS, -tel[i0][1] * AS))
+                          tel[i0][0] * AS, -tel[i0][1] * AS,
+                          row['jit'], mra, mde, net_point))
 
     if verbose:
         print('verbose: %s  %s .. %s  C=%.2f+-%.2f"  jitter=%.2f"  '
@@ -297,46 +315,59 @@ def hourly(rows):
     out = []
     for key in sorted(buckets):
         rs = buckets[key]
-        cs = [r['cmean'] for r in rs]
-        js = [r['jit'] for r in rs]
-        rr = [r['rollrate'] for r in rs]
-        out.append((key, len(rs), median(cs),
-                    max(r['cstd'] for r in rs), median(js), median(rr),
+        out.append((key, len(rs),
+                    median([r['cmean'] for r in rs]),
+                    max(r['cstd'] for r in rs),
+                    median([r['jit'] for r in rs]),
+                    median([r['rollrate'] for r in rs]),
                     rs[-1]['tazd'], rs[-1]['teld']))
     return out
 
 
 def regress(intervals):
-    """bias / scale-factor tests on fix intervals >= 120 s."""
-    good = [iv for iv in intervals if iv[3] >= 120.0]
+    """v1.1: STARE-ONLY bias / scale-factor regression.
+
+    interval fields: 0 t, 1 file, 2 scanid, 3 dur_s, 4 netx, 5 nety,
+    6 netz, 7 path_total, 8 path_point, 9 cmean, 10 cstd, 11 fixn0,
+    12 fixn1, 13 tazd, 14 teld, 15 jit, 16 mra, 17 mde, 18 net_point
+    """
+    stare = [iv for iv in intervals if iv[15] < 30.0 and iv[3] >= 10.0]
     lines = []
     bins = []
-    if not good:
-        return ['no intervals >= 120 s found'], []
+    if not stare:
+        return ['no stare intervals (jit<30", dur>=10s) found'], []
+    ys = [iv[18] for iv in stare]
+    xs = [iv[3] / 60.0 for iv in stare]
+    sl, ic, r2 = ols(xs, ys)
+    lines.append('POINTING DRIFT: net pointing motion vs stare duration: '
+                 '%+.2f"/min (R2 %.3f, n %d)' % (sl, r2, len(stare)))
+    med_durs = sorted(iv[3] for iv in stare)
+    lines.append('  stare durations: median %.0f s  p90 %.0f s'
+                 % (med_durs[len(med_durs) // 2],
+                    med_durs[int(0.9 * len(med_durs))]))
     for ai, name in ((4, 'x'), (5, 'y'), (6, 'z')):
-        ys = [iv[ai] for iv in good]
-        sl, ic, r2 = ols([iv[3] / 60.0 for iv in good], ys)
-        lines.append('%s-axis: net angle vs duration: slope %+.2f"/min '
-                     '(R2 %.3f, n %d)' % (name, sl, r2, len(good)))
-        sl2, ic2, r22 = ols([iv[7] for iv in good], ys)
-        lines.append('%s-axis: net angle vs path:   slope %+.5f (R2 %.3f)'
-                     % (name, sl2, r22))
-    dC = [iv[10] - iv[9] for iv in good]
-    lines.append('C change within intervals: median |dC| %.2f", p90 %.2f"'
-                 % (median([abs(d) for d in dC]),
-                    sorted(abs(d) for d in dC)[int(0.9 * len(dC))]))
-    durs = sorted(iv[3] for iv in good)
+        sl, ic, r2 = ols(xs, [iv[ai] for iv in stare])
+        lines.append('  body-%s drift: %+.2f"/min (R2 %.3f)' % (name, sl, r2))
+    # scale-factor test: net pointing motion vs accumulated pointing path
+    sl2, ic2, r22 = ols([iv[8] for iv in stare], ys)
+    lines.append('SCALE FACTOR: net vs accumulated pointing path: '
+                 '%+.4f (R2 %.3f)' % (sl2, r22))
+    sl3, ic3, r23 = ols([iv[7] for iv in stare], ys)
+    lines.append('  net vs total attitude path (roll-dominated): '
+                 '%+.4f (R2 %.3f)' % (sl3, r23))
+    # binned by duration
     nb = 20
-    edges = [durs[int(i * (len(durs) - 1) / nb)] for i in range(nb + 1)]
+    edges = [med_durs[int(i * (len(med_durs) - 1) / nb)] for i in range(nb + 1)]
     for b in range(nb):
         lo, hi = edges[b], edges[b + 1]
         if b == nb - 1:
-            grp = [iv for iv in good if lo <= iv[3] <= hi]
+            grp = [iv for iv in stare if lo <= iv[3] <= hi]
         else:
-            grp = [iv for iv in good if lo <= iv[3] < hi]
-        if len(grp) < 3:
+            grp = [iv for iv in stare if lo <= iv[3] < hi]
+        if len(grp) < 5:
             continue
         bins.append((lo, hi, len(grp),
+                     median([iv[18] for iv in grp]),
                      median([iv[4] for iv in grp]), median([iv[5] for iv in grp]),
                      median([iv[6] for iv in grp]), median([iv[9] for iv in grp])))
     return lines, bins
@@ -381,7 +412,8 @@ def main():
     cols = ['scanid', 'file', 't0', 'nrec', 'span_s', 'err',
             'fixn0', 'fixn1', 'nfix', 'nadj', 'tazd', 'teld',
             'cmean', 'cstd', 'jit', 'netx', 'nety', 'netz',
-            'rollrate', 'oscamp', 'nt_attT', 'attT_off', 'starc0', 'starc1']
+            'rollrate', 'oscamp', 'nt_attT', 'attT_off', 'starc0', 'starc1',
+            'mra', 'mde']
     with open(os.path.join(args.outdir, 'udp_file_summary.tsv'), 'w') as fh:
         fh.write('\t'.join(cols) + '\n')
         for r in all_rows:
@@ -390,11 +422,11 @@ def main():
     with open(os.path.join(args.outdir, 'udp_intervals.tsv'), 'w') as fh:
         fh.write('t_start\tfile\tscanid\tdur_s\tnetx_as\tnety_as\tnetz_as\t'
                  'path_total_as\tpath_point_as\tcmean\tcstd\tfixn0\tfixn1\t'
-                 'tazd\tteld\n')
+                 'tazd\tteld\tjit\tmra\tmde\tnet_point_as\n')
         for iv in all_intervals:
             fh.write('%s\t%s\t%s\t%.1f\t%.2f\t%.2f\t%.2f\t%.1f\t%.2f\t'
-                     '%.2f\t%.3f\t%d\t%d\t%.1f\t%.1f\n'
-                     % ((iso(iv[0]),) + iv[1:]))
+                     '%.2f\t%.3f\t%d\t%d\t%.1f\t%.1f\t%.2f\t%.3f\t%.3f\t'
+                     '%.2f\n' % ((iso(iv[0]),) + iv[1:]))
 
     with open(os.path.join(args.outdir, 'udp_fix_events.tsv'), 'w') as fh:
         fh.write('utc\tfile\ttype\told\tnew\tstarCount\n')
@@ -402,51 +434,103 @@ def main():
             fh.write('%s\t%s\t%s\t%s\t%s\t%s\n'
                      % (iso(e[0]), e[1], e[2], e[3], e[4], e[5]))
 
+    # hourly aggregate (bundle)
     with open(os.path.join(args.outdir, 'udp_hourly.tsv'), 'w') as fh:
         fh.write('hour\tnfiles\tmedC_as\tmaxCstd_as\tmedjit_as\t'
                  'medrollrate\ttAzD_as\ttElD_as\n')
         for h in hourly(all_rows):
             fh.write('%s\t%d\t%.1f\t%.3f\t%.2f\t%.0f\t%.0f\t%.0f\n' % h)
 
+    # C on a 0.5-deg sky grid, all files (bundle)
+    grid = {}
+    for r in all_rows:
+        if r.get('cmean') == '' or r.get('mra') == '':
+            continue
+        key = (round(r['mra'] * 2) / 2.0, round(r['mde'] * 2) / 2.0)
+        g = grid.setdefault(key, {'C': [], 'cs': []})
+        g['C'].append(r['cmean'])
+        g['cs'].append(r['cstd'])
+        g['tazd'], g['teld'], g['n'] = r['tazd'], r['teld'], \
+            g.get('n', 0) + 1
+    with open(os.path.join(args.outdir, 'udp_C_grid.tsv'), 'w') as fh:
+        fh.write('ra_bin\tdec_bin\tn\tmedC\tminC\tmaxC\tmedcstd\t'
+                 'tAzD_as\ttElD_as\n')
+        for k in sorted(grid):
+            g = grid[k]
+            fh.write('%.1f\t%.1f\t%d\t%.1f\t%.1f\t%.1f\t%.3f\t%.0f\t%.0f\n'
+                     % (k[0], k[1], g['n'], median(g['C']), min(g['C']),
+                        max(g['C']), median(g['cs']), g['tazd'], g['teld']))
+
+    # clean stare C vs position, deduped by 0.1-deg position + offsets (bundle)
+    sg = {}
+    for r in all_rows:
+        if (r.get('err') or r.get('cmean') == '' or r.get('jit') == ''
+                or r['jit'] >= 30.0 or r.get('cstd') == ''
+                or r['cstd'] >= 0.5):
+            continue
+        key = (round(r['mra'] * 10) / 10.0, round(r['mde'] * 10) / 10.0,
+               round(r['tazd']), round(r['teld']))
+        g = sg.setdefault(key, {'C': []})
+        g['C'].append(r['cmean'])
+        g['cstd'], g['t0'] = r['cstd'], r['t0']
+    with open(os.path.join(args.outdir, 'udp_stare_C.tsv'), 'w') as fh:
+        fh.write('ra\tdec\tn\tmedC\tminC\tmaxC\tcstd\ttAzD_as\ttElD_as\t'
+                 't_last\n')
+        for k in sorted(sg):
+            g = sg[k]
+            fh.write('%.1f\t%.1f\t%d\t%.1f\t%.1f\t%.1f\t%.3f\t%.0f\t%.0f\t'
+                     '%s\n' % (k[0], k[1], len(g['C']), median(g['C']),
+                               min(g['C']), max(g['C']), g['cstd'],
+                               k[2], k[3], g['t0']))
+
+    # stare-only regression (bundle)
     lines, bins = regress(all_intervals)
     with open(os.path.join(args.outdir, 'udp_regress_binned.tsv'), 'w') as fh:
-        fh.write('dur_lo_s\tdur_hi_s\tn\tmed_netx\tmed_nety\tmed_netz\tmedC\n')
+        fh.write('dur_lo_s\tdur_hi_s\tn\tmed_netpoint\tmed_netx\t'
+                 'med_nety\tmed_netz\tmedC\n')
         for b in bins:
-            fh.write('%.0f\t%.0f\t%d\t%.2f\t%.2f\t%.2f\t%.1f\n' % b)
+            fh.write('%.0f\t%.0f\t%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.1f\n' % b)
 
+    # report (bundle)
     with open(os.path.join(args.outdir, 'udp_report.txt'), 'w') as fh:
-        fh.write('GUSTO UDP telemetry extraction report\n')
+        fh.write('GUSTO UDP telemetry extraction report (v1.1)\n')
         fh.write('files processed: %d\n' % len(all_rows))
         ok = [r for r in all_rows if not r.get('err')]
         if ok:
-            fh.write('intervals: %d\n' % len(all_intervals))
-            fh.write('fix events: %d   adj events: %d\n'
-                     % (sum(r.get('nfix') or 0 for r in ok),
+            fh.write('intervals: %d   fix events: %d   adj events: %d\n'
+                     % (len(all_intervals),
+                        sum(r.get('nfix') or 0 for r in ok),
                         sum(r.get('nadj') or 0 for r in ok)))
             cs = [r['cmean'] for r in ok if r.get('cmean') != '']
-            fh.write('C (ra/dec vs attitude offset): median %.1f"  min %.1f  '
-                     'max %.1f\n' % (median(cs), min(cs), max(cs)))
-            unstable = [r for r in ok
-                        if r.get('cstd') != '' and r['cstd'] > 0.5]
-            fh.write('files with C_std > 0.5": %d\n' % len(unstable))
-            js = [r['jit'] for r in ok if r.get('jit') != '']
-            fh.write('pointing jitter: median %.2f"  p90 %.2f"\n'
-                     % (median(js), sorted(js)[int(0.9 * len(js))]))
-            rr = [r['rollrate'] for r in ok if r.get('rollrate') != '']
-            fh.write('roll drift rate: median %.0f"/min  p90 |rate| %.0f"/min\n'
-                     % (median(rr),
-                        sorted(abs(x) for x in rr)[int(0.9 * len(rr))]))
-            oa = [r['oscamp'] for r in ok if r.get('oscamp') != '']
-            fh.write('roll oscillation amplitude: median %.0f"  p90 %.0f"\n'
-                     % (median(oa), sorted(oa)[int(0.9 * len(oa))]))
-            fh.write('q_attT changed within file (nonzero): %d files\n'
-                     % sum(1 for r in ok if r.get('nt_attT')))
-        fh.write('\nbias / scale-factor regression (fix intervals >= 120 s):\n')
+            fh.write('C: median %.1f"  min %.1f  max %.1f\n'
+                     % (median(cs), min(cs), max(cs)))
+            stares = [r for r in ok if r.get('jit') != '' and r['jit'] < 30.0]
+            clean = [r for r in stares
+                     if r.get('cstd') != '' and r['cstd'] < 0.5]
+            fh.write('stare files (jit<30"): %d   clean stares (cstd<0.5"): '
+                     '%d\n' % (len(stares), len(clean)))
+            js = [r['jit'] for r in stares]
+            if js:
+                fh.write('stare jitter: median %.2f"  p90 %.2f"\n'
+                         % (median(js), sorted(js)[int(0.9 * len(js))]))
+            fh.write('C sky grid cells populated: %d\n' % len(grid))
+        fh.write('\nSTARE-ONLY bias / scale-factor regression:\n')
         for ln in lines:
             fh.write('  %s\n' % ln)
-        fh.write('\nuploads to chat: udp_hourly.tsv + udp_regress_binned.tsv'
-                 ' + udp_report.txt (keep the rest local)\n')
+        fh.write('\nUPLOAD upload/udp_v11.tar.gz (rename .txt if needed) -'
+                 ' nothing else\n')
     print('done: %d files -> %s' % (len(all_rows), args.outdir))
+
+    # gzipped upload bundle
+    updir = os.path.join(args.outdir, 'upload')
+    os.makedirs(updir, exist_ok=True)
+    bundle = os.path.join(updir, 'udp_v11.tar.gz')
+    with tarfile.open(bundle, 'w:gz') as tar:
+        for fn in ('udp_report.txt', 'udp_regress_binned.tsv',
+                   'udp_C_grid.tsv', 'udp_stare_C.tsv', 'udp_hourly.tsv'):
+            tar.add(os.path.join(args.outdir, fn), arcname=fn)
+    print('upload bundle: %s (%d bytes)'
+          % (bundle, os.path.getsize(bundle)))
 
 
 if __name__ == '__main__':
