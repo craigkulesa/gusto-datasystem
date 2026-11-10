@@ -96,6 +96,8 @@ def make_gusto_array(directory, linename, mx, vel_vector, coordType, args):
         vlsr = (np.arange(npix) - VLSR_pix) * VLSR_del + VLSR_val
         qsort = vlsr.argsort()
         vlsr  = vlsr[qsort]          # sorted in-place equivalent, keeps qsort valid
+        # also sort the sequence IDs
+        seqid = seqid[qsort]
 
         line_freq = hdr['LINEFREQ']
 
